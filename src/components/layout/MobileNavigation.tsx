@@ -1,5 +1,5 @@
 
-import { Home, Users, Calendar, Building, User } from "lucide-react";
+import { Home, Fish, Package, ShoppingCart, Users } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +10,10 @@ const MobileNavigation = () => {
 
   const mobileNavItems = [
     { name: "Dashboard", href: "/", icon: Home },
-    { name: "Users", href: "/users", icon: Users },
-    { name: "Bookings", href: "/bookings", icon: Calendar },
-    { name: "Guests", href: "/guests", icon: User },
-    { name: "Staff", href: "/staff", icon: Users },
+    { name: "Inventory", href: "/inventory", icon: Fish },
+    { name: "Products", href: "/products", icon: Package },
+    { name: "Orders", href: "/orders", icon: ShoppingCart },
+    { name: "Customers", href: "/customers", icon: Users },
   ];
 
   return (

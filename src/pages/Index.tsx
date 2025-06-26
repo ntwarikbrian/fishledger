@@ -1,115 +1,118 @@
 
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building, Calendar, CreditCard, Users } from "lucide-react";
+import { Fish, Package, ShoppingCart, TrendingUp, AlertTriangle, DollarSign, Users, Clock } from "lucide-react";
 
 const Dashboard = () => {
   return (
     <AppLayout>
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, Admin</p>
+          <h1 className="text-3xl font-bold">Fish Sales Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, Sales Manager</p>
         </div>
         
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">245</div>
+              <div className="text-2xl font-bold">$18,450</div>
               <p className="text-xs text-muted-foreground">+15% from last month</p>
             </CardContent>
           </Card>
-          
+
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Products in Stock</CardTitle>
+              <Package className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$15,243</div>
-              <p className="text-xs text-muted-foreground">+5% from last month</p>
+              <div className="text-2xl font-bold">12</div>
+              <p className="text-xs text-muted-foreground">5 different fish types</p>
             </CardContent>
           </Card>
-          
+
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">345</div>
-              <p className="text-xs text-muted-foreground">+32 new users</p>
+              <div className="text-2xl font-bold">8</div>
+              <p className="text-xs text-muted-foreground">Need processing</p>
             </CardContent>
           </Card>
-          
+
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Available Rooms</CardTitle>
-              <Building className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+              <Users className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">28</div>
-              <p className="text-xs text-muted-foreground">78% occupancy rate</p>
+              <div className="text-2xl font-bold">24</div>
+              <p className="text-xs text-muted-foreground">6 new this month</p>
             </CardContent>
           </Card>
         </div>
         
-        {/* Recent Bookings */}
+        {/* Recent Sales Activities */}
         <Card className="hover-card">
           <CardHeader>
-            <CardTitle>Recent Bookings</CardTitle>
-            <CardDescription>Overview of the latest bookings in your property</CardDescription>
+            <CardTitle>Recent Sales Activities</CardTitle>
+            <CardDescription>Overview of the latest sales and order activities</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-2 text-sm">Guest</th>
-                    <th className="text-left py-3 px-2 text-sm">Room</th>
-                    <th className="text-left py-3 px-2 text-sm">Check-in</th>
-                    <th className="text-left py-3 px-2 text-sm">Check-out</th>
-                    <th className="text-right py-3 px-2 text-sm">Amount</th>
+                    <th className="text-left py-3 px-2 text-sm">Activity</th>
+                    <th className="text-left py-3 px-2 text-sm">Customer</th>
+                    <th className="text-left py-3 px-2 text-sm">Product</th>
+                    <th className="text-left py-3 px-2 text-sm">Amount</th>
+                    <th className="text-left py-3 px-2 text-sm">Date</th>
+                    <th className="text-right py-3 px-2 text-sm">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array(5)
-                    .fill(0)
-                    .map((_, index) => (
+                  {[
+                    { activity: 'New Order', customer: 'Ocean View Restaurant', product: 'Atlantic Salmon (15kg)', amount: '$277.50', date: 'Jan 22, 2024', status: 'Processing' },
+                    { activity: 'Order Delivered', customer: 'Fresh Market Co', product: 'Tilapia Fillets (20 boxes)', amount: '$259.80', date: 'Jan 22, 2024', status: 'Completed' },
+                    { activity: 'Payment Received', customer: 'John Smith', product: 'Atlantic Salmon (2 boxes)', amount: '$51.98', date: 'Jan 21, 2024', status: 'Completed' },
+                    { activity: 'Order Cancelled', customer: 'Metro Supermarket', product: 'Rainbow Trout (30kg)', amount: '$401.63', date: 'Jan 21, 2024', status: 'Cancelled' },
+                    { activity: 'New Customer', customer: 'Seaside Bistro', product: 'Registration', amount: '-', date: 'Jan 20, 2024', status: 'Active' }
+                  ].map((activity, index) => (
                       <tr key={index} className="border-b">
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-emplify-100 flex items-center justify-center">
-                              <span className="font-medium text-emplify-600">
-                                {['JD', 'AS', 'RK', 'MT', 'BL'][index]}
-                              </span>
-                            </div>
+                            {activity.activity === 'New Order' && <ShoppingCart className="h-4 w-4 text-blue-600" />}
+                            {activity.activity === 'Order Delivered' && <Package className="h-4 w-4 text-green-600" />}
+                            {activity.activity === 'Payment Received' && <DollarSign className="h-4 w-4 text-green-600" />}
+                            {activity.activity === 'Order Cancelled' && <AlertTriangle className="h-4 w-4 text-red-600" />}
+                            {activity.activity === 'New Customer' && <Users className="h-4 w-4 text-purple-600" />}
                             <div>
-                              <p className="font-medium">
-                                {['John Doe', 'Alice Smith', 'Robert Kim', 'Maria Torres', 'Ben Lewis'][index]}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {['2 adults', '1 adult', '2 adults, 1 child', '4 adults', '3 adults'][index]}
-                              </p>
+                              <div className="font-medium">{activity.activity}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-2">
-                          {['Suite 101', 'Deluxe 204', 'Standard 312', 'Premium 405', 'Suite 107'][index]}
-                        </td>
-                        <td className="py-3 px-2">
-                          {['May 15, 2025', 'May 16, 2025', 'May 16, 2025', 'May 17, 2025', 'May 18, 2025'][index]}
-                        </td>
-                        <td className="py-3 px-2">
-                          {['May 18, 2025', 'May 20, 2025', 'May 19, 2025', 'May 22, 2025', 'May 20, 2025'][index]}
-                        </td>
-                        <td className="py-3 px-2 text-right font-medium">
-                          ${['450', '320', '280', '520', '450'][index]}
+                        <td className="py-3 px-2">{activity.customer}</td>
+                        <td className="py-3 px-2 text-muted-foreground">{activity.product}</td>
+                        <td className="py-3 px-2 font-medium">{activity.amount}</td>
+                        <td className="py-3 px-2">{activity.date}</td>
+                        <td className="py-3 px-2 text-right">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                            activity.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                            activity.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
+                            activity.status === 'Active' ? 'bg-purple-100 text-purple-800' :
+                            activity.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {activity.status}
+                          </span>
                         </td>
                       </tr>
                     ))}

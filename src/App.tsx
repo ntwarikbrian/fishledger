@@ -5,10 +5,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Index";
-import Users from "./pages/Users";
-import Bookings from "./pages/Bookings";
-import Staff from "./pages/Staff";
-import Guests from "./pages/Guests";
+import ProductInventory from "./pages/ProductInventory";
+import ProductCatalog from "./pages/ProductCatalog";
+import Sales from "./pages/Sales";
+import Orders from "./pages/Orders";
+import Customers from "./pages/Customers";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,10 +23,12 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/guests" element={<Guests />} />
+          <Route path="/inventory" element={<ProductInventory />} />
+          <Route path="/products" element={<ProductCatalog />} />
+          <Route path="/sales" element={<Sales />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

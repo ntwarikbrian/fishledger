@@ -1,6 +1,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Users, Calendar, Building, User, MenuIcon } from "lucide-react";
+import { Home, Fish, Package, ShoppingCart, Users, TrendingUp, FileText, MenuIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   Sidebar as SidebarContainer, 
@@ -17,10 +17,12 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Bookings", href: "/bookings", icon: Calendar },
-  { name: "Guests", href: "/guests", icon: User },
-  { name: "Staff", href: "/staff", icon: Users },
+  { name: "Product Inventory", href: "/inventory", icon: Fish },
+  { name: "Product Catalog", href: "/products", icon: Package },
+  { name: "Orders", href: "/orders", icon: ShoppingCart },
+  { name: "Customers", href: "/customers", icon: Users },
+  { name: "Sales & Analytics", href: "/sales", icon: TrendingUp },
+  { name: "Reports", href: "/reports", icon: FileText },
 ];
 
 const Sidebar = () => {
@@ -32,8 +34,8 @@ const Sidebar = () => {
     <SidebarContainer className="hidden md:flex">
       <SidebarHeader className="flex h-14 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
-          <Building className="h-6 w-6 text-emplify-600" />
-          <span className="text-xl font-semibold">Emplify</span>
+          <Fish className="h-6 w-6 text-blue-600" />
+          <span className="text-xl font-semibold">AquaManage</span>
         </div>
         <SidebarTrigger>
           <MenuIcon className="h-4 w-4" />

@@ -28,7 +28,7 @@ const Navbar = () => {
           <MenuIcon className="h-5 w-5" />
           <span className="sr-only">Toggle menu</span>
         </Button>
-        <h1 className="font-semibold">Emplify</h1>
+        <h1 className="font-semibold">FishSell Pro</h1>
       </div>
       
       {/* Right side - Account & action buttons */}
