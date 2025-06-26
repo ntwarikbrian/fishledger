@@ -136,6 +136,23 @@
     animation: shimmer 3s infinite;
   }
 
+  /* Ensure gradient text fallback */
+  .gradient-text {
+    background: linear-gradient(to right, #2563eb, #9333ea, #4f46e5);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* Fallback for browsers that don't support background-clip: text */
+  @supports not (background-clip: text) or not (-webkit-background-clip: text) {
+    .gradient-text {
+      color: #2563eb;
+      -webkit-text-fill-color: initial;
+    }
+  }
+
   .welcome-glow {
     box-shadow:
       0 0 15px rgba(59, 130, 246, 0.08),

@@ -48,12 +48,12 @@ const Dashboard = () => {
     <AppLayout>
       <div className="space-y-4">
         {/* Beautiful Welcome Section */}
-        <div className="relative overflow-hidden welcome-glow">
+        <div className="relative overflow-hidden welcome-glow rounded-3xl">
           {/* Background Gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 rounded-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 rounded-3xl" />
 
           {/* Animated Background Elements */}
-          <div className="absolute inset-0 overflow-hidden rounded-2xl">
+          <div className="absolute inset-0 overflow-hidden rounded-3xl">
             <div className="floating-element absolute -top-2 -right-2 w-16 h-16 bg-blue-200/30 dark:bg-blue-800/20 rounded-full" />
             <div className="floating-element absolute top-4 right-8 w-12 h-12 bg-purple-200/30 dark:bg-purple-800/20 rounded-full" />
             <div className="floating-element absolute bottom-2 left-4 w-14 h-14 bg-indigo-200/30 dark:bg-indigo-800/20 rounded-full" />
@@ -78,9 +78,11 @@ const Dashboard = () => {
                     </span>
                   </div>
 
-                  <h1 className="relative text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent leading-tight">
-                    <span className="relative z-10">{getGreeting()}, Admin! 👋</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent opacity-50 text-shimmer" />
+                  <h1 className="text-2xl lg:text-3xl font-bold leading-tight">
+                    <span className="gradient-text">
+                      {getGreeting()}, Admin!
+                    </span>
+                    <span className="ml-2 text-gray-800 dark:text-gray-100">👋</span>
                   </h1>
 
                   <p className="text-sm text-muted-foreground/80 font-medium">
