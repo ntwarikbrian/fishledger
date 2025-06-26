@@ -14,7 +14,10 @@ import Staff from "./pages/Staff";
 import Expenses from "./pages/Expenses";
 import Documents from "./pages/Documents";
 import Reports from "./pages/Reports";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import AuthGuard from "./components/auth/AuthGuard";
 
 const queryClient = new QueryClient();
 
@@ -26,15 +29,20 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/inventory" element={<ProductInventory />} />
-            <Route path="/sales" element={<Sales />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/quick-math" element={<QuickMath />} />
-            <Route path="/staff" element={<Staff />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/reports" element={<Reports />} />
+            {/* Authentication Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* Protected Main Application Routes */}
+            <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
+            <Route path="/inventory" element={<AuthGuard><ProductInventory /></AuthGuard>} />
+            <Route path="/sales" element={<AuthGuard><Sales /></AuthGuard>} />
+            <Route path="/customers" element={<AuthGuard><Customers /></AuthGuard>} />
+            <Route path="/quick-math" element={<AuthGuard><QuickMath /></AuthGuard>} />
+            <Route path="/staff" element={<AuthGuard><Staff /></AuthGuard>} />
+            <Route path="/expenses" element={<AuthGuard><Expenses /></AuthGuard>} />
+            <Route path="/documents" element={<AuthGuard><Documents /></AuthGuard>} />
+            <Route path="/reports" element={<AuthGuard><Reports /></AuthGuard>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

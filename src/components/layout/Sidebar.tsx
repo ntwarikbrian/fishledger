@@ -1,6 +1,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Calculator } from "lucide-react";
+import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Calculator, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,13 +27,13 @@ import {
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Product Inventory", href: "/inventory", icon: Fish },
-  { name: "Customers", href: "/customers", icon: Users },
   { name: "Sales & Analytics", href: "/sales", icon: TrendingUp },
+  { name: "Contacts", href: "/customers", icon: Users },
   { name: "Quick Math", href: "/quick-math", icon: Calculator },
-  { name: "Staff", href: "/staff", icon: Users },
   { name: "Expenses", href: "/expenses", icon: DollarSign },
   { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Workers", href: "/staff", icon: Users },
 ];
 
 const Sidebar = () => {
@@ -44,17 +44,22 @@ const Sidebar = () => {
 
   // Handle logout functionality
   const handleLogout = () => {
-    // Add confirmation dialog
     const confirmed = window.confirm("Are you sure you want to logout?");
     if (confirmed) {
-      // Add your logout logic here
-      console.log("Logging out...");
-      // For example: clear tokens, redirect to login, etc.
-      // localStorage.removeItem("authToken");
-      // navigate("/login");
-      alert("Logout functionality would be implemented here");
+      // Clear authentication data
+      localStorage.removeItem("userType");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("workerId");
+
+      // Redirect to login page
+      navigate("/login");
     }
   };
+
+  // Get current user info
+  const userType = localStorage.getItem("userType");
+  const userEmail = localStorage.getItem("userEmail");
+  const workerId = localStorage.getItem("workerId");
 
   return (
     <SidebarContainer collapsible="icon">
@@ -112,14 +117,20 @@ const Sidebar = () => {
           <div className="flex flex-col items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="h-8 w-8 rounded-full bg-emplify-100 flex items-center justify-center cursor-pointer">
-                  <span className="font-medium text-emplify-600">AD</span>
+                <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center cursor-pointer">
+                  <span className="font-medium text-blue-600 dark:text-blue-300">
+                    {userType === "admin" ? "AD" : "WK"}
+                  </span>
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right">
                 <div>
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-muted-foreground">admin@emplify.com</p>
+                  <p className="text-sm font-medium">
+                    {userType === "admin" ? "Admin User" : "Worker"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {userType === "admin" ? userEmail : `Worker ID: ${workerId}`}
+                  </p>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -144,12 +155,18 @@ const Sidebar = () => {
           // Expanded state - show user info and logout button
           <>
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-emplify-100 flex items-center justify-center">
-                <span className="font-medium text-emplify-600">AD</span>
+              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                <span className="font-medium text-blue-600 dark:text-blue-300">
+                  {userType === "admin" ? "AD" : "WK"}
+                </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">Admin User</p>
-                <p className="text-xs text-muted-foreground">admin@emplify.com</p>
+                <p className="text-sm font-medium">
+                  {userType === "admin" ? "Admin User" : "Worker"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {userType === "admin" ? userEmail : `Worker ID: ${workerId}`}
+                </p>
               </div>
               <Button
                 variant="ghost"

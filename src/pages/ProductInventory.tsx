@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Fish, Search, Filter, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, Archive, Plus, FileText, Save } from "lucide-react";
+import { Fish, Search, Filter, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, Archive, Plus, FileText, Save, DollarSign, TrendingUp, Calculator } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -55,6 +55,8 @@ const ProductInventory = () => {
       sellingType: "Both", // Boxed and Weight-based
       pricePerBox: 25.99,
       pricePerKg: 18.50,
+      costPerBox: 18.50, // Cost price for boxes
+      costPerKg: 13.20, // Cost price per kg
       boxWeight: "1.5 kg",
       status: "In Stock",
       expiryDate: "2024-02-15",
@@ -70,6 +72,8 @@ const ProductInventory = () => {
       sellingType: "Weight-based",
       pricePerBox: 0, // Not sold in boxes
       pricePerKg: 15.75,
+      costPerBox: 0,
+      costPerKg: 11.20,
       boxWeight: "N/A",
       status: "Low Stock",
       expiryDate: "2024-02-12",
@@ -85,6 +89,8 @@ const ProductInventory = () => {
       sellingType: "Boxed",
       pricePerBox: 12.99,
       pricePerKg: 0,
+      costPerBox: 9.50,
+      costPerKg: 0,
       boxWeight: "800g",
       status: "In Stock",
       expiryDate: "2024-02-18",
@@ -100,6 +106,8 @@ const ProductInventory = () => {
       sellingType: "Both",
       pricePerBox: 32.50,
       pricePerKg: 22.00,
+      costPerBox: 24.00,
+      costPerKg: 16.50,
       boxWeight: "1.2 kg",
       status: "In Stock",
       expiryDate: "2024-02-14",
@@ -115,6 +123,8 @@ const ProductInventory = () => {
       sellingType: "Weight-based",
       pricePerBox: 0,
       pricePerKg: 24.99,
+      costPerBox: 0,
+      costPerKg: 18.75,
       boxWeight: "N/A",
       status: "Critical Stock",
       expiryDate: "2024-02-10",
@@ -516,6 +526,52 @@ const ProductInventory = () => {
     }
   };
 
+  // Calculate inventory totals
+  const calculateInventoryTotals = () => {
+    let totalValue = 0;
+    let totalCostPrice = 0;
+    let totalProfit = 0;
+
+    productData.forEach(product => {
+      // Calculate value and cost based on selling type
+      if (product.sellingType === "Both") {
+        // For products sold both ways, calculate based on available stock
+        const boxValue = product.stockQuantity * product.pricePerBox;
+        const weightValue = product.stockWeight * product.pricePerKg;
+        const boxCost = product.stockQuantity * product.costPerBox;
+        const weightCost = product.stockWeight * product.costPerKg;
+
+        totalValue += boxValue + weightValue;
+        totalCostPrice += boxCost + weightCost;
+      } else if (product.sellingType === "Boxed") {
+        // Only boxed sales
+        const value = product.stockQuantity * product.pricePerBox;
+        const cost = product.stockQuantity * product.costPerBox;
+
+        totalValue += value;
+        totalCostPrice += cost;
+      } else if (product.sellingType === "Weight-based") {
+        // Only weight-based sales
+        const value = product.stockWeight * product.pricePerKg;
+        const cost = product.stockWeight * product.costPerKg;
+
+        totalValue += value;
+        totalCostPrice += cost;
+      }
+    });
+
+    totalProfit = totalValue - totalCostPrice;
+
+    return {
+      totalValue: Math.round(totalValue * 100) / 100,
+      totalCostPrice: Math.round(totalCostPrice * 100) / 100,
+      totalProfit: Math.round(totalProfit * 100) / 100,
+      profitMargin: totalValue > 0 ? Math.round((totalProfit / totalValue) * 100 * 100) / 100 : 0
+    };
+  };
+
+  const totals = calculateInventoryTotals();
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -524,6 +580,8 @@ const ProductInventory = () => {
           <h1 className="text-3xl font-bold">Product Inventory</h1>
           <p className="text-muted-foreground">Manage fish products, stock levels, and pricing</p>
         </div>
+
+
 
 
 
@@ -626,6 +684,110 @@ const ProductInventory = () => {
                 {renderCurrentView()}
               </CardContent>
             </Card>
+
+            {/* Inventory Summary Cards - Below Product List */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-4 text-center">Inventory Financial Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Total Inventory Value */}
+                <Card className="hover-card bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Inventory Value</CardTitle>
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      ${totals.totalValue.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Current selling price value
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Total Cost Price */}
+                <Card className="hover-card bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border-orange-200 dark:border-orange-800">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-orange-900 dark:text-orange-100">Total Cost Price</CardTitle>
+                    <Calculator className="h-4 w-4 text-orange-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                      ${totals.totalCostPrice.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-orange-700 dark:text-orange-300">
+                      Total investment in stock
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Total Potential Profit */}
+                <Card className="hover-card bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Potential Profit</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      ${totals.totalProfit.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300">
+                      If all stock is sold
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Profit Margin */}
+                <Card className={`hover-card border-2 ${
+                  totals.profitMargin >= 30
+                    ? 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border-emerald-200 dark:border-emerald-800'
+                    : totals.profitMargin >= 15
+                    ? 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800'
+                    : 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200 dark:border-red-800'
+                }`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className={`text-sm font-medium ${
+                      totals.profitMargin >= 30
+                        ? 'text-emerald-900 dark:text-emerald-100'
+                        : totals.profitMargin >= 15
+                        ? 'text-yellow-900 dark:text-yellow-100'
+                        : 'text-red-900 dark:text-red-100'
+                    }`}>
+                      Profit Margin
+                    </CardTitle>
+                    <TrendingUp className={`h-4 w-4 ${
+                      totals.profitMargin >= 30
+                        ? 'text-emerald-600'
+                        : totals.profitMargin >= 15
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
+                    }`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${
+                      totals.profitMargin >= 30
+                        ? 'text-emerald-900 dark:text-emerald-100'
+                        : totals.profitMargin >= 15
+                        ? 'text-yellow-900 dark:text-yellow-100'
+                        : 'text-red-900 dark:text-red-100'
+                    }`}>
+                      {totals.profitMargin}%
+                    </div>
+                    <p className={`text-xs ${
+                      totals.profitMargin >= 30
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : totals.profitMargin >= 15
+                        ? 'text-yellow-700 dark:text-yellow-300'
+                        : 'text-red-700 dark:text-red-300'
+                    }`}>
+                      {totals.profitMargin >= 30 && "Excellent margin"}
+                      {totals.profitMargin >= 15 && totals.profitMargin < 30 && "Good margin"}
+                      {totals.profitMargin < 15 && "Low margin"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Add Product Tab Content */}
