@@ -3,19 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Fish, 
-  Eye, 
-  EyeOff, 
-  User, 
-  Lock, 
+import {
+  Fish,
+  Eye,
+  EyeOff,
+  User,
+  Lock,
   Mail,
-  UserCheck,
-  Users
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
+import { Separator } from "@/components/ui/separator";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -65,124 +66,132 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950 dark:via-indigo-950 dark:to-purple-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
         {/* Logo and Header */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <div className="p-3 bg-blue-600 rounded-full">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
               <Fish className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
               AquaManage
             </h1>
           </div>
-          <p className="text-muted-foreground">
-            Fish Selling Management System
+          <p className="text-gray-600 dark:text-gray-400 text-lg">
+            Welcome back to your fish business
           </p>
         </div>
 
         {/* Login Form */}
-        <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Sign in to your account to continue
+        <Card className="shadow-2xl border-0 bg-white dark:bg-gray-900">
+          <CardHeader className="text-center pb-6">
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+              Sign In
+            </CardTitle>
+            <p className="text-gray-600 dark:text-gray-400">
+              Choose your account type to continue
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <Tabs value={loginType} onValueChange={(value) => setLoginType(value as "admin" | "worker")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="admin" className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4" />
+              <TabsList className="grid w-full grid-cols-2 mb-8 h-12 bg-gray-100 dark:bg-gray-800">
+                <TabsTrigger value="admin" className="h-10 text-sm font-medium">
                   Admin
                 </TabsTrigger>
-                <TabsTrigger value="worker" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
+                <TabsTrigger value="worker" className="h-10 text-sm font-medium">
                   Worker
                 </TabsTrigger>
               </TabsList>
 
-              <form onSubmit={handleLogin} className="space-y-4">
-                <TabsContent value="admin" className="space-y-4 mt-0">
+              <form onSubmit={handleLogin} className="space-y-6">
+                <TabsContent value="admin" className="space-y-5 mt-0">
                   {/* Admin Login Fields */}
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Email Address
+                    </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="admin@aquamanage.com"
+                        placeholder="Enter your email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 h-11"
+                        className="pl-11 h-12 border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Password
+                    </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-11"
+                        className="pl-11 pr-11 h-12 border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="worker" className="space-y-4 mt-0">
+                <TabsContent value="worker" className="space-y-5 mt-0">
                   {/* Worker Login Fields */}
                   <div className="space-y-2">
-                    <Label htmlFor="workerId">Worker ID</Label>
+                    <Label htmlFor="workerId" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Worker ID
+                    </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
                         id="workerId"
                         type="text"
                         placeholder="Enter your Worker ID"
                         value={workerId}
                         onChange={(e) => setWorkerId(e.target.value)}
-                        className="pl-10 h-11"
+                        className="pl-11 h-12 border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="workerPassword">Password</Label>
+                    <Label htmlFor="workerPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Password
+                    </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
                         id="workerPassword"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-11"
+                        className="pl-11 pr-11 h-12 border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
@@ -190,25 +199,35 @@ const Login = () => {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
                   </div>
                 )}
 
                 {/* Login Button */}
-                <Button 
-                  type="submit" 
-                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
 
                 {/* Forgot Password */}
-                <div className="text-center">
+                <div className="text-center pt-2">
                   <button
                     type="button"
-                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="text-sm text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                   >
                     Forgot your password?
                   </button>
@@ -219,30 +238,31 @@ const Login = () => {
         </Card>
 
         {/* Registration Link */}
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">
+        <div className="text-center mt-8">
+          <Separator className="my-6" />
+          <p className="text-gray-600 dark:text-gray-400">
             Don't have an admin account?{" "}
             <button
               onClick={() => navigate("/register")}
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline underline-offset-4"
             >
-              Register here
+              Create one here
             </button>
           </p>
         </div>
 
         {/* Demo Credentials */}
-        <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+        <Card className="mt-6 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardContent className="pt-4">
-            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Demo Credentials</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">Admin</Badge>
-                <span className="text-blue-800 dark:text-blue-200">admin@aquamanage.com / admin123</span>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 text-center">Demo Credentials</h4>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 rounded">
+                <Badge variant="secondary" className="text-xs">Admin</Badge>
+                <span className="text-gray-700 dark:text-gray-300 font-mono text-xs">admin@aquamanage.com / admin123</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">Worker</Badge>
-                <span className="text-blue-800 dark:text-blue-200">Any Worker ID / any password</span>
+              <div className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 rounded">
+                <Badge variant="secondary" className="text-xs">Worker</Badge>
+                <span className="text-gray-700 dark:text-gray-300 font-mono text-xs">Any Worker ID / any password</span>
               </div>
             </div>
           </CardContent>
