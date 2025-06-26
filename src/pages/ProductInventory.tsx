@@ -2,7 +2,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Fish, PlusCircle, Search, Filter, Edit, Trash2, Package, Scale } from "lucide-react";
+import { Fish, PlusCircle, Search, Filter, Edit, Trash2, Package, Scale, Snowflake, TrendingUp, History, ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   Select,
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ProductInventory = () => {
   // Mock data for fish product inventory - focused on selling business
@@ -133,8 +134,8 @@ const ProductInventory = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Product Inventory</h1>
-            <p className="text-muted-foreground">Manage fish products, stock levels, and pricing</p>
+            <h1 className="text-3xl font-bold">Inventory Management</h1>
+            <p className="text-muted-foreground">Manage everything related to your fish stock</p>
           </div>
           <Button className="bg-blue-600 hover:bg-blue-700">
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
@@ -190,141 +191,231 @@ const ProductInventory = () => {
           </Card>
         </div>
 
-        {/* Filters and Search */}
+        {/* Inventory Management */}
         <Card>
           <CardHeader>
-            <CardTitle>Product Inventory Management</CardTitle>
+            <CardTitle>Inventory Management</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Search products..."
-                    className="pl-10"
-                  />
+            <Tabs defaultValue="fish-types" className="w-full">
+              <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="fish-types">🐟 Fish Types</TabsTrigger>
+                <TabsTrigger value="stock-box">📦 Stock by Box</TabsTrigger>
+                <TabsTrigger value="stock-kg">⚖️ Stock by Kilogram</TabsTrigger>
+                <TabsTrigger value="frozen-fresh">🧊 Frozen vs Fresh</TabsTrigger>
+                <TabsTrigger value="stock-records">📝 Stock In/Out</TabsTrigger>
+                <TabsTrigger value="stock-history">🔍 Stock History</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="fish-types" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Fish Types Management</h3>
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Fish Type
+                  </Button>
                 </div>
-              </div>
-              
-              <Select>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="premium">Premium Fish</SelectItem>
-                  <SelectItem value="freshwater">Fresh Water Fish</SelectItem>
-                  <SelectItem value="processed">Processed Fish</SelectItem>
-                  <SelectItem value="white">White Fish</SelectItem>
-                </SelectContent>
-              </Select>
 
-              <Select>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="in-stock">In Stock</SelectItem>
-                  <SelectItem value="low-stock">Low Stock</SelectItem>
-                  <SelectItem value="critical">Critical Stock</SelectItem>
-                  <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" className="w-full md:w-auto">
-                <Filter className="mr-2 h-4 w-4" /> Apply Filters
-              </Button>
-            </div>
-
-            {/* Product Inventory Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-2 text-sm font-medium">Product</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Category</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Stock</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Selling Type</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Pricing</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Status</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">Expiry</th>
-                    <th className="text-right py-3 px-2 text-sm font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productData.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2">
-                        <div className="flex items-center gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from(new Set(productData.map(p => p.category))).map((category) => (
+                    <Card key={category} className="hover-card">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
                           <Fish className="h-4 w-4 text-blue-600" />
-                          <div>
-                            <span className="font-medium">{product.name}</span>
-                            <p className="text-xs text-muted-foreground">{product.supplier}</p>
-                          </div>
+                          {category}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {productData.filter(p => p.category === category).length}
                         </div>
-                      </td>
-                      <td className="py-3 px-2 text-sm text-muted-foreground">
-                        {product.category}
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="text-sm">
-                          {product.sellingType === "Weight-based" ? (
-                            <span>{product.stockWeight} kg</span>
-                          ) : product.sellingType === "Boxed" ? (
-                            <span>{product.stockQuantity} boxes</span>
-                          ) : (
-                            <div>
-                              <div>{product.stockQuantity} boxes</div>
-                              <div className="text-xs text-muted-foreground">{product.stockWeight} kg</div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex items-center gap-1">
-                          {getSellingTypeIcon(product.sellingType)}
-                          <span className="text-sm">{product.sellingType}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="text-sm">
-                          {product.sellingType === "Weight-based" ? (
-                            <span>${product.pricePerKg}/kg</span>
-                          ) : product.sellingType === "Boxed" ? (
-                            <span>${product.pricePerBox}/box</span>
-                          ) : (
-                            <div>
-                              <div>${product.pricePerBox}/box</div>
-                              <div className="text-xs text-muted-foreground">${product.pricePerKg}/kg</div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <Badge className={getStatusColor(product.status)}>
-                          {product.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-2 text-sm">
-                        {product.expiryDate}
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+                        <p className="text-xs text-muted-foreground">Products in category</p>
+                      </CardContent>
+                    </Card>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search fish types..."
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button variant="outline">
+                      <Filter className="mr-2 h-4 w-4" /> Filter
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-2 text-sm font-medium">Fish Type</th>
+                          <th className="text-left py-3 px-2 text-sm font-medium">Category</th>
+                          <th className="text-left py-3 px-2 text-sm font-medium">Total Stock</th>
+                          <th className="text-left py-3 px-2 text-sm font-medium">Selling Methods</th>
+                          <th className="text-left py-3 px-2 text-sm font-medium">Status</th>
+                          <th className="text-right py-3 px-2 text-sm font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {productData.map((product) => (
+                          <tr key={product.id} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-2">
+                                <Fish className="h-4 w-4 text-blue-600" />
+                                <div>
+                                  <span className="font-medium">{product.name}</span>
+                                  <p className="text-xs text-muted-foreground">{product.supplier}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 text-sm text-muted-foreground">
+                              {product.category}
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="text-sm">
+                                {product.sellingType === "Weight-based" ? (
+                                  <span>{product.stockWeight} kg</span>
+                                ) : product.sellingType === "Boxed" ? (
+                                  <span>{product.stockQuantity} boxes</span>
+                                ) : (
+                                  <div>
+                                    <div>{product.stockQuantity} boxes</div>
+                                    <div className="text-xs text-muted-foreground">{product.stockWeight} kg</div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-1">
+                                {product.sellingType === "Both" ? (
+                                  <div className="flex gap-1">
+                                    <Package className="h-3 w-3" />
+                                    <Scale className="h-3 w-3" />
+                                  </div>
+                                ) : product.sellingType === "Boxed" ? (
+                                  <Package className="h-3 w-3" />
+                                ) : (
+                                  <Scale className="h-3 w-3" />
+                                )}
+                                <span className="text-sm">{product.sellingType}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2">
+                              <Badge className={product.status === "In Stock" ? "bg-green-100 text-green-800" :
+                                              product.status === "Low Stock" ? "bg-yellow-100 text-yellow-800" :
+                                              "bg-red-100 text-red-800"}>
+                                {product.status}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="stock-box" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Stock by Box</h3>
+                  <div className="text-sm text-muted-foreground">
+                    Total: {productData.filter(p => p.sellingType === "Boxed" || p.sellingType === "Both").reduce((sum, p) => sum + p.stockQuantity, 0)} boxes
+                  </div>
+                </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-4" />
+                  <p>Manage fish products sold in boxes</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="stock-kg" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Stock by Kilogram</h3>
+                  <div className="text-sm text-muted-foreground">
+                    Total: {productData.filter(p => p.sellingType === "Weight-based" || p.sellingType === "Both").reduce((sum, p) => sum + p.stockWeight, 0).toFixed(1)} kg
+                  </div>
+                </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Scale className="h-12 w-12 mx-auto mb-4" />
+                  <p>Manage fish products sold by weight</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="frozen-fresh" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Frozen vs Fresh Stock</h3>
+                  <Button variant="outline">
+                    <Snowflake className="mr-2 h-4 w-4" /> Toggle Storage Type
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="hover-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Snowflake className="h-4 w-4 text-blue-600" />
+                        Frozen Stock
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">65%</div>
+                      <p className="text-xs text-muted-foreground">Of total inventory</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="hover-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Fish className="h-4 w-4 text-green-600" />
+                        Fresh Stock
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">35%</div>
+                      <p className="text-xs text-muted-foreground">Of total inventory</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="stock-records" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Stock In/Out Records</h3>
+                  <Button className="bg-green-600 hover:bg-green-700">
+                    <ArrowUpDown className="mr-2 h-4 w-4" /> Record Transaction
+                  </Button>
+                </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4" />
+                  <p>Track all stock movements and transactions</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="stock-history" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Stock History</h3>
+                  <Button variant="outline">
+                    <History className="mr-2 h-4 w-4" /> View Full History
+                  </Button>
+                </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <History className="h-12 w-12 mx-auto mb-4" />
+                  <p>Trace movement and changes in your inventory</p>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
