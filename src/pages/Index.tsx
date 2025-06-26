@@ -1,15 +1,129 @@
 
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Fish, Package, ShoppingCart, TrendingUp, AlertTriangle, DollarSign, Users, Clock } from "lucide-react";
+import { Fish, Package, ShoppingCart, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Sparkles, Waves } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const Dashboard = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    // Trigger animations on mount
+    setIsVisible(true);
+
+    // Update time every minute
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  const formatTime = () => {
+    return currentTime.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDate = () => {
+    return currentTime.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
     <AppLayout>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Fish Sales Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, Sales Manager</p>
+      <div className="space-y-6">
+        {/* Beautiful Welcome Section */}
+        <div className="relative overflow-hidden welcome-glow">
+          {/* Background Gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 rounded-2xl" />
+
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 overflow-hidden rounded-2xl">
+            <div className="floating-element absolute -top-4 -right-4 w-24 h-24 bg-blue-200/30 dark:bg-blue-800/20 rounded-full" />
+            <div className="floating-element absolute top-8 right-16 w-16 h-16 bg-purple-200/30 dark:bg-purple-800/20 rounded-full" />
+            <div className="floating-element absolute bottom-4 left-8 w-20 h-20 bg-indigo-200/30 dark:bg-indigo-800/20 rounded-full" />
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-100/10 to-purple-100/10 dark:from-blue-900/10 dark:to-purple-900/10 rounded-full blur-3xl animate-pulse" />
+          </div>
+
+          {/* Content */}
+          <div className="relative p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              {/* Welcome Text */}
+              <div className="space-y-3">
+                <div className={`transform transition-all duration-1000 ease-out ${
+                  isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+                }`}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="relative">
+                      <Waves className="h-8 w-8 text-blue-500 animate-pulse" />
+                      <Sparkles className="h-4 w-4 text-yellow-400 absolute -top-1 -right-1 animate-spin" style={{ animationDuration: '3s' }} />
+                    </div>
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                      FishSell Pro
+                    </span>
+                  </div>
+
+                  <h1 className="relative text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent leading-tight">
+                    <span className="relative z-10">{getGreeting()}, Admin! 👋</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent opacity-50 text-shimmer" />
+                  </h1>
+
+                  <p className="text-lg text-muted-foreground/80 font-medium">
+                    Ready to dive into today's fish sales insights
+                  </p>
+                </div>
+              </div>
+
+              {/* Time and Date */}
+              <div className={`transform transition-all duration-1000 ease-out ${
+                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+              }`} style={{ transitionDelay: '200ms' }}>
+                <div className="text-right lg:text-right">
+                  <div className="text-3xl lg:text-4xl font-bold text-gray-800 dark:text-gray-200 mb-1">
+                    {formatTime()}
+                  </div>
+                  <div className="text-sm text-muted-foreground font-medium">
+                    {formatDate()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats Bar */}
+            <div className={`mt-6 transform transition-all duration-1000 ease-out ${
+              isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+            }`} style={{ transitionDelay: '400ms' }}>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="group flex items-center gap-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse group-hover:animate-bounce" />
+                  <span className="font-medium">System Online</span>
+                </div>
+                <div className="group flex items-center gap-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
+                  <Fish className="h-4 w-4 text-blue-500 group-hover:animate-pulse" />
+                  <span className="font-medium">12 Products Active</span>
+                </div>
+                <div className="group flex items-center gap-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
+                  <TrendingUp className="h-4 w-4 text-green-500 group-hover:animate-bounce" />
+                  <span className="font-medium">Sales Up 15%</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Stats Cards */}

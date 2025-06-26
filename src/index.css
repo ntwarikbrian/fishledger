@@ -96,15 +96,6 @@
 }
 
 @layer components {
-  /* For mobile bottom navigation */
-  .mobile-tab {
-    @apply flex flex-col items-center justify-center text-muted-foreground py-2;
-  }
-  
-  .mobile-tab.active {
-    @apply text-emplify-600;
-  }
-  
   /* Sidebar animation */
   .fade-in-sidebar {
     @apply animate-fade-in;
@@ -113,5 +104,79 @@
   /* Card hover effects */
   .hover-card {
     @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+
+  /* Welcome section animations */
+  .welcome-gradient {
+    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background-size: 400% 400%;
+    animation: gradient-shift 15s ease infinite;
+  }
+
+  .floating-element {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .floating-element:nth-child(2) {
+    animation-delay: 2s;
+  }
+
+  .floating-element:nth-child(3) {
+    animation-delay: 4s;
+  }
+
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s infinite;
+  }
+
+  .welcome-glow {
+    box-shadow:
+      0 0 20px rgba(59, 130, 246, 0.1),
+      0 0 40px rgba(147, 51, 234, 0.1),
+      0 0 80px rgba(79, 70, 229, 0.05);
+  }
+
+  .dark .welcome-glow {
+    box-shadow:
+      0 0 20px rgba(59, 130, 246, 0.2),
+      0 0 40px rgba(147, 51, 234, 0.2),
+      0 0 80px rgba(79, 70, 229, 0.1);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
   }
 }
