@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Fish, Package, ShoppingCart, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Sparkles, Waves, ChevronDown, Activity, Archive, BarChart3, Check } from "lucide-react";
+import { Fish, Package, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Sparkles, Waves, ChevronDown, Activity, Archive, BarChart3, Check, CheckCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const Dashboard = () => {
@@ -101,10 +101,10 @@ const Dashboard = () => {
   ];
 
   const recentActivityData = [
-    { activity: 'New Order', customer: 'Ocean View Restaurant', product: 'Atlantic Salmon (15kg)', amount: '$277.50', date: 'Jan 22, 2024', status: 'Processing' },
-    { activity: 'Order Delivered', customer: 'Fresh Market Co', product: 'Tilapia Fillets (20 boxes)', amount: '$259.80', date: 'Jan 22, 2024', status: 'Completed' },
+    { activity: 'Sale Completed', customer: 'Ocean View Restaurant', product: 'Atlantic Salmon (15kg)', amount: '$277.50', date: 'Jan 22, 2024', status: 'Completed' },
+    { activity: 'Sale Delivered', customer: 'Fresh Market Co', product: 'Tilapia Fillets (20 boxes)', amount: '$259.80', date: 'Jan 22, 2024', status: 'Completed' },
     { activity: 'Payment Received', customer: 'John Smith', product: 'Atlantic Salmon (2 boxes)', amount: '$51.98', date: 'Jan 21, 2024', status: 'Completed' },
-    { activity: 'Order Cancelled', customer: 'Metro Supermarket', product: 'Rainbow Trout (30kg)', amount: '$401.63', date: 'Jan 21, 2024', status: 'Cancelled' },
+    { activity: 'Stock Added', customer: 'Supplier', product: 'Rainbow Trout (50kg)', amount: '$750.00', date: 'Jan 21, 2024', status: 'Completed' },
     { activity: 'New Customer', customer: 'Seaside Bistro', product: 'Registration', amount: '-', date: 'Jan 20, 2024', status: 'Active' }
   ];
 
@@ -180,10 +180,10 @@ const Dashboard = () => {
             <tr key={index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
               <td className="py-3 px-2">
                 <div className="flex items-center gap-2">
-                  {activity.activity === 'New Order' && <ShoppingCart className="h-4 w-4 text-blue-600" />}
-                  {activity.activity === 'Order Delivered' && <Package className="h-4 w-4 text-green-600" />}
+                  {activity.activity === 'Sale Completed' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                  {activity.activity === 'Sale Delivered' && <Package className="h-4 w-4 text-green-600" />}
                   {activity.activity === 'Payment Received' && <DollarSign className="h-4 w-4 text-green-600" />}
-                  {activity.activity === 'Order Cancelled' && <AlertTriangle className="h-4 w-4 text-red-600" />}
+                  {activity.activity === 'Stock Added' && <Plus className="h-4 w-4 text-blue-600" />}
                   {activity.activity === 'New Customer' && <Users className="h-4 w-4 text-purple-600" />}
                   <div>
                     <div className="font-medium">{activity.activity}</div>
@@ -221,7 +221,7 @@ const Dashboard = () => {
             <th className="text-left py-3 px-2 text-sm">Current Stock</th>
             <th className="text-left py-3 px-2 text-sm">Minimum Stock</th>
             <th className="text-left py-3 px-2 text-sm">Stock Level</th>
-            <th className="text-left py-3 px-2 text-sm">Need to Order</th>
+            <th className="text-left py-3 px-2 text-sm">Need to Restock</th>
             <th className="text-right py-3 px-2 text-sm">Status</th>
           </tr>
         </thead>
@@ -488,12 +488,12 @@ const Dashboard = () => {
 
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-orange-600" />
+              <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">8</div>
-              <p className="text-xs text-muted-foreground">Need processing</p>
+              <div className="text-2xl font-bold">4</div>
+              <p className="text-xs text-muted-foreground">Need restocking</p>
             </CardContent>
           </Card>
 

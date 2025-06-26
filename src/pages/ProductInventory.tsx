@@ -24,6 +24,15 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -31,6 +40,10 @@ type ViewType = "all" | "low-stock" | "damaged" | "expiry" | "stock-adjustment";
 
 const ProductInventory = () => {
   const [currentView, setCurrentView] = useState<ViewType>("all");
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isAddStockOpen, setIsAddStockOpen] = useState(false);
+  const [isAddDamagedOpen, setIsAddDamagedOpen] = useState(false);
+  const [isAddExpiredOpen, setIsAddExpiredOpen] = useState(false);
   // Mock data for fish product inventory - focused on selling business
   const productData = [
     {
@@ -630,10 +643,123 @@ const ProductInventory = () => {
                       Create and add a brand new fish product to your comprehensive inventory system with complete product details, pricing, and specifications
                     </p>
                   </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
-                    <Plus className="mr-1 h-3 w-3" />
-                    Add Product
-                  </Button>
+                  <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add Product
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Add New Fish Product</DialogTitle>
+                        <DialogDescription>
+                          Create a new fish product with complete details, pricing, and specifications.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Basic Information */}
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Basic Information</h3>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="productName">Product Name *</Label>
+                              <Input id="productName" placeholder="e.g., Atlantic Salmon" required />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="category">Category *</Label>
+                              <Select>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="premium">Premium Fish</SelectItem>
+                                  <SelectItem value="freshwater">Fresh Water Fish</SelectItem>
+                                  <SelectItem value="processed">Processed Fish</SelectItem>
+                                  <SelectItem value="white">White Fish</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="supplier">Supplier *</Label>
+                              <Input id="supplier" placeholder="e.g., Ocean Fresh Ltd" required />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="description">Description</Label>
+                              <Textarea id="description" placeholder="Product description..." rows={3} />
+                            </div>
+                          </div>
+
+                          {/* Selling & Pricing */}
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Selling & Pricing</h3>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="sellingType">Selling Method *</Label>
+                              <Select>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select selling method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="both">Both (Boxed & Weight)</SelectItem>
+                                  <SelectItem value="weight">Weight-based Only</SelectItem>
+                                  <SelectItem value="boxed">Boxed Only</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="pricePerKg">Price per Kg ($)</Label>
+                                <Input id="pricePerKg" type="number" step="0.01" placeholder="0.00" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="pricePerBox">Price per Box ($)</Label>
+                                <Input id="pricePerBox" type="number" step="0.01" placeholder="0.00" />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="boxWeight">Box Weight (if applicable)</Label>
+                              <Input id="boxWeight" placeholder="e.g., 1.5 kg" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Stock Information */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold">Stock Information</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="stockQuantity">Stock Quantity (boxes)</Label>
+                              <Input id="stockQuantity" type="number" placeholder="0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="stockWeight">Stock Weight (kg)</Label>
+                              <Input id="stockWeight" type="number" step="0.1" placeholder="0.0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="expiryDate">Expiry Date</Label>
+                              <Input id="expiryDate" type="date" />
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsAddProductOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                          <Save className="mr-2 h-4 w-4" />
+                          Add Product
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
 
@@ -649,10 +775,81 @@ const ProductInventory = () => {
                       Increase and replenish inventory stock levels for existing fish products with new arrivals, deliveries, and fresh stock supplies
                     </p>
                   </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
-                    <Plus className="mr-1 h-3 w-3" />
-                    Add Stock
-                  </Button>
+                  <Dialog open={isAddStockOpen} onOpenChange={setIsAddStockOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add Stock
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle>Add Fresh Stock</DialogTitle>
+                        <DialogDescription>
+                          Increase inventory levels for existing products with new stock arrivals.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form className="space-y-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="stockProduct">Select Product *</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose existing product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="salmon">Atlantic Salmon</SelectItem>
+                                <SelectItem value="trout">Rainbow Trout</SelectItem>
+                                <SelectItem value="tilapia">Tilapia Fillets</SelectItem>
+                                <SelectItem value="seabass">Sea Bass</SelectItem>
+                                <SelectItem value="cod">Cod Fillets</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="addQuantity">Add Quantity (boxes)</Label>
+                              <Input id="addQuantity" type="number" placeholder="0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="addWeight">Add Weight (kg)</Label>
+                              <Input id="addWeight" type="number" step="0.1" placeholder="0.0" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="deliveryDate">Delivery Date</Label>
+                            <Input id="deliveryDate" type="date" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="newExpiryDate">New Expiry Date</Label>
+                            <Input id="newExpiryDate" type="date" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="batchNumber">Batch Number</Label>
+                            <Input id="batchNumber" placeholder="e.g., AS-2024-004" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="stockNotes">Notes</Label>
+                            <Textarea id="stockNotes" placeholder="Additional notes about this stock addition..." rows={3} />
+                          </div>
+                        </div>
+                      </form>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsAddStockOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                          <Package className="mr-2 h-4 w-4" />
+                          Add Stock
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
 
@@ -668,10 +865,108 @@ const ProductInventory = () => {
                       Document and record damaged, spoiled, or compromised fish products and automatically remove them from available sellable inventory
                     </p>
                   </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
-                    <Plus className="mr-1 h-3 w-3" />
-                    Add Damaged
-                  </Button>
+                  <Dialog open={isAddDamagedOpen} onOpenChange={setIsAddDamagedOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add Damaged
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle>Record Damaged Products</DialogTitle>
+                        <DialogDescription>
+                          Document damaged products and remove them from available inventory.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form className="space-y-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="damagedProduct">Select Product *</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="salmon">Atlantic Salmon</SelectItem>
+                                <SelectItem value="trout">Rainbow Trout</SelectItem>
+                                <SelectItem value="tilapia">Tilapia Fillets</SelectItem>
+                                <SelectItem value="seabass">Sea Bass</SelectItem>
+                                <SelectItem value="cod">Cod Fillets</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="damagedQuantity">Damaged Quantity</Label>
+                              <Input id="damagedQuantity" type="number" placeholder="0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="damagedWeight">Damaged Weight (kg)</Label>
+                              <Input id="damagedWeight" type="number" step="0.1" placeholder="0.0" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="damageReason">Damage Reason *</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select reason" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="transit">Damaged in Transit</SelectItem>
+                                <SelectItem value="freezer">Freezer Malfunction</SelectItem>
+                                <SelectItem value="quality">Quality Issues</SelectItem>
+                                <SelectItem value="handling">Poor Handling</SelectItem>
+                                <SelectItem value="contamination">Contamination</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="estimatedLoss">Estimated Loss Value ($)</Label>
+                            <Input id="estimatedLoss" type="number" step="0.01" placeholder="0.00" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="damageBatch">Batch Number</Label>
+                            <Input id="damageBatch" placeholder="e.g., AS-2024-003" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="damageAction">Action Taken</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select action" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="disposed">Disposed</SelectItem>
+                                <SelectItem value="returned">Returned to Supplier</SelectItem>
+                                <SelectItem value="insurance">Insurance Claim</SelectItem>
+                                <SelectItem value="partial">Partial Recovery</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="damageNotes">Additional Notes</Label>
+                            <Textarea id="damageNotes" placeholder="Describe the damage and circumstances..." rows={3} />
+                          </div>
+                        </div>
+                      </form>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsAddDamagedOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          Record Damage
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
 
@@ -687,10 +982,102 @@ const ProductInventory = () => {
                       Identify and mark fish products that have reached their expiration date and handle proper disposal, return, or waste management procedures
                     </p>
                   </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
-                    <Plus className="mr-1 h-3 w-3" />
-                    Add Expired
-                  </Button>
+                  <Dialog open={isAddExpiredOpen} onOpenChange={setIsAddExpiredOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add Expired
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle>Mark Expired Products</DialogTitle>
+                        <DialogDescription>
+                          Mark products as expired and handle disposal or return procedures.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form className="space-y-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="expiredProduct">Select Product *</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="salmon">Atlantic Salmon</SelectItem>
+                                <SelectItem value="trout">Rainbow Trout</SelectItem>
+                                <SelectItem value="tilapia">Tilapia Fillets</SelectItem>
+                                <SelectItem value="seabass">Sea Bass</SelectItem>
+                                <SelectItem value="cod">Cod Fillets</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="expiredQuantity">Expired Quantity</Label>
+                              <Input id="expiredQuantity" type="number" placeholder="0" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="expiredWeight">Expired Weight (kg)</Label>
+                              <Input id="expiredWeight" type="number" step="0.1" placeholder="0.0" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="originalExpiryDate">Original Expiry Date</Label>
+                            <Input id="originalExpiryDate" type="date" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="discoveryDate">Discovery Date</Label>
+                            <Input id="discoveryDate" type="date" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="expiredBatch">Batch Number</Label>
+                            <Input id="expiredBatch" placeholder="e.g., CF-2024-001" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="disposalMethod">Disposal Method</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select disposal method" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="waste">Waste Disposal</SelectItem>
+                                <SelectItem value="compost">Composting</SelectItem>
+                                <SelectItem value="return">Return to Supplier</SelectItem>
+                                <SelectItem value="donation">Donation (if safe)</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="lossValue">Loss Value ($)</Label>
+                            <Input id="lossValue" type="number" step="0.01" placeholder="0.00" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="expiredNotes">Notes</Label>
+                            <Textarea id="expiredNotes" placeholder="Additional details about the expired products..." rows={3} />
+                          </div>
+                        </div>
+                      </form>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsAddExpiredOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Mark as Expired
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </div>

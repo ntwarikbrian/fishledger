@@ -11,7 +11,7 @@ const Sales = () => {
   const salesData = [
     {
       id: 1,
-      orderNumber: "ORD-001",
+      saleNumber: "SALE-001",
       customer: "Fresh Fish Market",
       customerType: "Retail",
       product: "Atlantic Salmon",
@@ -19,14 +19,14 @@ const Sales = () => {
       quantity: "15.5 kg",
       unitPrice: 18.50,
       totalAmount: 286.75,
-      orderDate: "2024-01-20",
+      saleDate: "2024-01-20",
       deliveryDate: "2024-01-22",
       status: "Delivered",
       paymentStatus: "Paid"
     },
     {
       id: 2,
-      orderNumber: "ORD-002",
+      saleNumber: "SALE-002",
       customer: "Ocean Restaurant",
       customerType: "Restaurant",
       product: "Sea Bass",
@@ -34,14 +34,14 @@ const Sales = () => {
       quantity: "5 boxes (1.2kg each)",
       unitPrice: 32.50,
       totalAmount: 146.25, // After 10% restaurant discount
-      orderDate: "2024-01-21",
+      saleDate: "2024-01-21",
       deliveryDate: "2024-01-23",
       status: "Processing",
       paymentStatus: "Pending"
     },
     {
       id: 3,
-      orderNumber: "ORD-003",
+      saleNumber: "SALE-003",
       customer: "Seafood Wholesale Co.",
       customerType: "Wholesale",
       product: "Tilapia Fillets",
@@ -49,14 +49,14 @@ const Sales = () => {
       quantity: "20 boxes (800g each)",
       unitPrice: 12.99,
       totalAmount: 220.83, // After 15% wholesale discount
-      orderDate: "2024-01-19",
+      saleDate: "2024-01-19",
       deliveryDate: "2024-01-21",
       status: "Delivered",
       paymentStatus: "Paid"
     },
     {
       id: 4,
-      orderNumber: "ORD-004",
+      saleNumber: "SALE-004",
       customer: "Local Fish Shop",
       customerType: "Retail",
       product: "Rainbow Trout",
@@ -64,14 +64,14 @@ const Sales = () => {
       quantity: "8.5 kg",
       unitPrice: 15.75,
       totalAmount: 133.88,
-      orderDate: "2024-01-22",
+      saleDate: "2024-01-22",
       deliveryDate: "2024-01-24",
       status: "Confirmed",
       paymentStatus: "Pending"
     },
     {
       id: 5,
-      orderNumber: "ORD-005",
+      saleNumber: "SALE-005",
       customer: "Metro Supermarket",
       customerType: "Wholesale",
       product: "Atlantic Salmon",
@@ -79,7 +79,7 @@ const Sales = () => {
       quantity: "10 boxes + 25kg loose",
       unitPrice: 0, // Mixed pricing
       totalAmount: 598.25, // After 15% wholesale discount
-      orderDate: "2024-01-23",
+      saleDate: "2024-01-23",
       deliveryDate: "2024-01-25",
       status: "Processing",
       paymentStatus: "Pending"
@@ -91,9 +91,9 @@ const Sales = () => {
       id: 1,
       name: "Fresh Fish Market",
       type: "Retail",
-      totalOrders: 15,
+      totalSales: 15,
       totalSpent: 28500.00,
-      lastOrder: "2024-01-20",
+      lastSale: "2024-01-20",
       status: "Active",
       contact: "john@freshfish.com"
     },
@@ -101,9 +101,9 @@ const Sales = () => {
       id: 2,
       name: "Ocean Restaurant",
       type: "Restaurant",
-      totalOrders: 8,
+      totalSales: 8,
       totalSpent: 12400.00,
-      lastOrder: "2024-01-21",
+      lastSale: "2024-01-21",
       status: "Active",
       contact: "chef@oceanrest.com"
     },
@@ -111,9 +111,9 @@ const Sales = () => {
       id: 3,
       name: "Seafood Wholesale Co.",
       type: "Wholesale",
-      totalOrders: 25,
+      totalSales: 25,
       totalSpent: 45600.00,
-      lastOrder: "2024-01-19",
+      lastSale: "2024-01-19",
       status: "Active",
       contact: "orders@seafoodwholesale.com"
     },
@@ -121,9 +121,9 @@ const Sales = () => {
       id: 4,
       name: "Local Fish Shop",
       type: "Retail",
-      totalOrders: 12,
+      totalSales: 12,
       totalSpent: 18200.00,
-      lastOrder: "2024-01-22",
+      lastSale: "2024-01-22",
       status: "Active",
       contact: "info@localfish.com"
     }
@@ -195,10 +195,10 @@ const Sales = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Sales & Distribution</h1>
-            <p className="text-muted-foreground">Manage sales orders and customer relationships</p>
+            <p className="text-muted-foreground">Manage sales transactions and customer relationships</p>
           </div>
           <Button className="bg-blue-600 hover:bg-blue-700">
-            <PlusCircle className="mr-2 h-4 w-4" /> New Sale Order
+            <PlusCircle className="mr-2 h-4 w-4" /> New Sale
           </Button>
         </div>
 
@@ -213,7 +213,7 @@ const Sales = () => {
               <div className="text-2xl font-bold">
                 ${salesData.reduce((sum, sale) => sum + sale.totalAmount, 0).toFixed(2)}
               </div>
-              <p className="text-xs text-muted-foreground">From {salesData.length} orders</p>
+              <p className="text-xs text-muted-foreground">From {salesData.length} sales</p>
             </CardContent>
           </Card>
           
@@ -226,7 +226,7 @@ const Sales = () => {
               <div className="text-2xl font-bold">
                 {salesData.filter(s => s.sellingMethod === "Boxed" || s.sellingMethod === "Both").length}
               </div>
-              <p className="text-xs text-muted-foreground">Orders with boxes</p>
+              <p className="text-xs text-muted-foreground">Sales with boxes</p>
             </CardContent>
           </Card>
 
@@ -239,7 +239,7 @@ const Sales = () => {
               <div className="text-2xl font-bold">
                 {salesData.filter(s => s.sellingMethod === "Weight-based" || s.sellingMethod === "Both").length}
               </div>
-              <p className="text-xs text-muted-foreground">Orders by weight</p>
+              <p className="text-xs text-muted-foreground">Sales by weight</p>
             </CardContent>
           </Card>
           
@@ -261,18 +261,18 @@ const Sales = () => {
             <CardTitle>Sales Management</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="orders" className="w-full">
+            <Tabs defaultValue="sales" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="orders">Sales Orders</TabsTrigger>
+                <TabsTrigger value="sales">Sales Transactions</TabsTrigger>
                 <TabsTrigger value="customers">Customer Management</TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="orders" className="space-y-4">
+
+              <TabsContent value="sales" className="space-y-4">
                 <div className="flex justify-between items-center">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search orders..."
+                      placeholder="Search sales..."
                       className="pl-10 w-64"
                     />
                   </div>
@@ -282,7 +282,7 @@ const Sales = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-2 text-sm font-medium">Order #</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium">Sale #</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Customer</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Product</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Selling Method</th>
@@ -296,7 +296,7 @@ const Sales = () => {
                     <tbody>
                       {salesData.map((sale) => (
                         <tr key={sale.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-2 font-medium">{sale.orderNumber}</td>
+                          <td className="py-3 px-2 font-medium">{sale.saleNumber}</td>
                           <td className="py-3 px-2">
                             <div>
                               <span className="font-medium">{sale.customer}</span>
@@ -370,8 +370,8 @@ const Sales = () => {
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="font-medium">Total Orders:</span>
-                            <p className="text-muted-foreground">{customer.totalOrders}</p>
+                            <span className="font-medium">Total Sales:</span>
+                            <p className="text-muted-foreground">{customer.totalSales}</p>
                           </div>
                           <div>
                             <span className="font-medium">Total Spent:</span>
@@ -381,8 +381,8 @@ const Sales = () => {
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="font-medium">Last Order:</span>
-                            <p className="text-muted-foreground">{customer.lastOrder}</p>
+                            <span className="font-medium">Last Sale:</span>
+                            <p className="text-muted-foreground">{customer.lastSale}</p>
                           </div>
                           <div>
                             <span className="font-medium">Status:</span>
@@ -394,10 +394,10 @@ const Sales = () => {
 
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" className="flex-1">
-                            View Orders
+                            View Sales
                           </Button>
                           <Button variant="outline" size="sm" className="flex-1">
-                            New Order
+                            New Sale
                           </Button>
                         </div>
                       </CardContent>

@@ -1,6 +1,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Fish, Package, ShoppingCart, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut } from "lucide-react";
+import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,9 +27,9 @@ import {
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Product Inventory", href: "/inventory", icon: Fish },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Sales & Analytics", href: "/sales", icon: TrendingUp },
+  { name: "Quick Math", href: "/quick-math", icon: Calculator },
   { name: "Staff", href: "/staff", icon: Users },
   { name: "Expenses", href: "/expenses", icon: DollarSign },
   { name: "Documents", href: "/documents", icon: FolderOpen },

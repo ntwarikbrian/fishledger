@@ -8,8 +8,8 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import Dashboard from "./pages/Index";
 import ProductInventory from "./pages/ProductInventory";
 import Sales from "./pages/Sales";
-import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
+import QuickMath from "./pages/QuickMath";
 import Staff from "./pages/Staff";
 import Expenses from "./pages/Expenses";
 import Documents from "./pages/Documents";
@@ -29,8 +29,8 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/inventory" element={<ProductInventory />} />
             <Route path="/sales" element={<Sales />} />
-            <Route path="/orders" element={<Orders />} />
             <Route path="/customers" element={<Customers />} />
+            <Route path="/quick-math" element={<QuickMath />} />
             <Route path="/staff" element={<Staff />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/documents" element={<Documents />} />
