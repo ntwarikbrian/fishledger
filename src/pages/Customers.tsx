@@ -190,52 +190,7 @@ const Customers = () => {
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-              <Users className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{customerStats.total}</div>
-              <p className="text-xs text-muted-foreground">{customerStats.active} active</p>
-            </CardContent>
-          </Card>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Wholesale</CardTitle>
-              <Building className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{customerStats.wholesale}</div>
-              <p className="text-xs text-muted-foreground">High volume buyers</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Restaurants</CardTitle>
-              <Store className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{customerStats.restaurant}</div>
-              <p className="text-xs text-muted-foreground">Commercial buyers</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <User className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${customerStats.totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">From all customers</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Customer Management */}
         <Tabs defaultValue="list" className="w-full">

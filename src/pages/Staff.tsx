@@ -127,52 +127,7 @@ const Staff = () => {
           </Button>
         </div>
 
-        {/* Staff Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-              <Users className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{staffStats.totalStaff}</div>
-              <p className="text-xs text-muted-foreground">All employees</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
-              <UserCheck className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{staffStats.activeStaff}</div>
-              <p className="text-xs text-muted-foreground">Currently working</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">On Leave</CardTitle>
-              <UserX className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{staffStats.onLeave}</div>
-              <p className="text-xs text-muted-foreground">Temporarily away</p>
-            </CardContent>
-          </Card>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
-              <DollarSign className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${staffStats.totalPayroll.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Annual salaries</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Staff Management Tabs */}
         <Tabs defaultValue="list" className="w-full">

@@ -164,52 +164,7 @@ const Documents = () => {
           </Button>
         </div>
 
-        {/* Document Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Files</CardTitle>
-              <FolderOpen className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documentStats.totalDocuments}</div>
-              <p className="text-xs text-muted-foreground">All stored files</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Images</CardTitle>
-              <Image className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documentStats.totalImages}</div>
-              <p className="text-xs text-muted-foreground">Photos & images</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Documents</CardTitle>
-              <FileText className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documentStats.totalDocuments}</div>
-              <p className="text-xs text-muted-foreground">PDFs & documents</p>
-            </CardContent>
-          </Card>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Storage Used</CardTitle>
-              <Archive className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documentStats.totalSize.toFixed(1)} MB</div>
-              <p className="text-xs text-muted-foreground">Total file size</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Document Management Tabs */}
         <Tabs defaultValue="all" className="w-full">

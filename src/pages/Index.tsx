@@ -49,10 +49,10 @@ const Dashboard = () => {
       description: 'Fish products with low inventory levels'
     },
     {
-      id: 'revenue-by-product',
-      label: 'Revenue by Product',
-      icon: BarChart3,
-      description: 'Products sorted by revenue performance'
+      id: 'damaged-expired',
+      label: 'Damaged or Expired',
+      icon: AlertTriangle,
+      description: 'Fish products that are damaged or expired'
     }
   ];
 
@@ -67,46 +67,36 @@ const Dashboard = () => {
       name: 'Atlantic Salmon',
       sales: 245,
       revenue: '$4,890',
-      growth: '+18%',
       stock: 'In Stock',
-      color: 'bg-blue-500',
-      percentage: 85
+      color: 'bg-blue-500'
     },
     {
       name: 'Rainbow Trout',
       sales: 189,
       revenue: '$3,780',
-      growth: '+12%',
       stock: 'In Stock',
-      color: 'bg-purple-500',
-      percentage: 70
+      color: 'bg-purple-500'
     },
     {
       name: 'Tilapia Fillets',
       sales: 156,
       revenue: '$2,340',
-      growth: '+8%',
       stock: 'Low Stock',
-      color: 'bg-green-500',
-      percentage: 55
+      color: 'bg-green-500'
     },
     {
       name: 'Sea Bass',
       sales: 134,
       revenue: '$2,010',
-      growth: '+15%',
       stock: 'In Stock',
-      color: 'bg-orange-500',
-      percentage: 48
+      color: 'bg-orange-500'
     },
     {
       name: 'Cod Fillets',
       sales: 98,
       revenue: '$1,470',
-      growth: '+5%',
       stock: 'In Stock',
-      color: 'bg-indigo-500',
-      percentage: 35
+      color: 'bg-indigo-500'
     }
   ];
 
@@ -126,12 +116,13 @@ const Dashboard = () => {
     { name: 'Tuna Steaks', currentStock: 15, minStock: 35, status: 'Low', color: 'bg-yellow-500', percentage: 43 }
   ];
 
-  const revenueByProductData = [
-    { name: 'Atlantic Salmon', revenue: '$4,890', orders: 245, avgOrder: '$19.96', color: 'bg-blue-500', percentage: 100 },
-    { name: 'Rainbow Trout', revenue: '$3,780', orders: 189, avgOrder: '$20.00', color: 'bg-purple-500', percentage: 77 },
-    { name: 'Tilapia Fillets', revenue: '$2,340', orders: 156, avgOrder: '$15.00', color: 'bg-green-500', percentage: 48 },
-    { name: 'Sea Bass', revenue: '$2,010', orders: 134, avgOrder: '$15.00', color: 'bg-orange-500', percentage: 41 },
-    { name: 'Cod Fillets', revenue: '$1,470', orders: 98, avgOrder: '$15.00', color: 'bg-indigo-500', percentage: 30 }
+  const damagedExpiredData = [
+    { name: 'Tilapia Fillets', quantity: 15, reason: 'Expired', date: 'Jan 22, 2024', loss: '$225.00', batch: 'TF-2024-001', status: 'Disposed' },
+    { name: 'Atlantic Salmon', quantity: 8, reason: 'Damaged in Transit', date: 'Jan 21, 2024', loss: '$160.00', batch: 'AS-2024-003', status: 'Insurance Claim' },
+    { name: 'Cod Fillets', quantity: 12, reason: 'Expired', date: 'Jan 20, 2024', loss: '$180.00', batch: 'CF-2024-002', status: 'Disposed' },
+    { name: 'Sea Bass', quantity: 6, reason: 'Freezer Malfunction', date: 'Jan 19, 2024', loss: '$90.00', batch: 'SB-2024-001', status: 'Disposed' },
+    { name: 'Rainbow Trout', quantity: 10, reason: 'Expired', date: 'Jan 18, 2024', loss: '$200.00', batch: 'RT-2024-004', status: 'Disposed' },
+    { name: 'Mackerel', quantity: 20, reason: 'Quality Issues', date: 'Jan 17, 2024', loss: '$120.00', batch: 'MC-2024-001', status: 'Returned to Supplier' }
   ];
 
   // Render functions for different views
@@ -156,7 +147,6 @@ const Dashboard = () => {
                 {fish.revenue}
               </div>
               <div className="flex items-center gap-1 text-sm">
-                <span className="text-green-600 font-medium">{fish.growth}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   fish.stock === 'In Stock'
                     ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
@@ -165,18 +155,6 @@ const Dashboard = () => {
                   {fish.stock}
                 </span>
               </div>
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full ${fish.color} transition-all duration-1000 ease-out`}
-                style={{ width: `${fish.percentage}%` }}
-              />
-            </div>
-            <div className="absolute right-0 -top-6 text-xs text-muted-foreground">
-              {fish.percentage}% of target
             </div>
           </div>
         </div>
@@ -296,60 +274,62 @@ const Dashboard = () => {
     </div>
   );
 
-  const renderRevenueByProductView = () => (
+  const renderDamagedExpiredView = () => (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="border-b">
             <th className="text-left py-3 px-2 text-sm">Product</th>
-            <th className="text-left py-3 px-2 text-sm">Total Revenue</th>
-            <th className="text-left py-3 px-2 text-sm">Orders</th>
-            <th className="text-left py-3 px-2 text-sm">Avg Order Value</th>
-            <th className="text-left py-3 px-2 text-sm">Performance</th>
-            <th className="text-right py-3 px-2 text-sm">Rank</th>
+            <th className="text-left py-3 px-2 text-sm">Quantity</th>
+            <th className="text-left py-3 px-2 text-sm">Reason</th>
+            <th className="text-left py-3 px-2 text-sm">Date</th>
+            <th className="text-left py-3 px-2 text-sm">Loss Value</th>
+            <th className="text-left py-3 px-2 text-sm">Batch #</th>
+            <th className="text-right py-3 px-2 text-sm">Status</th>
           </tr>
         </thead>
         <tbody>
-          {revenueByProductData.map((product, index) => (
-            <tr key={index} className="border-b hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors">
+          {damagedExpiredData.map((item, index) => (
+            <tr key={index} className="border-b hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
               <td className="py-3 px-2">
                 <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-green-600" />
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
                   <div>
-                    <div className="font-medium">{product.name}</div>
+                    <div className="font-medium">{item.name}</div>
                   </div>
                 </div>
               </td>
               <td className="py-3 px-2">
-                <span className="font-bold text-lg text-green-600">{product.revenue}</span>
-              </td>
-              <td className="py-3 px-2 text-muted-foreground">
-                {product.orders} orders
-              </td>
-              <td className="py-3 px-2 font-medium">
-                {product.avgOrder}
+                <span className="font-medium text-red-600">{item.quantity} units</span>
               </td>
               <td className="py-3 px-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-[100px]">
-                    <div
-                      className={`h-2 rounded-full ${product.color} transition-all duration-1000 ease-out`}
-                      style={{ width: `${product.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground min-w-[40px]">
-                    {product.percentage}%
-                  </span>
-                </div>
-              </td>
-              <td className="py-3 px-2 text-right">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  index === 0 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                  index === 1 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                  index === 2 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                  item.reason === 'Expired' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                  item.reason === 'Damaged in Transit' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                  item.reason === 'Freezer Malfunction' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
+                  item.reason === 'Quality Issues' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
                   'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
                 }`}>
-                  #{index + 1}
+                  {item.reason}
+                </span>
+              </td>
+              <td className="py-3 px-2 text-muted-foreground">
+                {item.date}
+              </td>
+              <td className="py-3 px-2">
+                <span className="font-bold text-red-600">{item.loss}</span>
+              </td>
+              <td className="py-3 px-2 text-muted-foreground font-mono text-xs">
+                {item.batch}
+              </td>
+              <td className="py-3 px-2 text-right">
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                  item.status === 'Disposed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                  item.status === 'Insurance Claim' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                  item.status === 'Returned to Supplier' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                  'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                }`}>
+                  {item.status}
                 </span>
               </td>
             </tr>
@@ -367,8 +347,8 @@ const Dashboard = () => {
         return renderRecentActivityView();
       case 'low-stock':
         return renderLowStockView();
-      case 'revenue-by-product':
-        return renderRevenueByProductView();
+      case 'damaged-expired':
+        return renderDamagedExpiredView();
       default:
         return renderTopSellingView();
     }

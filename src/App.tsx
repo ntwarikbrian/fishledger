@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import Dashboard from "./pages/Index";
 import ProductInventory from "./pages/ProductInventory";
-import ProductCatalog from "./pages/ProductCatalog";
 import Sales from "./pages/Sales";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
@@ -29,7 +28,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/inventory" element={<ProductInventory />} />
-            <Route path="/products" element={<ProductCatalog />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/customers" element={<Customers />} />
