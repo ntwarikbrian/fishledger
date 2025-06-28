@@ -211,7 +211,6 @@ const Expenses = () => {
         </div>
 
 
-
         {/* Expense Management Tabs */}
         <Tabs defaultValue="all-expenses" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
@@ -356,40 +355,67 @@ const Expenses = () => {
 
           {/* All Expenses Tab */}
           <TabsContent value="all-expenses" className="space-y-4">
-            {/* Overview Cards - Only in All Expenses Tab */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${totalExpenses.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">This month</p>
+            {/* Compact Overview Cards - Only in All Expenses Tab */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Total Expenses Card */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 hover:shadow-lg transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Expenses</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">${totalExpenses.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">This month</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Monthly Budget</CardTitle>
-                  <Receipt className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${monthlyBudget.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {((totalExpenses / monthlyBudget) * 100).toFixed(1)}% used
-                  </p>
+              {/* Monthly Budget Card */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 hover:shadow-lg transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                        <Receipt className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Monthly Budget</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">${monthlyBudget.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        {((totalExpenses / monthlyBudget) * 100).toFixed(1)}% used
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Categories</CardTitle>
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{expenseCategories.length}</div>
-                  <p className="text-xs text-muted-foreground">Active categories</p>
+              {/* Categories Card */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 hover:shadow-lg transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
+                        <Tag className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Categories</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{expenseCategories.length}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Active</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
