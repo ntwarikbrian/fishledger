@@ -171,39 +171,35 @@ const DataTable = <T extends Record<string, any>>({
     <Card className={cn("w-full", className)}>
       {/* Header with title and search */}
       <CardHeader className="pb-4">
-        <div className="flex flex-col gap-4">
-          {/* Title */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {title && (
-            <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
+            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
           )}
-
-          {/* Controls */}
-          <div className="flex flex-col gap-3">
-            {/* Search input - full width on mobile */}
-            <div className="relative w-full">
+          
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            {/* Search input */}
+            <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-full"
+                className="pl-8 w-full sm:w-64"
               />
             </div>
 
             {/* Items per page selector */}
-            <div className="flex justify-end">
-              <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 per page</SelectItem>
-                  <SelectItem value="10">10 per page</SelectItem>
-                  <SelectItem value="25">25 per page</SelectItem>
-                  <SelectItem value="50">50 per page</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+              <SelectTrigger className="w-full sm:w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 per page</SelectItem>
+                <SelectItem value="10">10 per page</SelectItem>
+                <SelectItem value="25">25 per page</SelectItem>
+                <SelectItem value="50">50 per page</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
@@ -272,39 +268,35 @@ const DataTable = <T extends Record<string, any>>({
 
         {/* Pagination */}
         {!loading && sortedData.length > 0 && (
-          <div className="flex flex-col gap-4 p-4 border-t">
-            {/* Results info */}
-            <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t">
+            <div className="text-sm text-muted-foreground">
               Showing {startItem} to {endItem} of {sortedData.length} entries
               {filteredData.length !== data.length && (
-                <span className="block sm:inline"> (filtered from {data.length} total entries)</span>
+                <span> (filtered from {data.length} total entries)</span>
               )}
             </div>
 
-            {/* Pagination controls */}
-            <div className="flex items-center justify-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => goToPage(1)}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0"
               >
-                <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronsLeft className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0"
               >
-                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-
-              <div className="flex items-center gap-1 mx-2">
-                <span className="text-xs sm:text-sm">Page</span>
-                <Badge variant="outline" className="px-2 py-1 text-xs">
+              
+              <div className="flex items-center gap-1">
+                <span className="text-sm">Page</span>
+                <Badge variant="outline" className="px-2 py-1">
                   {currentPage} of {totalPages}
                 </Badge>
               </div>
@@ -314,18 +306,16 @@ const DataTable = <T extends Record<string, any>>({
                 size="sm"
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="h-8 w-8 p-0"
               >
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronRight className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => goToPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="h-8 w-8 p-0"
               >
-                <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

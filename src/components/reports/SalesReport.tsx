@@ -273,27 +273,21 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
     }
   };
 
-  // Define table columns with responsive design
+  // Define table columns
   const columns: DataTableColumn<SaleItem>[] = [
     {
       key: 'saleDate',
       title: 'Date',
       sortable: true,
-      className: 'min-w-[100px]',
-      render: (value) => (
-        <div className="text-xs sm:text-sm">
-          {format(new Date(value), 'MMM dd, yyyy')}
-        </div>
-      )
+      render: (value) => format(new Date(value), 'MMM dd, yyyy')
     },
     {
       key: 'saleNumber',
       title: 'Sale #',
       sortable: true,
       searchable: true,
-      className: 'min-w-[100px]',
       render: (value) => (
-        <div className="font-mono text-xs sm:text-sm font-medium">{value}</div>
+        <div className="font-mono text-sm font-medium">{value}</div>
       )
     },
     {
@@ -301,63 +295,53 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       title: 'Item',
       sortable: true,
       searchable: true,
-      className: 'min-w-[150px]',
       render: (value, row) => (
         <div className="flex items-center gap-2">
-          <Package className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
-          <div className="min-w-0">
-            <div className="font-medium text-xs sm:text-sm truncate">{value}</div>
-            <div className="text-xs text-muted-foreground hidden sm:block">ID: {row.productId}</div>
+          <Package className="h-4 w-4 text-blue-600" />
+          <div>
+            <div className="font-medium">{value}</div>
+            <div className="text-xs text-muted-foreground">ID: {row.productId}</div>
           </div>
         </div>
       )
     },
     {
       key: 'quantitySold',
-      title: 'Qty',
+      title: 'Qty Sold',
       sortable: true,
-      className: 'min-w-[80px] text-right',
       render: (value, row) => (
         <div className="text-right">
-          <div className="font-medium text-xs sm:text-sm">
-            {value}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {row.unit === 'mixed' ? 'units' : row.unit}
+          <div className="font-medium">
+            {value} {row.unit === 'mixed' ? 'units' : row.unit}
           </div>
         </div>
       )
     },
     {
       key: 'sellingMethod',
-      title: 'Method',
+      title: 'Unit',
       sortable: true,
-      className: 'min-w-[100px]',
       render: (value) => {
         const display = getSellingMethodDisplay(value);
         const IconComponent = display.icon;
         return (
-          <Badge variant="secondary" className={cn(display.bgColor, display.color, "text-xs")}>
-            <IconComponent className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-            <span className="hidden sm:inline">{display.label}</span>
-            <span className="sm:hidden">
-              {value === 'Weight-based' ? 'Kg' : value === 'Boxed' ? 'Box' : 'Mix'}
-            </span>
+          <Badge variant="secondary" className={cn(display.bgColor, display.color)}>
+            <IconComponent className="h-3 w-3 mr-1" />
+            {display.label}
           </Badge>
         );
       }
     },
     {
       key: 'unitPrice',
-      title: 'Price',
+      title: 'Unit Price',
       sortable: true,
-      className: 'min-w-[80px] text-right hidden sm:table-cell',
       render: (value, row) => (
         <div className="text-right">
           {row.sellingMethod === 'Both' ? (
             <span className="text-xs text-muted-foreground">Mixed</span>
           ) : (
-            <span className="font-medium text-xs sm:text-sm">₣{value.toFixed(2)}</span>
+            <span className="font-medium">₣{value.toFixed(2)}</span>
           )}
         </div>
       )
@@ -366,9 +350,8 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       key: 'totalAmount',
       title: 'Total',
       sortable: true,
-      className: 'min-w-[100px] text-right',
       render: (value) => (
-        <div className="text-right font-bold text-green-600 text-xs sm:text-sm">
+        <div className="text-right font-bold text-green-600">
           ₣{value.toLocaleString()}
         </div>
       )
@@ -378,11 +361,10 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       title: 'Seller',
       sortable: true,
       searchable: true,
-      className: 'min-w-[120px] hidden lg:table-cell',
       render: (value) => (
         <div className="flex items-center gap-2">
-          <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs sm:text-sm truncate">{value}</span>
+          <User className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{value}</span>
         </div>
       )
     },
@@ -391,9 +373,8 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       title: 'Customer',
       sortable: true,
       searchable: true,
-      className: 'min-w-[120px] hidden xl:table-cell',
       render: (value) => (
-        <div className="max-w-32 truncate text-xs sm:text-sm" title={value}>
+        <div className="max-w-32 truncate" title={value}>
           {value}
         </div>
       )
@@ -402,17 +383,13 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       key: 'paymentStatus',
       title: 'Payment',
       sortable: true,
-      className: 'min-w-[100px]',
       render: (value) => {
         const display = getPaymentStatusDisplay(value);
         const IconComponent = display.icon;
         return (
-          <Badge variant="secondary" className={cn(display.bgColor, display.color, "text-xs")}>
-            <IconComponent className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-            <span className="hidden sm:inline">{value}</span>
-            <span className="sm:hidden">
-              {value === 'Paid' ? '✓' : value === 'Pending' ? '⏳' : '✗'}
-            </span>
+          <Badge variant="secondary" className={cn(display.bgColor, display.color)}>
+            <IconComponent className="h-3 w-3 mr-1" />
+            {value}
           </Badge>
         );
       }
@@ -422,90 +399,63 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
   return (
     <div className="space-y-6">
       {/* Header with filters */}
-      <div className="flex flex-col gap-4">
-        {/* Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
-              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-              Sales Report
-            </h2>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Detailed sales data and revenue analysis
-            </p>
-          </div>
-
-          {/* Export button - visible on larger screens */}
-          <div className="hidden lg:block">
-            <ExportActions
-              data={filteredSales}
-              columns={columns}
-              filename="sales_report"
-              dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
-              reportType="Sales"
-            />
-          </div>
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <DollarSign className="h-6 w-6 text-green-600" />
+            Sales Report
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Detailed sales data and revenue analysis
+          </p>
         </div>
 
-        {/* Filters Section */}
-        <div className="flex flex-col gap-3">
-          {/* Date Filter - Full width on mobile */}
-          <div className="w-full">
-            <DateFilter value={dateFilter} onChange={onDateFilterChange} className="w-full" />
-          </div>
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <DateFilter value={dateFilter} onChange={onDateFilterChange} />
+          
+          <Select value={sellingMethodFilter} onValueChange={setSellingMethodFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by method" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Methods</SelectItem>
+              <SelectItem value="Weight-based">Weight-based</SelectItem>
+              <SelectItem value="Boxed">Boxed</SelectItem>
+              <SelectItem value="Both">Mixed</SelectItem>
+            </SelectContent>
+          </Select>
 
-          {/* Other Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            <Select value={sellingMethodFilter} onValueChange={setSellingMethodFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Filter by method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Methods</SelectItem>
-                <SelectItem value="Weight-based">Weight-based</SelectItem>
-                <SelectItem value="Boxed">Boxed</SelectItem>
-                <SelectItem value="Both">Mixed</SelectItem>
-              </SelectContent>
-            </Select>
+          <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by payment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payments</SelectItem>
+              <SelectItem value="Paid">Paid</SelectItem>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Overdue">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
 
-            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Filter by payment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Export button - visible on smaller screens */}
-            <div className="lg:hidden sm:col-span-2 lg:col-span-1">
-              <ExportActions
-                data={filteredSales}
-                columns={columns}
-                filename="sales_report"
-                dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
-                reportType="Sales"
-                className="w-full"
-              />
-            </div>
-          </div>
+          <ExportActions
+            data={filteredSales}
+            columns={columns}
+            filename="sales_report"
+            dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
+            reportType="Sales"
+          />
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex-shrink-0">
-                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-muted-foreground">Total Revenue</div>
-                <div className="text-sm sm:text-lg font-bold text-green-600 truncate">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-green-600" />
+              <div>
+                <div className="text-sm text-muted-foreground">Total Revenue</div>
+                <div className="text-lg font-bold text-green-600">
                   ₣{summary.totalRevenue.toLocaleString()}
                 </div>
               </div>
@@ -513,15 +463,13 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex-shrink-0">
-                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-muted-foreground">Total Sales</div>
-                <div className="text-sm sm:text-lg font-bold text-blue-600">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              <div>
+                <div className="text-sm text-muted-foreground">Total Sales</div>
+                <div className="text-lg font-bold text-blue-600">
                   {filteredSales.length}
                 </div>
               </div>
@@ -529,15 +477,13 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex-shrink-0">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-muted-foreground">Avg Order Value</div>
-                <div className="text-sm sm:text-lg font-bold text-purple-600">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
+              <div>
+                <div className="text-sm text-muted-foreground">Avg Order Value</div>
+                <div className="text-lg font-bold text-purple-600">
                   ₣{summary.averageOrderValue.toFixed(0)}
                 </div>
               </div>
@@ -545,15 +491,13 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex-shrink-0">
-                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-muted-foreground">Top Product</div>
-                <div className="text-xs sm:text-sm font-bold text-orange-600 truncate" title={summary.topSellingProduct}>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-orange-600" />
+              <div>
+                <div className="text-sm text-muted-foreground">Top Product</div>
+                <div className="text-sm font-bold text-orange-600 truncate">
                   {summary.topSellingProduct}
                 </div>
               </div>
@@ -561,15 +505,13 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex-shrink-0">
-                <User className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-muted-foreground">Top Seller</div>
-                <div className="text-xs sm:text-sm font-bold text-indigo-600 truncate" title={summary.topPerformingWorker}>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-indigo-600" />
+              <div>
+                <div className="text-sm text-muted-foreground">Top Seller</div>
+                <div className="text-sm font-bold text-indigo-600 truncate">
                   {summary.topPerformingWorker}
                 </div>
               </div>
@@ -579,17 +521,14 @@ const SalesReport: React.FC<SalesReportProps> = ({ dateFilter, onDateFilterChang
       </div>
 
       {/* Data Table */}
-      <div className="w-full overflow-hidden">
-        <DataTable
-          data={filteredSales}
-          columns={columns}
-          title="Sales Transactions"
-          searchPlaceholder="Search sales..."
-          pageSize={10}
-          emptyMessage="No sales found for the selected criteria"
-          className="min-w-full"
-        />
-      </div>
+      <DataTable
+        data={filteredSales}
+        columns={columns}
+        title="Sales Transactions"
+        searchPlaceholder="Search sales..."
+        pageSize={15}
+        emptyMessage="No sales found for the selected criteria"
+      />
     </div>
   );
 };

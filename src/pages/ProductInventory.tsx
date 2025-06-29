@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Fish, Search, Filter, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, Archive, Plus, FileText, Save, DollarSign, TrendingUp, Calculator } from "lucide-react";
+import { Fish, Search, Filter, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, Archive, Plus, FileText, Save, DollarSign, TrendingUp, Calculator, Camera, Scan, Upload, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -44,6 +44,186 @@ const ProductInventory = () => {
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isAddDamagedOpen, setIsAddDamagedOpen] = useState(false);
   const [isAddExpiredOpen, setIsAddExpiredOpen] = useState(false);
+
+  // OCR-related state
+  const [isOcrMode, setIsOcrMode] = useState(false);
+  const [ocrImage, setOcrImage] = useState<File | null>(null);
+  const [ocrImagePreview, setOcrImagePreview] = useState<string | null>(null);
+  const [isProcessingOcr, setIsProcessingOcr] = useState(false);
+  const [ocrResults, setOcrResults] = useState<{
+    productName?: string;
+    quantity?: string;
+    weight?: string;
+    expiryDate?: string;
+  } | null>(null);
+
+  // OCR processing functions
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setOcrImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setOcrImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      // Check if the browser supports camera access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access is not supported in this browser');
+        return;
+      }
+
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment' // Use back camera on mobile
+        }
+      });
+
+      // Create a video element to show camera feed
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.playsInline = true;
+
+      // Create a modal-like overlay for camera
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      `;
+
+      video.style.cssText = `
+        max-width: 90%;
+        max-height: 70%;
+        border-radius: 8px;
+      `;
+
+      // Create capture button
+      const captureBtn = document.createElement('button');
+      captureBtn.textContent = 'Capture Photo';
+      captureBtn.style.cssText = `
+        margin-top: 20px;
+        padding: 12px 24px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+      `;
+
+      // Create cancel button
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.cssText = `
+        margin-top: 10px;
+        padding: 8px 16px;
+        background: transparent;
+        color: white;
+        border: 1px solid white;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+      `;
+
+      overlay.appendChild(video);
+      overlay.appendChild(captureBtn);
+      overlay.appendChild(cancelBtn);
+      document.body.appendChild(overlay);
+
+      // Handle capture
+      captureBtn.onclick = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+            setOcrImage(file);
+            setOcrImagePreview(canvas.toDataURL());
+          }
+        }, 'image/jpeg', 0.8);
+
+        // Cleanup
+        stream.getTracks().forEach(track => track.stop());
+        document.body.removeChild(overlay);
+      };
+
+      // Handle cancel
+      cancelBtn.onclick = () => {
+        stream.getTracks().forEach(track => track.stop());
+        document.body.removeChild(overlay);
+      };
+
+    } catch (error) {
+      console.error('Camera access failed:', error);
+      alert('Unable to access camera. Please check permissions or use file upload instead.');
+    }
+  };
+
+  const processOcrImage = async () => {
+    if (!ocrImage) return;
+
+    setIsProcessingOcr(true);
+    try {
+      // Simulate OCR processing - In a real app, you would use a service like Tesseract.js or cloud OCR
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Mock OCR results - In reality, this would come from actual OCR processing
+      const mockResults = {
+        productName: "Atlantic Salmon",
+        quantity: "25",
+        weight: "37.5",
+        expiryDate: "2024-03-15"
+      };
+
+      setOcrResults(mockResults);
+    } catch (error) {
+      console.error('OCR processing failed:', error);
+      // Handle error appropriately
+    } finally {
+      setIsProcessingOcr(false);
+    }
+  };
+
+  const clearOcrData = () => {
+    setOcrImage(null);
+    setOcrImagePreview(null);
+    setOcrResults(null);
+    setIsProcessingOcr(false);
+  };
+
+  const toggleOcrMode = () => {
+    setIsOcrMode(!isOcrMode);
+    if (isOcrMode) {
+      clearOcrData();
+    }
+  };
+
+  const handleCloseAddStock = () => {
+    setIsAddStockOpen(false);
+    setIsOcrMode(false);
+    clearOcrData();
+  };
+
   // Mock data for fish product inventory - focused on selling business
   const productData = [
     {
@@ -937,78 +1117,229 @@ const ProductInventory = () => {
                       Increase and replenish inventory stock levels for existing fish products with new arrivals, deliveries, and fresh stock supplies
                     </p>
                   </div>
-                  <Dialog open={isAddStockOpen} onOpenChange={setIsAddStockOpen}>
+                  <Dialog open={isAddStockOpen} onOpenChange={(open) => {
+                    if (open) {
+                      setIsAddStockOpen(true);
+                    } else {
+                      handleCloseAddStock();
+                    }
+                  }}>
                     <DialogTrigger asChild>
                       <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
                         <Plus className="mr-1 h-3 w-3" />
                         Add Stock
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-xl">
-                      <DialogHeader>
-                        <DialogTitle>Add Fresh Stock</DialogTitle>
-                        <DialogDescription>
-                          Increase inventory levels for existing products with new stock arrivals.
+                    <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+                      <DialogHeader className="pb-3">
+                        <DialogTitle className="text-base flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Add Fresh Stock
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                          Add stock using manual entry or scan documents.
                         </DialogDescription>
                       </DialogHeader>
-                      <form className="space-y-6">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="stockProduct">Select Product *</Label>
-                            <Select>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Choose existing product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="salmon">Atlantic Salmon</SelectItem>
-                                <SelectItem value="trout">Rainbow Trout</SelectItem>
-                                <SelectItem value="tilapia">Tilapia Fillets</SelectItem>
-                                <SelectItem value="seabass">Sea Bass</SelectItem>
-                                <SelectItem value="cod">Cod Fillets</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="addQuantity">Add Quantity (boxes)</Label>
-                              <Input id="addQuantity" type="number" placeholder="0" />
+                      {/* Input Method Toggle */}
+                      <div className="flex items-center gap-1 p-2 bg-muted/30 rounded-md">
+                        <Button
+                          type="button"
+                          variant={!isOcrMode ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setIsOcrMode(false)}
+                          className="gap-1 h-8 px-3 text-xs"
+                        >
+                          <FileText className="h-3 w-3" />
+                          Manual
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={isOcrMode ? "default" : "ghost"}
+                          size="sm"
+                          onClick={toggleOcrMode}
+                          className="gap-1 h-8 px-3 text-xs"
+                        >
+                          <Scan className="h-3 w-3" />
+                          OCR Scan
+                        </Button>
+                      </div>
+
+                      <form className="space-y-3">
+                        {isOcrMode ? (
+                          /* OCR Mode */
+                          <div className="space-y-3">
+                            {!ocrImagePreview ? (
+                              /* Image Upload Section */
+                              <div className="border-2 border-dashed border-muted-foreground/25 rounded-md p-4">
+                                <div className="text-center space-y-3">
+                                  <div className="mx-auto w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-md flex items-center justify-center">
+                                    <Camera className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-xs font-medium">Upload Document</h3>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Photo or image of stock document
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2 justify-center">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => document.getElementById('ocr-file-input')?.click()}
+                                      className="gap-1 h-8 px-3 text-xs"
+                                    >
+                                      <Upload className="h-3 w-3" />
+                                      File
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleCameraCapture}
+                                      className="gap-1 h-8 px-3 text-xs"
+                                    >
+                                      <Camera className="h-3 w-3" />
+                                      Camera
+                                    </Button>
+                                  </div>
+                                  <input
+                                    id="ocr-file-input"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              /* Image Preview and Processing */
+                              <div className="space-y-3">
+                                <div className="relative">
+                                  <img
+                                    src={ocrImagePreview}
+                                    alt="Stock document"
+                                    className="w-full h-32 object-cover rounded-md border"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearOcrData}
+                                    className="absolute top-1 right-1 h-6 w-6 p-0"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+
+                                {!ocrResults && !isProcessingOcr && (
+                                  <Button
+                                    type="button"
+                                    onClick={processOcrImage}
+                                    className="w-full gap-1 h-8 text-xs"
+                                  >
+                                    <Scan className="h-3 w-3" />
+                                    Process Document
+                                  </Button>
+                                )}
+
+                                {isProcessingOcr && (
+                                  <div className="text-center py-2">
+                                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                      Processing...
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Form Fields - shown in manual mode or after OCR processing */}
+                        {(!isOcrMode || ocrResults) && (
+                          <div className="space-y-2">
+                            <div className="space-y-1">
+                              <Label htmlFor="stockProduct" className="text-xs font-medium">Product *</Label>
+                              <Select defaultValue={ocrResults?.productName?.toLowerCase().replace(' ', '-')}>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Choose product" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="salmon">Atlantic Salmon</SelectItem>
+                                  <SelectItem value="trout">Rainbow Trout</SelectItem>
+                                  <SelectItem value="tilapia">Tilapia Fillets</SelectItem>
+                                  <SelectItem value="seabass">Sea Bass</SelectItem>
+                                  <SelectItem value="cod">Cod Fillets</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="addWeight">Add Weight (kg)</Label>
-                              <Input id="addWeight" type="number" step="0.1" placeholder="0.0" />
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label htmlFor="addQuantity" className="text-xs font-medium">Quantity</Label>
+                                <Input
+                                  id="addQuantity"
+                                  type="number"
+                                  placeholder="0"
+                                  className="h-8 text-xs"
+                                  defaultValue={ocrResults?.quantity || ""}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="addWeight" className="text-xs font-medium">Weight (kg)</Label>
+                                <Input
+                                  id="addWeight"
+                                  type="number"
+                                  step="0.1"
+                                  placeholder="0.0"
+                                  className="h-8 text-xs"
+                                  defaultValue={ocrResults?.weight || ""}
+                                />
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="deliveryDate">Delivery Date</Label>
-                            <Input id="deliveryDate" type="date" />
-                          </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label htmlFor="deliveryDate" className="text-xs font-medium">Delivery</Label>
+                                <Input id="deliveryDate" type="date" className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="newExpiryDate" className="text-xs font-medium">Expiry</Label>
+                                <Input
+                                  id="newExpiryDate"
+                                  type="date"
+                                  className="h-8 text-xs"
+                                  defaultValue={ocrResults?.expiryDate || ""}
+                                />
+                              </div>
+                            </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="newExpiryDate">New Expiry Date</Label>
-                            <Input id="newExpiryDate" type="date" />
+                            {ocrResults && (
+                              <div className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                                <div className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
+                                  <Scan className="h-3 w-3" />
+                                  <span className="font-medium">OCR Data Extracted</span>
+                                </div>
+                                <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                                  Review and modify as needed.
+                                </p>
+                              </div>
+                            )}
                           </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="batchNumber">Batch Number</Label>
-                            <Input id="batchNumber" placeholder="e.g., AS-2024-004" />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="stockNotes">Notes</Label>
-                            <Textarea id="stockNotes" placeholder="Additional notes about this stock addition..." rows={3} />
-                          </div>
-                        </div>
+                        )}
                       </form>
-                      <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsAddStockOpen(false)}>
+                      <DialogFooter className="gap-2 pt-3">
+                        <Button type="button" variant="outline" onClick={handleCloseAddStock} className="h-8 px-3 text-xs">
                           Cancel
                         </Button>
-                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                          <Package className="mr-2 h-4 w-4" />
-                          Add Stock
-                        </Button>
+                        {(!isOcrMode || ocrResults) && (
+                          <Button type="submit" className="bg-blue-600 hover:bg-blue-700 h-8 px-3 text-xs">
+                            <Package className="mr-1 h-3 w-3" />
+                            Add Stock
+                          </Button>
+                        )}
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
