@@ -262,27 +262,33 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
     }
   };
 
-  // Define table columns
+  // Define table columns with responsive design
   const columns: DataTableColumn<ExpenseItem>[] = [
     {
       key: 'date',
       title: 'Date',
       sortable: true,
-      render: (value) => format(new Date(value), 'MMM dd, yyyy')
+      className: 'min-w-[100px]',
+      render: (value) => (
+        <div className="text-xs sm:text-sm">
+          {format(new Date(value), 'MMM dd, yyyy')}
+        </div>
+      )
     },
     {
       key: 'title',
       title: 'Expense',
       sortable: true,
       searchable: true,
+      className: 'min-w-[200px]',
       render: (value, row) => {
         const IconComponent = getCategoryIcon(row.category);
         return (
           <div className="flex items-center gap-2">
-            <IconComponent className="h-4 w-4 text-blue-600" />
-            <div>
-              <div className="font-medium">{value}</div>
-              <div className="text-xs text-muted-foreground line-clamp-1">
+            <IconComponent className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium text-xs sm:text-sm truncate">{value}</div>
+              <div className="text-xs text-muted-foreground line-clamp-1 hidden sm:block">
                 {row.description}
               </div>
             </div>
@@ -294,8 +300,9 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
       key: 'amount',
       title: 'Amount',
       sortable: true,
+      className: 'min-w-[100px] text-right',
       render: (value) => (
-        <div className="text-right font-bold text-red-600">
+        <div className="text-right font-bold text-red-600 text-xs sm:text-sm">
           ₣{value.toLocaleString()}
         </div>
       )
@@ -305,8 +312,9 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
       title: 'Category',
       sortable: true,
       searchable: true,
+      className: 'min-w-[120px] hidden lg:table-cell',
       render: (value) => (
-        <Badge variant="outline" className="text-xs">
+        <Badge variant="outline" className="text-xs truncate max-w-[100px]">
           {value}
         </Badge>
       )
@@ -316,10 +324,11 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
       title: 'Spent By',
       sortable: true,
       searchable: true,
+      className: 'min-w-[120px] hidden xl:table-cell',
       render: (value) => (
         <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{value}</span>
+          <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-xs sm:text-sm truncate">{value}</span>
         </div>
       )
     },
@@ -328,26 +337,31 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
       title: 'Vendor',
       sortable: true,
       searchable: true,
+      className: 'min-w-[120px] hidden 2xl:table-cell',
       render: (value) => value ? (
         <div className="flex items-center gap-2">
-          <Building className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{value}</span>
+          <Building className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-xs sm:text-sm truncate">{value}</span>
         </div>
       ) : (
-        <span className="text-muted-foreground">-</span>
+        <span className="text-muted-foreground text-xs">-</span>
       )
     },
     {
       key: 'status',
       title: 'Status',
       sortable: true,
+      className: 'min-w-[100px]',
       render: (value) => {
         const display = getStatusDisplay(value);
         const IconComponent = display.icon;
         return (
-          <Badge variant="secondary" className={cn(display.bgColor, display.color)}>
-            <IconComponent className="h-3 w-3 mr-1" />
-            {display.label}
+          <Badge variant="secondary" className={cn(display.bgColor, display.color, "text-xs")}>
+            <IconComponent className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+            <span className="hidden sm:inline">{display.label}</span>
+            <span className="sm:hidden">
+              {value === 'paid' ? '✓' : value === 'approved' ? '👍' : value === 'pending' ? '⏳' : '✗'}
+            </span>
           </Badge>
         );
       }
@@ -355,22 +369,25 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
     {
       key: 'paymentMethod',
       title: 'Payment',
+      className: 'min-w-[100px] hidden lg:table-cell',
       render: (value) => value ? (
-        <div className="text-xs text-muted-foreground">{value}</div>
+        <div className="text-xs text-muted-foreground truncate">{value}</div>
       ) : (
-        <span className="text-muted-foreground">-</span>
+        <span className="text-muted-foreground text-xs">-</span>
       )
     },
     {
       key: 'receipt',
       title: 'Receipt',
+      className: 'min-w-[80px] hidden sm:table-cell',
       render: (value) => value ? (
         <div className="flex items-center gap-1">
           <FileText className="h-3 w-3 text-green-600" />
-          <span className="text-xs text-green-600">Available</span>
+          <span className="text-xs text-green-600 hidden lg:inline">Available</span>
+          <span className="text-xs text-green-600 lg:hidden">✓</span>
         </div>
       ) : (
-        <span className="text-xs text-muted-foreground">None</span>
+        <span className="text-xs text-muted-foreground">-</span>
       )
     }
   ];
@@ -381,64 +398,91 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
   return (
     <div className="space-y-6">
       {/* Header with filters */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Receipt className="h-6 w-6 text-red-600" />
-            Expense Report
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Financial tracking of expenditures by category and person
-          </p>
+      <div className="flex flex-col gap-4">
+        {/* Title Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
+              <Receipt className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
+              Expense Report
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              Financial tracking of expenditures by category and person
+            </p>
+          </div>
+
+          {/* Export button - visible on larger screens */}
+          <div className="hidden lg:block">
+            <ExportActions
+              data={filteredExpenses}
+              columns={columns}
+              filename="expense_report"
+              dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
+              reportType="Expense"
+            />
+          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <DateFilter value={dateFilter} onChange={onDateFilterChange} />
-          
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map(category => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Filters Section */}
+        <div className="flex flex-col gap-3">
+          {/* Date Filter - Full width on mobile */}
+          <div className="w-full">
+            <DateFilter value={dateFilter} onChange={onDateFilterChange} className="w-full" />
+          </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Other Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <ExportActions
-            data={filteredExpenses}
-            columns={columns}
-            filename="expense_report"
-            dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
-            reportType="Expense"
-          />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Export button - visible on smaller screens */}
+            <div className="lg:hidden sm:col-span-2 lg:col-span-1">
+              <ExportActions
+                data={filteredExpenses}
+                columns={columns}
+                filename="expense_report"
+                dateRange={dateFilter.customRange || { from: new Date(), to: new Date() }}
+                reportType="Expense"
+                className="w-full"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-red-600" />
-              <div>
-                <div className="text-sm text-muted-foreground">Total Expenses</div>
-                <div className="text-lg font-bold text-red-600">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-shrink-0">
+                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-muted-foreground">Total Expenses</div>
+                <div className="text-sm sm:text-lg font-bold text-red-600 truncate">
                   ₣{summary.totalExpenses.toLocaleString()}
                 </div>
               </div>
@@ -446,13 +490,15 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-blue-600" />
-              <div>
-                <div className="text-sm text-muted-foreground">Avg Expense</div>
-                <div className="text-lg font-bold text-blue-600">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-shrink-0">
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-muted-foreground">Avg Expense</div>
+                <div className="text-sm sm:text-lg font-bold text-blue-600">
                   ₣{summary.averageExpense.toFixed(0)}
                 </div>
               </div>
@@ -460,13 +506,15 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Tag className="h-4 w-4 text-purple-600" />
-              <div>
-                <div className="text-sm text-muted-foreground">Top Category</div>
-                <div className="text-sm font-bold text-purple-600 truncate">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-shrink-0">
+                <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-muted-foreground">Top Category</div>
+                <div className="text-xs sm:text-sm font-bold text-purple-600 truncate" title={summary.topCategory}>
                   {summary.topCategory}
                 </div>
               </div>
@@ -474,13 +522,15 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-600" />
-              <div>
-                <div className="text-sm text-muted-foreground">Pending</div>
-                <div className="text-lg font-bold text-yellow-600">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-shrink-0">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-muted-foreground">Pending</div>
+                <div className="text-sm sm:text-lg font-bold text-yellow-600">
                   {summary.pendingApprovals}
                 </div>
               </div>
@@ -488,13 +538,15 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-orange-600" />
-              <div>
-                <div className="text-sm text-muted-foreground">Budget</div>
-                <div className="text-lg font-bold text-orange-600">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-shrink-0">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-muted-foreground">Budget</div>
+                <div className="text-sm sm:text-lg font-bold text-orange-600 truncate">
                   ₣{summary.monthlyBudget.toLocaleString()}
                 </div>
               </div>
@@ -502,35 +554,41 @@ const ExpenseReport: React.FC<ExpenseReportProps> = ({ dateFilter, onDateFilterC
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
+          <CardContent className="p-3 sm:p-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Budget Used</span>
-                <span className="text-sm font-medium">{summary.budgetUsed.toFixed(1)}%</span>
+                <span className="text-xs sm:text-sm text-muted-foreground">Budget Used</span>
+                <span className="text-xs sm:text-sm font-medium">{summary.budgetUsed.toFixed(1)}%</span>
               </div>
-              <Progress 
-                value={summary.budgetUsed} 
+              <Progress
+                value={summary.budgetUsed}
                 className={cn(
-                  "h-2",
+                  "h-1.5 sm:h-2",
                   summary.budgetUsed > 90 && "bg-red-100",
                   summary.budgetUsed > 75 && summary.budgetUsed <= 90 && "bg-yellow-100"
                 )}
               />
+              <div className="text-xs text-muted-foreground">
+                ₣{(summary.monthlyBudget * summary.budgetUsed / 100).toFixed(0)} used
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Data Table */}
-      <DataTable
-        data={filteredExpenses}
-        columns={columns}
-        title="Expense Transactions"
-        searchPlaceholder="Search expenses..."
-        pageSize={15}
-        emptyMessage="No expenses found for the selected criteria"
-      />
+      <div className="w-full overflow-hidden">
+        <DataTable
+          data={filteredExpenses}
+          columns={columns}
+          title="Expense Transactions"
+          searchPlaceholder="Search expenses..."
+          pageSize={10}
+          emptyMessage="No expenses found for the selected criteria"
+          className="min-w-full"
+        />
+      </div>
     </div>
   );
 };

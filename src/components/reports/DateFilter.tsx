@@ -123,14 +123,14 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
   };
 
   return (
-    <div className={cn("flex flex-col sm:flex-row gap-3 items-start sm:items-center", className)}>
+    <div className={cn("flex flex-col gap-3", className)}>
       {/* Preset Selection */}
       <div className="flex flex-wrap gap-2">
         <Button
           variant={value.preset === 'today' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('today')}
-          className="text-xs"
+          className="text-xs flex-1 sm:flex-none min-w-[70px]"
         >
           Today
         </Button>
@@ -138,7 +138,7 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
           variant={value.preset === 'week' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('week')}
-          className="text-xs"
+          className="text-xs flex-1 sm:flex-none min-w-[80px]"
         >
           This Week
         </Button>
@@ -146,18 +146,18 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
           variant={value.preset === 'month' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('month')}
-          className="text-xs"
+          className="text-xs flex-1 sm:flex-none min-w-[90px]"
         >
           This Month
         </Button>
-        
+
         {/* Custom Date Range Trigger */}
         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
               variant={value.preset === 'custom' ? 'default' : 'outline'}
               size="sm"
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none min-w-[80px]"
             >
               <CalendarIcon className="h-3 w-3 mr-1" />
               Custom
@@ -168,7 +168,7 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
               mode="range"
               selected={tempDateRange}
               onSelect={handleCustomDateSelect}
-              numberOfMonths={2}
+              numberOfMonths={window.innerWidth < 768 ? 1 : 2}
               className="rounded-md border"
             />
             <div className="p-3 border-t">
@@ -177,6 +177,7 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
                   variant="outline"
                   size="sm"
                   onClick={() => setIsCalendarOpen(false)}
+                  className="flex-1"
                 >
                   Cancel
                 </Button>
@@ -188,6 +189,7 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
                     }
                   }}
                   disabled={!tempDateRange?.from || !tempDateRange?.to}
+                  className="flex-1"
                 >
                   Apply
                 </Button>
@@ -198,18 +200,18 @@ const DateFilter: React.FC<DateFilterProps> = ({ value, onChange, className }) =
       </div>
 
       {/* Current Selection Display */}
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant="secondary" className="text-xs flex-1 justify-center sm:flex-none">
           {formatDateRange(currentRange)}
         </Badge>
-        
+
         {/* Clear button for custom ranges */}
         {value.preset === 'custom' && (
           <Button
             variant="ghost"
             size="sm"
             onClick={clearCustomRange}
-            className="h-6 w-6 p-0"
+            className="h-6 w-6 p-0 flex-shrink-0"
           >
             <X className="h-3 w-3" />
           </Button>
