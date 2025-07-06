@@ -1,5 +1,7 @@
 {
   "common": {
+    "appName": "LocalFishing",
+    "appSubtitle": "Sisitemu yo gucuruza amafi",
     "welcome": "Murakaza neza",
     "logout": "Sohoka",
     "login": "Injira",
@@ -61,6 +63,20 @@
   "dashboard": {
     "title": "Ikibaho",
     "overview": "Muri rusange",
+    "goodMorning": "Mwaramutse",
+    "goodAfternoon": "Mwiriwe",
+    "goodEvening": "Muramuke",
+    "systemOnline": "Sisitemu irakora",
+    "productsActive": "Ibicuruzwa 12 birakora",
+    "salesUp": "Igurisha ryiyongereye 15%",
+    "totalRevenue": "Inyungu zose",
+    "revenueGrowth": "+15% kuva ukwezi gushize",
+    "productsInStock": "Ibicuruzwa biri mu bubiko",
+    "fishTypes": "Ubwoko 5 bw'amafi",
+    "lowStockItems": "Ibicuruzwa bike",
+    "needRestocking": "Bikeneye kwongera",
+    "activeCustomers": "Abakiriya bakora",
+    "newCustomers": "6 bashya muri uku kwezi",
     "totalSales": "Igurisha ryose",
     "totalCustomers": "Abakiriya bose",
     "totalProducts": "Ibicuruzwa byose",
@@ -201,13 +217,16 @@
     "sent": "Ubutumwa bwoherejwe",
     "draft": "Ubutumwa butarangiye",
     "messageStatus": "Uko ubutumwa bumeze",
-    "sent": "Bwoherejwe",
+    "sentStatus": "Bwoherejwe",
     "pending": "Burategereza",
     "failed": "Ntibyakunze"
   },
   "auth": {
     "loginTitle": "Injira muri LocalFishing",
     "registerTitle": "Iyandikishe muri LocalFishing",
+    "systemDescription": "Sisitemu yo gucuruza amafi",
+    "welcomeBack": "Murakaza neza mu bucuruzi bwanyu bw'amafi",
+    "signInToAccount": "Injira muri konti yawe",
     "email": "Imeyili",
     "password": "Ijambo ry'ibanga",
     "confirmPassword": "Emeza ijambo ry'ibanga",
@@ -219,7 +238,9 @@
     "dontHaveAccount": "Nta konti ufite?",
     "resetPassword": "Ongera ushyireho ijambo ry'ibanga",
     "backToLogin": "Subira ku kwinjira",
-    "confirmLogout": "Uremeza ko ushaka gusohoka?"
+    "confirmLogout": "Uremeza ko ushaka gusohoka?",
+    "completeBusinessSolution": "Igisubizo cyuzuye cy'ubucuruzi bw'amafi",
+    "createAccountToStart": "Kora konti yawe y'ubuyobozi kugira ngo utangire"
   },
   "validation": {
     "required": "Iki gice gikenewe",
@@ -248,5 +269,21 @@
     "uploadSuccess": "Idosiye yoherejwe neza",
     "uploadError": "Kohereza idosiye ntibyakunze",
     "networkError": "Ikibazo cy'umuyoboro. Reba neza umuyoboro wawe"
+  },
+  "settings": {
+    "languagePreferences": "Ihitamo ry'ururimi",
+    "languageDescription": "Hitamo ururimi rwiza rw'interface",
+    "currentLanguage": "Ururimi rw'ubu",
+    "selectLanguage": "Hitamo ururimi",
+    "languageInfo": "Amakuru y'ururimi",
+    "languageInfoAutoSave": "Ihitamo ryawe ry'ururimi rirabikwa mu buryo bwikora",
+    "languageInfoInstant": "Impinduka zikora ako kanya",
+    "languageInfoPersistent": "Igenamiterere rikomeza mu bikorwa byose",
+    "resetToEnglish": "Subira ku Cyongereza",
+    "languageChanged": "Ururimi rwahinduwe neza",
+    "languageChangeDescription": "Ururimi rw'interface rwahinduwe",
+    "languageChangeError": "Guhindura ururimi ntibyakunze",
+    "languageChangeErrorDescription": "Nyamuneka ongera ugerageze",
+    "language": "Ururimi"
   }
 }

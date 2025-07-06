@@ -1,5 +1,7 @@
 {
   "common": {
+    "appName": "LocalFishing",
+    "appSubtitle": "Fish Management System",
     "welcome": "Welcome back",
     "logout": "Logout",
     "login": "Login",
@@ -61,6 +63,20 @@
   "dashboard": {
     "title": "Dashboard",
     "overview": "Overview",
+    "goodMorning": "Good Morning",
+    "goodAfternoon": "Good Afternoon",
+    "goodEvening": "Good Evening",
+    "systemOnline": "System Online",
+    "productsActive": "12 Products Active",
+    "salesUp": "Sales Up 15%",
+    "totalRevenue": "Total Revenue",
+    "revenueGrowth": "+15% from last month",
+    "productsInStock": "Products in Stock",
+    "fishTypes": "5 different fish types",
+    "lowStockItems": "Low Stock Items",
+    "needRestocking": "Need restocking",
+    "activeCustomers": "Active Customers",
+    "newCustomers": "6 new this month",
     "totalSales": "Total Sales",
     "totalCustomers": "Total Customers",
     "totalProducts": "Total Products",
@@ -208,6 +224,9 @@
   "auth": {
     "loginTitle": "Login to LocalFishing",
     "registerTitle": "Register for LocalFishing",
+    "systemDescription": "Fish Business Management System",
+    "welcomeBack": "Welcome back to your fish business",
+    "signInToAccount": "Sign in to your account",
     "email": "Email",
     "password": "Password",
     "confirmPassword": "Confirm Password",
@@ -219,7 +238,9 @@
     "dontHaveAccount": "Don't have an account?",
     "resetPassword": "Reset Password",
     "backToLogin": "Back to Login",
-    "confirmLogout": "Are you sure you want to logout?"
+    "confirmLogout": "Are you sure you want to logout?",
+    "completeBusinessSolution": "Complete Fish Business Solution",
+    "createAccountToStart": "Create your admin account to get started"
   },
   "validation": {
     "required": "This field is required",
@@ -248,5 +269,21 @@
     "uploadSuccess": "File uploaded successfully",
     "uploadError": "Failed to upload file",
     "networkError": "Network error. Please check your connection"
+  },
+  "settings": {
+    "languagePreferences": "Language Preferences",
+    "languageDescription": "Choose your preferred language for the interface",
+    "currentLanguage": "Current Language",
+    "selectLanguage": "Select Language",
+    "languageInfo": "Language Information",
+    "languageInfoAutoSave": "Your language preference is automatically saved",
+    "languageInfoInstant": "Changes take effect immediately",
+    "languageInfoPersistent": "Settings persist across browser sessions",
+    "resetToEnglish": "Reset to English",
+    "languageChanged": "Language changed successfully",
+    "languageChangeDescription": "The interface language has been updated",
+    "languageChangeError": "Failed to change language",
+    "languageChangeErrorDescription": "Please try again",
+    "language": "Language"
   }
 }

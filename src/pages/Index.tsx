@@ -10,8 +10,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Fish, Package, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Sparkles, Waves, ChevronDown, Activity, Archive, BarChart3, Check, CheckCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 const Dashboard = () => {
+  const { t } = useTranslation();
+  usePageTitle('navigation.dashboard', 'Dashboard');
+
   const [isVisible, setIsVisible] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentView, setCurrentView] = useState('top-selling');
@@ -356,9 +361,9 @@ const Dashboard = () => {
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
+    if (hour < 12) return t('dashboard.goodMorning', 'Good Morning');
+    if (hour < 17) return t('dashboard.goodAfternoon', 'Good Afternoon');
+    return t('dashboard.goodEvening', 'Good Evening');
   };
 
   const formatTime = () => {
@@ -447,15 +452,15 @@ const Dashboard = () => {
               <div className="flex flex-wrap gap-2 text-xs">
                 <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse group-hover:animate-bounce" />
-                  <span className="font-medium">System Online</span>
+                  <span className="font-medium">{t('dashboard.systemOnline', 'System Online')}</span>
                 </div>
                 <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
                   <Fish className="h-3 w-3 text-blue-500 group-hover:animate-pulse" />
-                  <span className="font-medium">12 Products Active</span>
+                  <span className="font-medium">{t('dashboard.productsActive', '12 Products Active')}</span>
                 </div>
                 <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
                   <TrendingUp className="h-3 w-3 text-green-500 group-hover:animate-bounce" />
-                  <span className="font-medium">Sales Up 15%</span>
+                  <span className="font-medium">{t('dashboard.salesUp', 'Sales Up 15%')}</span>
                 </div>
               </div>
             </div>
@@ -466,45 +471,45 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.totalRevenue', 'Total Revenue')}</CardTitle>
               <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">$18,450</div>
-              <p className="text-xs text-muted-foreground">+15% from last month</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.revenueGrowth', '+15% from last month')}</p>
             </CardContent>
           </Card>
 
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Products in Stock</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.productsInStock', 'Products in Stock')}</CardTitle>
               <Package className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">5 different fish types</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.fishTypes', '5 different fish types')}</p>
             </CardContent>
           </Card>
 
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.lowStockItems', 'Low Stock Items')}</CardTitle>
               <AlertTriangle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">4</div>
-              <p className="text-xs text-muted-foreground">Need restocking</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.needRestocking', 'Need restocking')}</p>
             </CardContent>
           </Card>
 
           <Card className="hover-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.activeCustomers', 'Active Customers')}</CardTitle>
               <Users className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">24</div>
-              <p className="text-xs text-muted-foreground">6 new this month</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.newCustomers', '6 new this month')}</p>
             </CardContent>
           </Card>
         </div>

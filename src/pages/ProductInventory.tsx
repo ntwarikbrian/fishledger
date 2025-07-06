@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import AppLayout from "@/components/layout/AppLayout";
 import { Package, Plus, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,10 +13,14 @@ import { useCategories } from "@/hooks/use-categories";
 import InventoryTab from "@/components/inventory/InventoryTab";
 import AddProductTab from "@/components/inventory/AddProductTab";
 import AuditTab from "@/components/inventory/AuditTab";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 type ViewType = "all" | "low-stock" | "damaged" | "expiry" | "stock-adjustment" | "categories";
 
 const ProductInventory = () => {
+  const { t } = useTranslation();
+  usePageTitle('navigation.inventory', 'Product Inventory');
+
   // View state
   const [currentView, setCurrentView] = useState<ViewType>("all");
   

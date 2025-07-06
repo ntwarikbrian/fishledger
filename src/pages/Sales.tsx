@@ -5,8 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Search, Scale, Edit, Eye, Plus, FileText, ShoppingCart, Package, Fish, Calculator, Truck, CreditCard, Calendar, MapPin, DollarSign, Hash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 const Sales = () => {
+  const { t } = useTranslation();
+  usePageTitle('navigation.sales', 'Sales');
+
   // Mock data for sales with both selling methods
   const salesData = [
     {

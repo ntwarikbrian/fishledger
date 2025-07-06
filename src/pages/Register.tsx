@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,9 +29,14 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
+import { CompactLanguageSwitcher } from "@/components/ui/language-switcher";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { authAPI } from "@/services/api";
 
 const Register = () => {
+  const { t } = useTranslation();
+  usePageTitle('auth.registerTitle', 'Register');
+
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -197,8 +203,8 @@ const Register = () => {
               <Fish className="h-12 w-12 text-white" />
             </div>
             <div>
-              <h1 className="text-5xl font-bold mb-2">AquaManage</h1>
-              <p className="text-green-100 text-xl">Complete Fish Business Solution</p>
+              <h1 className="text-5xl font-bold mb-2">LocalFishing</h1>
+              <p className="text-green-100 text-xl">{t('auth.completeBusinessSolution', 'Complete Fish Business Solution')}</p>
             </div>
           </div>
 
@@ -280,6 +286,11 @@ const Register = () => {
       {/* Right Side - Registration Form (Smaller) */}
       <div className="w-full lg:w-2/5 xl:w-1/3 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
+          {/* Language Switcher */}
+          <div className="flex justify-end mb-4">
+            <CompactLanguageSwitcher />
+          </div>
+
           {/* Mobile Logo (visible only on small screens) */}
           <div className="lg:hidden text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -287,11 +298,11 @@ const Register = () => {
                 <Fish className="h-8 w-8 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                AquaManage
+                LocalFishing
               </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
-              Create your admin account to get started
+              {t('auth.createAccountToStart', 'Create your admin account to get started')}
             </p>
           </div>
 

@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Users,
   MessageCircle,
@@ -48,6 +50,9 @@ import { contactsApi, Contact, CreateContactInput } from "@/lib/api";
 import { toast } from "sonner";
 
 const Customers = () => {
+  const { t } = useTranslation();
+  usePageTitle('navigation.customers', 'Customers');
+
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [chatFilter, setChatFilter] = useState("all"); // New filter state for chat tab
   const [chatSearchQuery, setChatSearchQuery] = useState(""); // Search state for chat tab

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +28,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { authAPI } from "@/services/api";
+import { CompactLanguageSwitcher } from "@/components/ui/language-switcher";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 const Login = () => {
+  const { t } = useTranslation();
+  usePageTitle('auth.loginTitle', 'Login');
+
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [loginType, setLoginType] = useState<"admin" | "worker">("admin");
@@ -113,8 +119,8 @@ const Login = () => {
               <Fish className="h-12 w-12 text-white" />
             </div>
             <div>
-              <h1 className="text-5xl font-bold mb-2">AquaManage</h1>
-              <p className="text-blue-100 text-xl">Fish Business Management System</p>
+              <h1 className="text-5xl font-bold mb-2">LocalFishing</h1>
+              <p className="text-blue-100 text-xl">{t('auth.systemDescription', 'Fish Business Management System')}</p>
             </div>
           </div>
 
@@ -176,6 +182,11 @@ const Login = () => {
       {/* Right Side - Login Form (Smaller) */}
       <div className="w-full lg:w-2/5 xl:w-1/3 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
+          {/* Language Switcher */}
+          <div className="flex justify-end mb-4">
+            <CompactLanguageSwitcher />
+          </div>
+
           {/* Mobile Logo (visible only on small screens) */}
           <div className="lg:hidden text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -183,11 +194,11 @@ const Login = () => {
                 <Fish className="h-8 w-8 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                AquaManage
+                LocalFishing
               </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
-              Welcome back to your fish business
+              {t('auth.welcomeBack', 'Welcome back to your fish business')}
             </p>
           </div>
 
@@ -195,10 +206,10 @@ const Login = () => {
         <Card className="shadow-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
-              Welcome Back
+              {t('common.welcome', 'Welcome Back')}
             </CardTitle>
             <p className="text-gray-500 dark:text-gray-400 text-sm">
-              Sign in to your account
+              {t('auth.signInToAccount', 'Sign in to your account')}
             </p>
           </CardHeader>
           <CardContent className="px-6 pb-6">
