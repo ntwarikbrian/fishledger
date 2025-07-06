@@ -1,6 +1,7 @@
 
 import { MenuIcon, Bell, UserRound, Sun, Moon, Clock, AlertCircle, CheckCircle, Info } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useNotifications } from "@/hooks/use-notifications";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 const Navbar = () => {
+  const { t } = useTranslation();
   const { toggleSidebar, state } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -71,11 +74,14 @@ const Navbar = () => {
           <span className="sr-only">Expand sidebar</span>
         </Button>
 
-        <h1 className="font-semibold">FishSell Pro</h1>
+        <h1 className="font-semibold">LocalFishing</h1>
       </div>
 
       {/* Right side - Account & action buttons */}
       <div className="flex items-center gap-3">
+        {/* Language Switcher */}
+        <LanguageSwitcher />
+
         {/* Notifications dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -89,12 +95,12 @@ const Navbar = () => {
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Badge>
               )}
-              <span className="sr-only">Notifications</span>
+              <span className="sr-only">{t('notifications.title', 'Notifications')}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
             <div className="flex items-center justify-between p-2">
-              <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+              <DropdownMenuLabel className="p-0">{t('notifications.title', 'Notifications')}</DropdownMenuLabel>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
@@ -102,7 +108,7 @@ const Navbar = () => {
                   className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
                   onClick={markAllAsRead}
                 >
-                  Mark all as read
+                  {t('notifications.markAllAsRead', 'Mark all as read')}
                 </Button>
               )}
             </div>
@@ -110,7 +116,7 @@ const Navbar = () => {
             <ScrollArea className="h-80">
               {notifications.length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground">
-                  No notifications
+                  {t('notifications.noNotifications', 'No notifications')}
                 </div>
               ) : (
                 notifications.map((notification) => (
@@ -145,7 +151,7 @@ const Navbar = () => {
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-center justify-center text-sm text-muted-foreground">
-                  View all notifications
+                  {t('notifications.viewAll', 'View all notifications')}
                 </DropdownMenuItem>
               </>
             )}
@@ -161,7 +167,7 @@ const Navbar = () => {
         >
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
+          <span className="sr-only">{t('common.toggleTheme', 'Toggle theme')}</span>
         </Button>
 
         <DropdownMenu>
@@ -173,12 +179,12 @@ const Navbar = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('common.profile', 'My Account')}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuItem>{t('common.profile', 'Profile')}</DropdownMenuItem>
+            <DropdownMenuItem>{t('common.settings', 'Settings')}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem>{t('common.logout', 'Log out')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

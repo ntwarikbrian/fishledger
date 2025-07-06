@@ -1,4 +1,7 @@
 
+// Import i18n configuration - must be imported before any components that use translations
+import './i18n';
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";

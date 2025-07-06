@@ -1,5 +1,6 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Calculator, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,27 +25,29 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Product Inventory", href: "/inventory", icon: Fish },
-  { name: "Sales & Analytics", href: "/sales", icon: TrendingUp },
-  { name: "Contacts", href: "/customers", icon: Users },
-  { name: "Quick Math", href: "/quick-math", icon: Calculator },
-  { name: "Expenses", href: "/expenses", icon: DollarSign },
-  { name: "Documents", href: "/documents", icon: FolderOpen },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Workers", href: "/staff", icon: Users },
-];
-
 const Sidebar = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   const { state } = useSidebar();
 
+  // Navigation items with translation keys
+  const navigation = [
+    { name: t('navigation.dashboard'), href: "/", icon: Home, key: "dashboard" },
+    { name: t('navigation.inventory'), href: "/inventory", icon: Fish, key: "inventory" },
+    { name: t('navigation.sales'), href: "/sales", icon: TrendingUp, key: "sales" },
+    { name: t('navigation.customers'), href: "/customers", icon: Users, key: "customers" },
+    { name: "Quick Math", href: "/quick-math", icon: Calculator, key: "quickmath" },
+    { name: t('navigation.expenses'), href: "/expenses", icon: DollarSign, key: "expenses" },
+    { name: t('navigation.documents'), href: "/documents", icon: FolderOpen, key: "documents" },
+    { name: t('navigation.reports'), href: "/reports", icon: FileText, key: "reports" },
+    { name: t('navigation.staff'), href: "/staff", icon: Users, key: "staff" },
+  ];
+
   // Handle logout functionality
   const handleLogout = () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
+    const confirmed = window.confirm(t('auth.confirmLogout', 'Are you sure you want to logout?'));
     if (confirmed) {
       // Clear authentication data
       localStorage.removeItem("userType");
@@ -75,7 +78,7 @@ const Sidebar = () => {
           <>
             <div className="flex items-center gap-2">
               <Fish className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-semibold">AquaManage</span>
+              <span className="text-xl font-semibold">LocalFishing</span>
             </div>
             <SidebarTrigger className="h-8 w-8">
               <MenuIcon className="h-4 w-4" />
