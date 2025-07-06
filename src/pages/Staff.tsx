@@ -80,6 +80,9 @@ const Staff = () => {
   });
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
+  // State for selected worker in roles and permissions
+  const [selectedWorker, setSelectedWorker] = useState<any>(null);
+
   // Mock data for existing workers with login and revenue data
   const workersData = [
     {
@@ -447,7 +450,7 @@ const Staff = () => {
 
         {/* Workers Management Tabs */}
         <Tabs defaultValue="all-workers" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all-workers" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               All Workers
@@ -459,6 +462,10 @@ const Staff = () => {
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4" />
               Tasks
+            </TabsTrigger>
+            <TabsTrigger value="roles-permissions" className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Roles & Permissions
             </TabsTrigger>
           </TabsList>
 
@@ -1098,6 +1105,176 @@ const Staff = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Roles and Permissions Tab */}
+          <TabsContent value="roles-permissions" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Worker Selection */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Select Worker
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a worker to view their roles and permissions
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Worker List */}
+                  <div className="space-y-2">
+                    {workersData.map((worker) => (
+                      <div
+                        key={worker.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedWorker(worker)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{worker.name}</p>
+                            <p className="text-sm text-muted-foreground">{worker.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Sales Worker</Badge>
+                          {selectedWorker?.id === worker.id && (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Worker Permissions Preview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckSquare className="h-5 w-5" />
+                    {selectedWorker ? `${selectedWorker.name}'s Permissions` : 'Worker Permissions'}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedWorker ? `View and manage permissions for ${selectedWorker.name}` : 'Select a worker to view their permissions'}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedWorker ? (
+                    <>
+                      {/* Worker Info */}
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{selectedWorker.name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedWorker.email}</p>
+                          <Badge variant="outline" className="mt-1">Sales Worker</Badge>
+                        </div>
+                      </div>
+
+                      {/* Permission Categories */}
+                      <div className="space-y-4">
+                        {/* Sales Permissions */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <DollarSign className="h-4 w-4" />
+                            Sales & Orders
+                          </h4>
+                          <div className="space-y-2 pl-6">
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm">View sales data</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm">Create new sales</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Edit existing sales</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Delete sales records</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Inventory Permissions */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Building className="h-4 w-4" />
+                            Inventory Management
+                          </h4>
+                          <div className="space-y-2 pl-6">
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm">View inventory</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Update stock levels</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Add new products</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Manage suppliers</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Customer Permissions */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Customer Management
+                          </h4>
+                          <div className="space-y-2 pl-6">
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm">View customer data</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm">Add new customers</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Edit customer information</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm">Send messages to customers</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit Permissions Button */}
+                      <div className="pt-4 border-t">
+                        <Button className="w-full">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit {selectedWorker.name}'s Permissions
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Select a worker from the left to view their roles and permissions</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

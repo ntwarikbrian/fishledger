@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { foldersApi, filesApi, type FolderData, type CreateFolderData, type FileData } from "@/lib/api";
 
 // Circular Progress Component for Statistics
 interface CircularProgressProps {
@@ -169,23 +170,16 @@ interface UploadStats {
   storageUsed: number; // percentage
 }
 
-interface Folder {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-  documentCount: number;
-  createdDate: string;
-  createdBy: string;
-}
+// Use FolderData from API
+type Folder = FolderData;
 
 // Add Folder Form Component
 interface AddFolderFormProps {
   onSubmit: (data: { name: string; description: string; color: string; icon: string }) => void;
+  isLoading?: boolean;
 }
 
-const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit }) => {
+const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit, isLoading = false }) => {
   const [name, setName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [color, setColor] = useState<string>("blue");
@@ -224,80 +218,94 @@ const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit }) => {
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
       {/* Folder Name */}
-      <div className="space-y-2">
-        <Label htmlFor="folderName">Folder Name</Label>
+      <div className="space-y-1">
+        <Label htmlFor="folderName" className="text-sm">Folder Name</Label>
         <Input
           id="folderName"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Enter folder name"
-          className="w-full"
+          className="w-full h-8"
           required
         />
       </div>
 
       {/* Folder Description */}
-      <div className="space-y-2">
-        <Label htmlFor="folderDescription">Description</Label>
+      <div className="space-y-1">
+        <Label htmlFor="folderDescription" className="text-sm">Description (Optional)</Label>
         <Textarea
           id="folderDescription"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Enter folder description"
-          className="w-full"
-          rows={3}
+          placeholder="Brief description..."
+          className="w-full text-sm"
+          rows={2}
         />
       </div>
 
-      {/* Color Selection */}
-      <div className="space-y-2">
-        <Label>Folder Color</Label>
-        <div className="flex gap-2">
-          {colorOptions.map((colorOption) => (
-            <button
-              key={colorOption.value}
-              type="button"
-              onClick={() => setColor(colorOption.value)}
-              className={`w-8 h-8 rounded-full ${colorOption.class} ${
-                color === colorOption.value ? "ring-2 ring-offset-2 ring-gray-400" : ""
-              } transition-all`}
-              title={colorOption.label}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Icon Selection */}
-      <div className="space-y-2">
-        <Label>Folder Icon</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {iconOptions.map((iconOption) => {
-            const IconComponent = iconOption.icon;
-            return (
+      {/* Color and Icon Selection - Side by Side */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Color Selection */}
+        <div className="space-y-1">
+          <Label className="text-sm">Color</Label>
+          <div className="flex gap-1">
+            {colorOptions.map((colorOption) => (
               <button
-                key={iconOption.value}
+                key={colorOption.value}
                 type="button"
-                onClick={() => setIcon(iconOption.value)}
-                className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-all ${
-                  icon === iconOption.value
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <IconComponent className="h-5 w-5" />
-                <span className="text-xs">{iconOption.label}</span>
-              </button>
-            );
-          })}
+                onClick={() => setColor(colorOption.value)}
+                className={`w-6 h-6 rounded-full ${colorOption.class} ${
+                  color === colorOption.value ? "ring-2 ring-offset-1 ring-gray-400" : ""
+                } transition-all`}
+                title={colorOption.label}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Icon Selection */}
+        <div className="space-y-1">
+          <Label className="text-sm">Icon</Label>
+          <div className="grid grid-cols-3 gap-1">
+            {iconOptions.map((iconOption) => {
+              const IconComponent = iconOption.icon;
+              return (
+                <button
+                  key={iconOption.value}
+                  type="button"
+                  onClick={() => setIcon(iconOption.value)}
+                  className={`p-1.5 rounded border flex flex-col items-center transition-all ${
+                    icon === iconOption.value
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                  }`}
+                  title={iconOption.label}
+                >
+                  <IconComponent className="h-3 w-3" />
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Submit Button */}
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-          Create Folder
+      <div className="flex justify-end gap-2 pt-2">
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="bg-blue-600 hover:bg-blue-700 h-8 px-4 text-sm"
+        >
+          {isLoading ? (
+            <>
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              Creating...
+            </>
+          ) : (
+            'Create Folder'
+          )}
         </Button>
       </div>
     </form>
@@ -306,84 +314,7 @@ const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit }) => {
 
 const Documents: React.FC = () => {
   // State management for documents and UI
-  const [documents, setDocuments] = useState<DocumentFile[]>([
-    {
-      id: "1",
-      name: "Fish_Inventory_Report_2024.pdf",
-      type: "document",
-      size: "2.4 MB",
-      uploadDate: "2024-01-15",
-      uploadedBy: "Admin",
-      category: "Reports", // Keep for backward compatibility
-      folderId: "4",
-      folderName: "Reports",
-      folderColor: "orange",
-      url: "/sample-document.pdf",
-      description: "Monthly fish inventory analysis report",
-      tags: ["inventory", "report", "2024"]
-    },
-    {
-      id: "2",
-      name: "Fresh_Salmon_Photo.jpg",
-      type: "image",
-      size: "1.8 MB",
-      uploadDate: "2024-01-14",
-      uploadedBy: "Worker",
-      category: "Product Images", // Keep for backward compatibility
-      folderId: "3",
-      folderName: "Product Images",
-      folderColor: "purple",
-      url: "/sample-image.jpg",
-      thumbnail: "/sample-thumbnail.jpg",
-      description: "High-quality salmon product photo",
-      tags: ["salmon", "product", "photo"]
-    },
-    {
-      id: "3",
-      name: "Supplier_Contract_2024.docx",
-      type: "document",
-      size: "856 KB",
-      uploadDate: "2024-01-13",
-      uploadedBy: "Admin",
-      category: "Contracts", // Keep for backward compatibility
-      folderId: "1",
-      folderName: "Contracts",
-      folderColor: "blue",
-      url: "/sample-contract.docx",
-      description: "Annual supplier agreement document",
-      tags: ["contract", "supplier", "legal"]
-    },
-    {
-      id: "4",
-      name: "Customer_Invoice_INV-2024-001.pdf",
-      type: "document",
-      size: "1.2 MB",
-      uploadDate: "2024-01-12",
-      uploadedBy: "Admin",
-      category: "Invoices", // Keep for backward compatibility
-      folderId: "2",
-      folderName: "Invoices",
-      folderColor: "green",
-      url: "/sample-invoice.pdf",
-      description: "Customer invoice for fish delivery",
-      tags: ["invoice", "customer", "billing"]
-    },
-    {
-      id: "5",
-      name: "Quality_Certificate_2024.pdf",
-      type: "document",
-      size: "945 KB",
-      uploadDate: "2024-01-10",
-      uploadedBy: "Admin",
-      category: "Certificates", // Keep for backward compatibility
-      folderId: "5",
-      folderName: "Certificates",
-      folderColor: "red",
-      url: "/sample-certificate.pdf",
-      description: "Quality assurance certificate",
-      tags: ["certificate", "quality", "compliance"]
-    }
-  ]);
+  const [documents, setDocuments] = useState<DocumentFile[]>([]);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -392,61 +323,14 @@ const Documents: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Folder management state
-  const [folders, setFolders] = useState<Folder[]>([
-    {
-      id: "1",
-      name: "Contracts",
-      description: "Legal contracts and agreements",
-      color: "blue",
-      icon: "FileText",
-      documentCount: 12,
-      createdDate: "2024-01-10",
-      createdBy: "Admin"
-    },
-    {
-      id: "2",
-      name: "Invoices",
-      description: "Customer invoices and billing documents",
-      color: "green",
-      icon: "Receipt",
-      documentCount: 28,
-      createdDate: "2024-01-08",
-      createdBy: "Admin"
-    },
-    {
-      id: "3",
-      name: "Product Images",
-      description: "Fish product photos and marketing materials",
-      color: "purple",
-      icon: "Image",
-      documentCount: 45,
-      createdDate: "2024-01-05",
-      createdBy: "Worker"
-    },
-    {
-      id: "4",
-      name: "Reports",
-      description: "Business reports and analytics",
-      color: "orange",
-      icon: "BarChart",
-      documentCount: 8,
-      createdDate: "2024-01-03",
-      createdBy: "Admin"
-    },
-    {
-      id: "5",
-      name: "Certificates",
-      description: "Quality certificates and compliance documents",
-      color: "red",
-      icon: "Award",
-      documentCount: 6,
-      createdDate: "2024-01-01",
-      createdBy: "Admin"
-    }
-  ]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [isAddFolderOpen, setIsAddFolderOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("folders");
+  const [isLoadingFolders, setIsLoadingFolders] = useState<boolean>(true);
+  const [isCreatingFolder, setIsCreatingFolder] = useState<boolean>(false);
+  const [selectedFolderForManage, setSelectedFolderForManage] = useState<Folder | null>(null);
+  const [isManageDialogOpen, setIsManageDialogOpen] = useState<boolean>(false);
 
   // Upload form state
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -458,16 +342,95 @@ const Documents: React.FC = () => {
   // Document viewer hook
   const { isOpen, currentDocument, openDocument, closeDocument } = useDocumentViewer();
 
+  // Fetch folders on component mount
+  React.useEffect(() => {
+    const fetchFolders = async () => {
+      try {
+        setIsLoadingFolders(true);
+
+        // Check authentication status
+        const authToken = localStorage.getItem('auth_token');
+        console.log("Auth token present:", !!authToken);
+
+        if (!authToken) {
+          console.error("No authentication token found");
+          toast.error("Please log in to access folders");
+          return;
+        }
+
+        const response = await foldersApi.getAll();
+        console.log("Folders API response:", response);
+
+        if (response.success && response.data) {
+          setFolders(response.data);
+        } else {
+          console.error('Failed to fetch folders:', response.message);
+          if (response.error?.includes('401') || response.error?.includes('Authentication')) {
+            toast.error("Authentication expired. Please log in again.");
+          } else {
+            toast.error('Failed to load folders');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching folders:', error);
+        toast.error('Failed to load folders');
+      } finally {
+        setIsLoadingFolders(false);
+      }
+    };
+
+    fetchFolders();
+  }, []);
+
   // Upload statistics
-  const uploadStats: UploadStats = {
-    totalFiles: documents.length,
-    totalSize: "12.8 GB",
-    recentUploads: 5,
-    storageUsed: 68
-  };
+  const uploadStats: UploadStats = React.useMemo(() => {
+    // Calculate total size from documents
+    const totalSizeBytes = documents.reduce((total, doc) => {
+      // Parse size string (e.g., "2.4 MB" -> 2.4 * 1024 * 1024)
+      const sizeMatch = doc.size.match(/^([\d.]+)\s*(KB|MB|GB)$/i);
+      if (sizeMatch) {
+        const value = parseFloat(sizeMatch[1]);
+        const unit = sizeMatch[2].toUpperCase();
+        switch (unit) {
+          case 'KB': return total + (value * 1024);
+          case 'MB': return total + (value * 1024 * 1024);
+          case 'GB': return total + (value * 1024 * 1024 * 1024);
+          default: return total;
+        }
+      }
+      return total;
+    }, 0);
+
+    // Format total size
+    const formatSize = (bytes: number): string => {
+      if (bytes === 0) return "0 MB";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    };
+
+    // Calculate recent uploads (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentUploads = documents.filter(doc =>
+      new Date(doc.uploadDate) >= sevenDaysAgo
+    ).length;
+
+    // Calculate storage usage percentage (assuming 1GB limit for demo)
+    const storageLimit = 1024 * 1024 * 1024; // 1GB in bytes
+    const storageUsed = Math.min((totalSizeBytes / storageLimit) * 100, 100);
+
+    return {
+      totalFiles: documents.length,
+      totalSize: formatSize(totalSizeBytes),
+      recentUploads,
+      storageUsed: Math.round(storageUsed)
+    };
+  }, [documents]);
 
   // Get unique folders for filtering
-  const availableFolders = ["all", ...Array.from(new Set(documents.map(doc => doc.folderName)))];
+  const availableFolders = ["all", ...Array.from(new Set(folders.map(folder => folder.folder_name)))];
 
   // Filter and sort documents
   const filteredDocuments = documents
@@ -513,33 +476,114 @@ const Documents: React.FC = () => {
       return;
     }
 
+    // Check authentication before upload
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) {
+      toast.error("Please log in to upload files");
+      return;
+    }
+
     try {
       setIsUploading(true);
 
-      const selectedFolder = folders.find(f => f.id === uploadFolderId);
+      const selectedFolder = folders.find(f => f.folder_id === uploadFolderId);
+      let successCount = 0;
+      let failCount = 0;
 
-      // Process each selected image
-      for (const file of selectedImages) {
-        // Create new document entry
-        const newDocument: DocumentFile = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          type: 'image',
-          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          uploadDate: new Date().toISOString().split('T')[0],
-          uploadedBy: "Current User", // This would come from auth context
-          category: selectedFolder?.name || "Product Images", // Keep for backward compatibility
-          folderId: selectedFolder?.id || "3", // Default to Product Images folder
-          folderName: selectedFolder?.name || "Product Images",
-          folderColor: selectedFolder?.color || "purple",
-          url: URL.createObjectURL(file), // In real app, this would be the server URL
-          thumbnail: URL.createObjectURL(file), // For images, use the same URL as thumbnail
-          description: uploadDescription || `Uploaded ${file.name}`,
-          tags: []
-        };
+      // Upload files to backend API
+      if (selectedImages.length === 1) {
+        // Single file upload
+        try {
+          const response = await filesApi.uploadSingle(
+            selectedImages[0],
+            uploadFolderId,
+            uploadDescription || `Uploaded ${selectedImages[0].name}`
+          );
 
-        // Add to documents list
-        setDocuments(prev => [newDocument, ...prev]);
+          if (response.success && response.data) {
+            // Convert API response to DocumentFile format
+            const newDocument: DocumentFile = {
+              id: response.data.file.file_id,
+              name: response.data.file.file_name,
+              type: response.data.file.file_type?.startsWith('image/') ? 'image' : 'document',
+              size: response.data.metadata.size,
+              uploadDate: new Date(response.data.file.upload_date).toISOString().split('T')[0],
+              uploadedBy: "You", // TODO: Get from auth context
+              category: selectedFolder?.folder_name || "Uncategorized",
+              folderId: response.data.file.folder_id,
+              folderName: selectedFolder?.folder_name || "Uncategorized",
+              folderColor: selectedFolder?.color || "purple",
+              url: response.data.file.file_url,
+              thumbnail: response.data.file.file_url, // Use same URL for thumbnail
+              description: response.data.file.description || "",
+              tags: []
+            };
+
+            // Add to documents list
+            setDocuments(prev => [newDocument, ...prev]);
+            successCount = 1;
+          } else {
+            console.error("Upload failed:", response.error);
+            toast.error(response.error || "Failed to upload file");
+            failCount = 1;
+          }
+        } catch (error) {
+          console.error("Upload error:", error);
+          toast.error("Failed to upload file. Please try again.");
+          failCount = 1;
+        }
+      } else {
+        // Multiple files upload
+        try {
+          const response = await filesApi.uploadMultiple(
+            selectedImages,
+            uploadFolderId,
+            uploadDescription || "Batch upload"
+          );
+
+          if (response.success && response.data) {
+            // Process successful uploads
+            for (const uploadResult of response.data.successful) {
+              const newDocument: DocumentFile = {
+                id: uploadResult.file.file_id,
+                name: uploadResult.file.file_name,
+                type: uploadResult.file.file_type?.startsWith('image/') ? 'image' : 'document',
+                size: `${(uploadResult.file.file_size || 0 / (1024 * 1024)).toFixed(1)} MB`,
+                uploadDate: new Date(uploadResult.file.upload_date).toISOString().split('T')[0],
+                uploadedBy: "You", // TODO: Get from auth context
+                category: selectedFolder?.folder_name || "Uncategorized",
+                folderId: uploadResult.file.folder_id,
+                folderName: selectedFolder?.folder_name || "Uncategorized",
+                folderColor: selectedFolder?.color || "purple",
+                url: uploadResult.file.file_url,
+                thumbnail: uploadResult.file.file_url,
+                description: uploadResult.file.description || "",
+                tags: []
+              };
+
+              // Add to documents list
+              setDocuments(prev => [newDocument, ...prev]);
+            }
+
+            successCount = response.data.summary.successful;
+            failCount = response.data.summary.failed;
+
+            // Show errors for failed uploads
+            if (response.data.failed.length > 0) {
+              response.data.failed.forEach(failure => {
+                console.error("Upload failed:", failure.error);
+              });
+            }
+          } else {
+            console.error("Multiple upload failed:", response.error);
+            toast.error(response.error || "Failed to upload files");
+            failCount = selectedImages.length;
+          }
+        } catch (error) {
+          console.error("Multiple upload error:", error);
+          toast.error("Failed to upload files. Please try again.");
+          failCount = selectedImages.length;
+        }
       }
 
       // Reset form
@@ -548,14 +592,172 @@ const Documents: React.FC = () => {
       setUploadFolderId("");
       setShowUploadForm(false);
 
-      toast.success(`Successfully uploaded ${selectedImages.length} image(s)`);
+      // Show success/error messages
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Successfully uploaded ${successCount} file(s)`);
+      } else if (successCount > 0 && failCount > 0) {
+        toast.warning(`Uploaded ${successCount} file(s), ${failCount} failed`);
+      } else if (failCount > 0) {
+        toast.error(`Failed to upload ${failCount} file(s)`);
+      }
+
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload images. Please try again.");
+      toast.error("Failed to upload files. Please try again.");
     } finally {
       setIsUploading(false);
     }
   }, [selectedImages, uploadDescription, uploadFolderId, folders]);
+
+  // Add loading state for files
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+
+  // File operation states
+  const [deletingFiles, setDeletingFiles] = useState<Set<string>>(new Set());
+  const [editingFile, setEditingFile] = useState<DocumentFile | null>(null);
+  const [isEditFileOpen, setIsEditFileOpen] = useState(false);
+  const [editFileForm, setEditFileForm] = useState({
+    name: '',
+    description: ''
+  });
+
+  // Cache for API calls to reduce requests
+  const [filesCache, setFilesCache] = useState<Map<string, { data: DocumentFile[]; timestamp: number }>>(new Map());
+  const [lastFolderLoad, setLastFolderLoad] = useState<number>(0);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+  // Debounce timer ref
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Load files from database by folder with caching
+  const loadFilesByFolder = useCallback(async (folderId: string, forceRefresh = false) => {
+    if (isLoadingFiles) return; // Prevent multiple simultaneous requests
+
+    // Check cache first
+    const cacheKey = `folder_${folderId}`;
+    const cached = filesCache.get(cacheKey);
+    const now = Date.now();
+
+    if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+      setDocuments(cached.data);
+      return;
+    }
+
+    try {
+      setIsLoadingFiles(true);
+      const response = await filesApi.getByFolder(folderId);
+
+      if (response.success && response.data) {
+        // Convert API response to DocumentFile format
+        const folderData = folders.find(f => f.folder_id === folderId);
+        const loadedDocuments: DocumentFile[] = response.data.map((file: FileData) => ({
+          id: file.file_id,
+          name: file.file_name,
+          type: file.file_type?.startsWith('image/') ? 'image' : 'document',
+          size: file.file_size ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB` : 'Unknown',
+          uploadDate: new Date(file.upload_date).toISOString().split('T')[0],
+          uploadedBy: "You", // TODO: Get from auth context or file.added_by
+          category: folderData?.folder_name || "Uncategorized",
+          folderId: file.folder_id,
+          folderName: folderData?.folder_name || "Uncategorized",
+          folderColor: folderData?.color || "purple",
+          url: file.file_url,
+          thumbnail: file.file_url,
+          description: file.description || "",
+          tags: []
+        }));
+
+        // Update cache
+        setFilesCache(prev => new Map(prev).set(cacheKey, { data: loadedDocuments, timestamp: now }));
+
+        // Update documents state with loaded files
+        setDocuments(loadedDocuments);
+      } else {
+        console.error("Failed to load files:", response.error);
+        setDocuments([]);
+      }
+    } catch (error) {
+      console.error("Error loading files:", error);
+      setDocuments([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [folders, isLoadingFiles, filesCache, CACHE_DURATION]);
+
+  // Load all files from all folders with caching
+  const loadAllFiles = useCallback(async (forceRefresh = false) => {
+    if (isLoadingFiles) return; // Prevent multiple simultaneous requests
+
+    // Check if we need to refresh based on time
+    const now = Date.now();
+    if (!forceRefresh && (now - lastFolderLoad) < CACHE_DURATION) {
+      // Use cached data if available
+      const allCachedFiles: DocumentFile[] = [];
+      for (const folder of folders) {
+        const cacheKey = `folder_${folder.folder_id}`;
+        const cached = filesCache.get(cacheKey);
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          allCachedFiles.push(...cached.data);
+        }
+      }
+      if (allCachedFiles.length > 0) {
+        allCachedFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+        setDocuments(allCachedFiles);
+        return;
+      }
+    }
+
+    try {
+      setIsLoadingFiles(true);
+      const allFiles: DocumentFile[] = [];
+
+      // Load files from each folder
+      for (const folder of folders) {
+        const cacheKey = `folder_${folder.folder_id}`;
+        const cached = filesCache.get(cacheKey);
+
+        // Use cache if valid, otherwise fetch
+        if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_DURATION) {
+          allFiles.push(...cached.data);
+        } else {
+          const response = await filesApi.getByFolder(folder.folder_id);
+
+          if (response.success && response.data) {
+            const folderFiles: DocumentFile[] = response.data.map((file: FileData) => ({
+              id: file.file_id,
+              name: file.file_name,
+              type: file.file_type?.startsWith('image/') ? 'image' : 'document',
+              size: file.file_size ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB` : 'Unknown',
+              uploadDate: new Date(file.upload_date).toISOString().split('T')[0],
+              uploadedBy: "You", // TODO: Get from auth context
+              category: folder.folder_name,
+              folderId: file.folder_id,
+              folderName: folder.folder_name,
+              folderColor: folder.color,
+              url: file.file_url,
+              thumbnail: file.file_url,
+              description: file.description || "",
+              tags: []
+            }));
+
+            // Update cache
+            setFilesCache(prev => new Map(prev).set(cacheKey, { data: folderFiles, timestamp: now }));
+            allFiles.push(...folderFiles);
+          }
+        }
+      }
+
+      // Sort by upload date (newest first)
+      allFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+      setDocuments(allFiles);
+      setLastFolderLoad(now);
+    } catch (error) {
+      console.error("Error loading all files:", error);
+      setDocuments([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [folders, isLoadingFiles, filesCache, lastFolderLoad, CACHE_DURATION]);
 
   // Cancel upload form
   const handleCancelUpload = useCallback(() => {
@@ -583,57 +785,285 @@ const Documents: React.FC = () => {
     handleImageSelection(droppedFiles);
   }, [handleImageSelection]);
 
+  // Handle folder filter change with debouncing
+  const handleFolderFilterChange = useCallback(async (folderName: string) => {
+    setSelectedCategory(folderName);
+
+    // Debounce the API call to prevent rapid successive requests
+    setTimeout(async () => {
+      if (folderName === "all") {
+        // Load all files from all folders
+        await loadAllFiles();
+      } else {
+        // Load files from specific folder
+        const selectedFolder = folders.find(f => f.folder_name === folderName);
+        if (selectedFolder) {
+          await loadFilesByFolder(selectedFolder.folder_id);
+        }
+      }
+    }, 300); // 300ms debounce
+  }, [folders, loadAllFiles, loadFilesByFolder]);
+
   // Handle folder navigation to files tab
   const handleFolderNavigation = useCallback((folderName: string) => {
-    // Set the filter to the selected folder
-    setSelectedCategory(folderName);
+    // Set the filter to the selected folder and load its files
+    handleFolderFilterChange(folderName);
     // Switch to the files tab
     setActiveTab("files");
-  }, []);
+  }, [handleFolderFilterChange]);
 
-  // Handle document deletion
-  const handleDeleteDocument = useCallback((documentId: string) => {
+  // Test server connection
+  const testServerConnection = useCallback(async () => {
     try {
-      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      toast.success("Document deleted successfully");
+      const response = await fetch('http://localhost:5004/health');
+      const result = await response.json();
+      console.log("Server health check:", result);
+
+      if (response.ok) {
+        toast.success("Server is running and accessible");
+      } else {
+        toast.error("Server is not responding properly");
+      }
     } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("Failed to delete document");
+      console.error("Server connection test failed:", error);
+      toast.error("Cannot connect to server. Please check if the backend is running.");
     }
   }, []);
 
-  // Handle folder creation
-  const handleCreateFolder = useCallback((folderData: { name: string; description: string; color: string; icon: string }) => {
+  // Handle file download
+  const handleDownloadFile = useCallback(async (document: DocumentFile) => {
     try {
-      const newFolder: Folder = {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-        name: folderData.name,
-        description: folderData.description,
+      const link = window.document.createElement('a');
+      link.href = document.url;
+      link.download = document.name;
+      link.click();
+
+      toast.success(`Downloading ${document.name}`, {
+        position: "bottom-right",
+        duration: 2000
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download file", {
+        position: "bottom-right",
+        duration: 3000
+      });
+    }
+  }, []);
+
+  // Handle file edit info
+  const handleEditFileInfo = useCallback((document: DocumentFile) => {
+    setEditingFile(document);
+    setEditFileForm({
+      name: document.name,
+      description: document.description || ''
+    });
+    setIsEditFileOpen(true);
+  }, []);
+
+  // Handle file info update
+  const handleUpdateFileInfo = useCallback(async () => {
+    if (!editingFile) return;
+
+    try {
+      const loadingToast = toast.loading("Updating file info...", {
+        position: "bottom-right",
+        duration: Infinity
+      });
+
+      const response = await filesApi.updateMetadata(editingFile.id, {
+        file_name: editFileForm.name.trim(),
+        description: editFileForm.description.trim() || undefined
+      });
+
+      if (response.success && response.data) {
+        // Update local state
+        setDocuments(prev => prev.map(doc =>
+          doc.id === editingFile.id
+            ? { ...doc, name: editFileForm.name.trim(), description: editFileForm.description.trim() }
+            : doc
+        ));
+
+        // Clear cache for the folder
+        const cacheKey = `folder_${editingFile.folderId}`;
+        setFilesCache(prev => {
+          const newCache = new Map(prev);
+          newCache.delete(cacheKey);
+          return newCache;
+        });
+
+        toast.dismiss(loadingToast);
+        toast.success("File info updated successfully", {
+          position: "bottom-right",
+          duration: 3000
+        });
+
+        setIsEditFileOpen(false);
+        setEditingFile(null);
+        setEditFileForm({ name: '', description: '' });
+      } else {
+        throw new Error(response.message || 'Failed to update file info');
+      }
+    } catch (error) {
+      console.error("File update error:", error);
+      toast.error("Failed to update file info", {
+        position: "bottom-right",
+        duration: 4000
+      });
+    }
+  }, [editingFile, editFileForm]);
+
+  // Handle file share
+  const handleShareFile = useCallback(async (document: DocumentFile) => {
+    try {
+      // Copy file URL to clipboard
+      await navigator.clipboard.writeText(document.url);
+
+      toast.success("File link copied to clipboard", {
+        position: "bottom-right",
+        duration: 3000
+      });
+    } catch (error) {
+      console.error("Share error:", error);
+      // Fallback: show the URL in a prompt
+      prompt("Copy this link to share the file:", document.url);
+    }
+  }, []);
+
+  // Handle document deletion with loading animation
+  const handleDeleteDocument = useCallback(async (documentId: string) => {
+    try {
+      // Add to deleting set and show loading toast
+      setDeletingFiles(prev => new Set(prev).add(documentId));
+
+      const loadingToast = toast.loading("Deleting...", {
+        position: "bottom-right",
+        duration: Infinity,
+        style: {
+          fontSize: '12px',
+          padding: '8px 12px',
+          minWidth: '120px'
+        }
+      });
+
+      // Call backend API to delete file
+      const response = await filesApi.delete(documentId);
+
+      if (response.success) {
+        // Remove from local state only after successful API call
+        setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+
+        // Clear cache for the folder
+        const deletedDoc = documents.find(doc => doc.id === documentId);
+        if (deletedDoc) {
+          const cacheKey = `folder_${deletedDoc.folderId}`;
+          setFilesCache(prev => {
+            const newCache = new Map(prev);
+            newCache.delete(cacheKey);
+            return newCache;
+          });
+        }
+
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToast);
+        toast.success("Document deleted successfully", {
+          position: "bottom-right",
+          duration: 3000
+        });
+      } else {
+        throw new Error(response.error || "Failed to delete document");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete document. Please try again.", {
+        position: "bottom-right",
+        duration: 4000
+      });
+    } finally {
+      // Remove from deleting set
+      setDeletingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(documentId);
+        return newSet;
+      });
+    }
+  }, [documents]);
+
+  // Handle folder creation
+  const handleCreateFolder = useCallback(async (folderData: { name: string; description: string; color: string; icon: string }) => {
+    try {
+      setIsCreatingFolder(true);
+
+      console.log("Creating folder with data:", folderData);
+
+      const createData: CreateFolderData = {
+        folder_name: folderData.name,
+        description: folderData.description || undefined,
         color: folderData.color,
         icon: folderData.icon,
-        documentCount: 0,
-        createdDate: new Date().toISOString().split('T')[0],
-        createdBy: "Current User" // This would come from auth context
       };
 
-      setFolders(prev => [newFolder, ...prev]);
-      setIsAddFolderOpen(false);
-      toast.success("Folder created successfully");
+      console.log("Sending API request with:", createData);
+
+      const response = await foldersApi.create(createData);
+
+      console.log("API response:", response);
+
+      if (response.success && response.data) {
+        setFolders(prev => [response.data!, ...prev]);
+        setIsAddFolderOpen(false);
+        toast.success("Folder created successfully");
+      } else {
+        console.error("API returned error:", response);
+        const errorMessage = response.error || response.message || 'Failed to create folder';
+        toast.error(`Failed to create folder: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
     } catch (error) {
       console.error("Folder creation error:", error);
-      toast.error("Failed to create folder");
+
+      // More detailed error handling
+      if (error instanceof Error) {
+        if (error.message.includes('fetch')) {
+          toast.error("Network error: Unable to connect to server");
+        } else if (error.message.includes('401')) {
+          toast.error("Authentication error: Please log in again");
+        } else if (error.message.includes('403')) {
+          toast.error("Permission error: You don't have permission to create folders");
+        } else if (error.message.includes('409')) {
+          toast.error("A folder with this name already exists");
+        } else {
+          toast.error(`Failed to create folder: ${error.message}`);
+        }
+      } else {
+        toast.error("Failed to create folder: Unknown error");
+      }
+    } finally {
+      setIsCreatingFolder(false);
     }
   }, []);
 
   // Handle folder deletion
-  const handleDeleteFolder = useCallback((folderId: string) => {
+  const handleDeleteFolder = useCallback(async (folderId: string) => {
     try {
-      setFolders(prev => prev.filter(folder => folder.id !== folderId));
-      toast.success("Folder deleted successfully");
+      const response = await foldersApi.delete(folderId);
+
+      if (response.success) {
+        setFolders(prev => prev.filter(folder => folder.folder_id !== folderId));
+        toast.success("Folder deleted successfully");
+      } else {
+        throw new Error(response.message || 'Failed to delete folder');
+      }
     } catch (error) {
       console.error("Folder deletion error:", error);
       toast.error("Failed to delete folder");
     }
+  }, []);
+
+  // Handle folder manage dialog
+  const handleManageFolder = useCallback((folder: Folder) => {
+    setSelectedFolderForManage(folder);
+    setIsManageDialogOpen(true);
   }, []);
 
   // Update folder document counts
@@ -641,10 +1071,17 @@ const Documents: React.FC = () => {
     setFolders(prevFolders =>
       prevFolders.map(folder => ({
         ...folder,
-        documentCount: documents.filter(doc => doc.folderId === folder.id).length
+        file_count: documents.filter(doc => doc.folderId === folder.folder_id).length
       }))
     );
   }, [documents]);
+
+  // Load all files when folders are loaded (only once)
+  React.useEffect(() => {
+    if (folders.length > 0) {
+      loadAllFiles();
+    }
+  }, [folders.length]); // Only depend on folders.length to avoid infinite loop
 
   // Update folder counts when documents change
   React.useEffect(() => {
@@ -787,35 +1224,52 @@ const Documents: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <Dialog open={isAddFolderOpen} onOpenChange={setIsAddFolderOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Folder
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Create New Folder</DialogTitle>
-                        <DialogDescription>
-                          Create a new folder to organize your documents
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={testServerConnection}
+                      className="text-sm"
+                    >
+                      Test Server
+                    </Button>
+                    <Dialog open={isAddFolderOpen} onOpenChange={setIsAddFolderOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Folder
+                        </Button>
+                      </DialogTrigger>
+                    <DialogContent className="sm:max-w-[380px]">
+                      <DialogHeader className="pb-2">
+                        <DialogTitle className="text-lg">Create New Folder</DialogTitle>
+                        <DialogDescription className="text-sm">
+                          Organize your documents with a new folder
                         </DialogDescription>
                       </DialogHeader>
-                      <AddFolderForm onSubmit={handleCreateFolder} />
+                      <AddFolderForm onSubmit={handleCreateFolder} isLoading={isCreatingFolder} />
                     </DialogContent>
-                  </Dialog>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
             </Card>
 
             {/* Folders Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {folders.map((folder) => (
+            {isLoadingFolders ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-muted-foreground">Loading folders...</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                {folders.map((folder) => (
                 <Card
-                  key={folder.id}
+                  key={folder.folder_id}
                   className="border hover:shadow-md hover:border-blue-300 transition-all duration-200 cursor-pointer group"
-                  onClick={() => handleFolderNavigation(folder.name)}
-                  title={`Click to view ${folder.name} files`}
+                  onClick={() => handleFolderNavigation(folder.folder_name)}
+                  title={`Click to view ${folder.folder_name} files`}
                 >
                   <CardContent className="p-4 sm:p-6">
                     {/* Folder Icon and Info */}
@@ -885,7 +1339,12 @@ const Documents: React.FC = () => {
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Folder
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleManageFolder(folder);
+                            }}
+                          >
                             <Settings className="h-4 w-4 mr-2" />
                             Manage
                           </DropdownMenuItem>
@@ -894,7 +1353,7 @@ const Documents: React.FC = () => {
                             className="text-red-600"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteFolder(folder.id);
+                              handleDeleteFolder(folder.folder_id);
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -906,18 +1365,18 @@ const Documents: React.FC = () => {
 
                     {/* Folder Details */}
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-base sm:text-lg group-hover:text-blue-600 transition-colors">{folder.name}</h3>
+                      <h3 className="font-semibold text-base sm:text-lg group-hover:text-blue-600 transition-colors">{folder.folder_name}</h3>
                       <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                        {folder.description}
+                        {folder.description || 'No description'}
                       </p>
                       <div className="flex items-center justify-between pt-2">
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <FileText className="h-3 w-3" />
-                          <span>{folder.documentCount} files</span>
+                          <span>{folder.file_count} files</span>
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <User className="h-3 w-3" />
-                          <span>{folder.createdBy}</span>
+                          <span>You</span>
                         </div>
                       </div>
                       {/* Click indicator */}
@@ -929,10 +1388,11 @@ const Documents: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            )}
 
             {/* Empty State */}
-            {folders.length === 0 && (
+            {!isLoadingFolders && folders.length === 0 && (
               <Card className="border-0 shadow-md">
                 <CardContent className="p-8 sm:p-12 text-center">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1069,7 +1529,7 @@ const Documents: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {folders.map((folder) => (
-                            <SelectItem key={folder.id} value={folder.id}>
+                            <SelectItem key={folder.folder_id} value={folder.folder_id}>
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${
                                   folder.color === "blue" ? "bg-blue-500" :
@@ -1079,7 +1539,7 @@ const Documents: React.FC = () => {
                                   folder.color === "red" ? "bg-red-500" :
                                   "bg-blue-500"
                                 }`} />
-                                {folder.name}
+                                {folder.folder_name}
                               </div>
                             </SelectItem>
                           ))}
@@ -1139,7 +1599,7 @@ const Documents: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {/* Navigate to files tab */}}
+                      onClick={() => setActiveTab("files")}
                       className="text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-sm w-full sm:w-auto"
                     >
                       View All Files
@@ -1219,7 +1679,7 @@ const Documents: React.FC = () => {
                   {/* Filter Controls */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                     {/* Folder Filter */}
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <Select value={selectedCategory} onValueChange={handleFolderFilterChange}>
                       <SelectTrigger className="w-full sm:w-40 bg-muted/30 dark:bg-muted/20 border-muted-foreground/20 dark:border-muted-foreground/30">
                         <Filter className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Folder" />
@@ -1276,7 +1736,7 @@ const Documents: React.FC = () => {
                     }
                   </p>
                   <Button
-                    onClick={() => {/* Switch to upload tab */}}
+                    onClick={() => setActiveTab("upload")}
                     className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -1592,6 +2052,87 @@ const Documents: React.FC = () => {
             document={currentDocument}
           />
         )}
+
+        {/* Folder Manage Dialog */}
+        <Dialog open={isManageDialogOpen} onOpenChange={setIsManageDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader className="pb-3">
+              <DialogTitle className="text-lg flex items-center gap-2">
+                <Settings className="h-5 w-5 text-blue-600" />
+                Manage Folder Access
+              </DialogTitle>
+              <DialogDescription className="text-sm">
+                View and manage access permissions for "{selectedFolderForManage?.folder_name}"
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Current Access */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Current Access</h4>
+
+                {/* Admin Access */}
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Admin</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">Full access</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                    Active
+                  </Badge>
+                </div>
+
+                {/* Worker Access */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Workers</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">View only</p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-gray-600 dark:text-gray-400">
+                    Limited
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Folder Stats */}
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Folder Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600 dark:text-gray-400">{selectedFolderForManage?.file_count || 0} files</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {selectedFolderForManage?.total_size ? `${(selectedFolderForManage.total_size / (1024 * 1024)).toFixed(1)} MB` : '0 MB'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => setIsManageDialogOpen(false)}
+                className="text-sm"
+              >
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

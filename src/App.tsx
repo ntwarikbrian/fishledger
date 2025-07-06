@@ -16,6 +16,7 @@ import Documents from "./pages/Documents";
 import Reports from "./pages/Reports";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 import AuthGuard from "./components/auth/AuthGuard";
 
@@ -32,6 +33,7 @@ const App = () => (
             {/* Authentication Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Protected Main Application Routes */}
             <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />

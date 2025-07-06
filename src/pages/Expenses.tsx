@@ -26,7 +26,9 @@ import {
   Wrench,
   ShoppingCart,
   Users,
-  Briefcase
+  Briefcase,
+  Save,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +48,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useExpenseCategories } from "@/hooks/use-expense-categories";
+import { toast } from "sonner";
 
 // Types for expenses
 interface ExpenseCategory {
@@ -74,6 +78,87 @@ const Expenses = () => {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  // Form state for adding categories
+  const [categoryForm, setCategoryForm] = useState({
+    category_name: '',
+    description: '',
+    budget: ''
+  });
+
+  // Use expense categories hook
+  const {
+    categories: backendCategories,
+    loading: categoriesLoading,
+    error: categoriesError,
+    createCategory
+  } = useExpenseCategories();
+
+  // Handle category form submission
+  const handleCreateCategory = async () => {
+    if (!categoryForm.category_name.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    const budgetValue = categoryForm.budget ? parseFloat(categoryForm.budget) : 0;
+    if (categoryForm.budget && (isNaN(budgetValue) || budgetValue < 0)) {
+      toast.error('Budget must be a positive number');
+      return;
+    }
+
+    const success = await createCategory({
+      category_name: categoryForm.category_name.trim(),
+      description: categoryForm.description.trim() || undefined,
+      budget: budgetValue,
+    });
+
+    if (success) {
+      setCategoryForm({ category_name: '', description: '', budget: '' });
+      setIsAddCategoryOpen(false);
+      toast.success('Category created successfully');
+    } else {
+      toast.error('Failed to create category');
+    }
+  };
+
+  // Function to get icon for category based on name
+  const getCategoryIcon = (categoryName: string) => {
+    const name = categoryName.toLowerCase();
+    if (name.includes('office') || name.includes('supplies')) return Briefcase;
+    if (name.includes('utilities') || name.includes('electricity') || name.includes('water')) return Zap;
+    if (name.includes('transport') || name.includes('fuel') || name.includes('vehicle')) return Car;
+    if (name.includes('maintenance') || name.includes('repair')) return Wrench;
+    if (name.includes('marketing') || name.includes('advertising')) return TrendingUp;
+    if (name.includes('food') || name.includes('beverage') || name.includes('meal')) return Utensils;
+    if (name.includes('equipment')) return ShoppingCart;
+    if (name.includes('staff') || name.includes('salary') || name.includes('employee')) return Users;
+    if (name.includes('phone') || name.includes('internet') || name.includes('communication')) return Phone;
+    return Tag; // Default icon
+  };
+
+  // Function to get color for category based on name
+  const getCategoryColor = (categoryName: string) => {
+    const name = categoryName.toLowerCase();
+    if (name.includes('office') || name.includes('supplies')) return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+    if (name.includes('utilities')) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+    if (name.includes('transport')) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+    if (name.includes('maintenance')) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
+    if (name.includes('marketing')) return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
+    if (name.includes('food')) return "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400";
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"; // Default color
+  };
+
+  // Transform backend categories to display format
+  const displayCategories = backendCategories.map(category => ({
+    id: category.category_id,
+    name: category.category_name,
+    description: category.description || '',
+    icon: getCategoryIcon(category.category_name),
+    color: getCategoryColor(category.category_name),
+    totalBudget: category.budget > 0 ? category.budget : undefined,
+    spent: 0 // TODO: Calculate actual spent amount from expenses
+  }));
 
   // Mock data for expense categories
   const expenseCategories: ExpenseCategory[] = [
@@ -260,6 +345,8 @@ const Expenses = () => {
                             id="category-name"
                             placeholder="Category name"
                             className="col-span-3"
+                            value={categoryForm.category_name}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, category_name: e.target.value }))}
                           />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
@@ -270,6 +357,8 @@ const Expenses = () => {
                             id="category-description"
                             placeholder="Category description"
                             className="col-span-3"
+                            value={categoryForm.description}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, description: e.target.value }))}
                           />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
@@ -281,12 +370,37 @@ const Expenses = () => {
                             type="number"
                             placeholder="0.00"
                             className="col-span-3"
+                            value={categoryForm.budget}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, budget: e.target.value }))}
                           />
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                          Create Category
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsAddCategoryOpen(false);
+                            setCategoryForm({ category_name: '', description: '', budget: '' });
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={handleCreateCategory}
+                          disabled={categoriesLoading || !categoryForm.category_name.trim()}
+                        >
+                          {categoriesLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              Create Category
+                            </>
+                          )}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -294,61 +408,80 @@ const Expenses = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {expenseCategories.map((category) => {
-                    const IconComponent = category.icon;
-                    const budgetUsed = category.totalBudget ? (category.spent / category.totalBudget) * 100 : 0;
+                {categoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading categories...</span>
+                  </div>
+                ) : categoriesError ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-600 dark:text-red-400">{categoriesError}</p>
+                  </div>
+                ) : displayCategories.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-semibold">No categories found</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Get started by creating your first expense category.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {displayCategories.map((category) => {
+                      const IconComponent = category.icon;
+                      const budgetUsed = category.totalBudget ? (category.spent / category.totalBudget) * 100 : 0;
 
-                    return (
-                      <Card key={category.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                                <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                      return (
+                        <Card key={category.id} className="hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                                  <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-sm">{category.name}</h3>
+                                  <p className="text-xs text-muted-foreground">{category.description}</p>
+                                </div>
                               </div>
-                              <div>
-                                <h3 className="font-semibold text-sm">{category.name}</h3>
-                                <p className="text-xs text-muted-foreground">{category.description}</p>
+                              <div className="flex space-x-1">
+                                <Button variant="ghost" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex space-x-1">
-                              <Button variant="ghost" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span>Spent: ${category.spent.toFixed(2)}</span>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span>Spent: ${category.spent.toFixed(2)}</span>
+                                {category.totalBudget && (
+                                  <span>Budget: ${category.totalBudget.toFixed(2)}</span>
+                                )}
+                              </div>
                               {category.totalBudget && (
-                                <span>Budget: ${category.totalBudget.toFixed(2)}</span>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${
+                                      budgetUsed > 90 ? 'bg-red-500' :
+                                      budgetUsed > 70 ? 'bg-yellow-500' : 'bg-green-500'
+                                    }`}
+                                    style={{ width: `${Math.min(budgetUsed, 100)}%` }}
+                                  ></div>
+                                </div>
                               )}
+                              <p className="text-xs text-muted-foreground">
+                                {category.totalBudget ? `${budgetUsed.toFixed(1)}% of budget used` : 'No budget set'}
+                              </p>
                             </div>
-                            {category.totalBudget && (
-                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                <div
-                                  className={`h-2 rounded-full ${
-                                    budgetUsed > 90 ? 'bg-red-500' :
-                                    budgetUsed > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                                  }`}
-                                  style={{ width: `${Math.min(budgetUsed, 100)}%` }}
-                                ></div>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {category.totalBudget ? `${budgetUsed.toFixed(1)}% of budget used` : 'No budget set'}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -442,7 +575,7 @@ const Expenses = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Categories</SelectItem>
-                        {expenseCategories.map((category) => (
+                        {displayCategories.map((category) => (
                           <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
@@ -596,7 +729,7 @@ const Expenses = () => {
                           </div>
                         </SelectTrigger>
                         <SelectContent className="rounded-lg">
-                          {expenseCategories.map((category) => {
+                          {displayCategories.map((category) => {
                             const IconComponent = category.icon;
                             return (
                               <SelectItem key={category.id} value={category.id}>

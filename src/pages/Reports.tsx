@@ -1,547 +1,202 @@
-import React, { useState } from "react";
+import React from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Package,
-  DollarSign,
-  Users,
-  Receipt,
-  TrendingUp,
-  Calendar as CalendarIcon,
-  Download,
   FileText,
-  Printer,
-  Search,
-  Filter,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
+  Package,
+  ShoppingCart,
+  DollarSign,
+  TrendingUp,
+  Brain,
   BarChart3,
-  ArrowLeft,
-  AlertTriangle,
-  RefreshCw
+  PieChart,
+  LineChart,
+  Activity,
+  Eye,
+  Download
 } from "lucide-react";
-import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay } from "date-fns";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-// ===== TypeScript Interfaces and Types =====
-
-// Date filter types
-export type DateFilterPreset = 'today' | 'week' | 'month' | 'custom';
-
-export interface DateRange {
-  from: Date;
-  to: Date;
-}
-
-export interface DateFilterState {
-  preset: DateFilterPreset;
-  customRange?: DateRange;
-}
-
-// Export types
-export type ExportFormat = 'excel' | 'csv' | 'print';
-
-export interface ExportOptions {
-  format: ExportFormat;
-  filename?: string;
-  includeHeaders: boolean;
-  dateRange: DateRange;
-}
-
-// Period comparison types
-export interface PeriodComparison {
-  current: number;
-  previous: number;
-  growth: number;
-  growthPercentage: number;
-  isPositive: boolean;
-}
-
-// Stock Report types
-export interface StockMovement {
-  id: string;
-  productName: string;
-  productId: string;
-  movementType: 'in' | 'out' | 'adjustment' | 'damaged' | 'expired';
-  quantity: number;
-  unit: 'kg' | 'box';
-  unitWeight?: number; // for boxed items
-  reason: string;
-  date: string;
-  performedBy: string;
-  notes?: string;
-}
-
-export interface StockReportData {
-  movements: StockMovement[];
-  summary: {
-    totalIn: number;
-    totalOut: number;
-    currentStock: number;
-    adjustments: number;
-    damaged: number;
-    expired: number;
-  };
-}
-
-// Sales Report types
-export interface SaleItem {
-  id: string;
-  saleNumber: string;
-  productName: string;
-  productId: string;
-  sellingMethod: 'Weight-based' | 'Boxed' | 'Both';
-  quantitySold: number;
-  unit: 'kg' | 'box';
-  unitPrice: number;
-  totalAmount: number;
-  sellerName: string;
-  sellerId: string;
-  customerName: string;
-  customerId: string;
-  saleDate: string;
-  paymentStatus: 'Paid' | 'Pending' | 'Overdue';
-  status: 'Completed' | 'Processing' | 'Cancelled';
-}
-
-export interface SalesReportData {
-  sales: SaleItem[];
-  summary: {
-    totalRevenue: number;
-    totalQuantitySold: number;
-    averageOrderValue: number;
-    topSellingProduct: string;
-    topPerformingWorker: string;
-  };
-}
-
-// Worker Report types
-export interface WorkerPerformance {
-  id: string;
-  workerId: string;
-  workerName: string;
-  workerEmail: string;
-  totalSales: number;
-  totalRevenue: number;
-  averageSaleValue: number;
-  workingDays: number;
-  hoursWorked: number;
-  tasksCompleted: number;
-  tasksAssigned: number;
-  performanceScore: number; // 0-100
-  lastActive: string;
-}
-
-export interface WorkerReportData {
-  workers: WorkerPerformance[];
-  summary: {
-    totalWorkers: number;
-    activeWorkers: number;
-    averagePerformance: number;
-    topPerformer: string;
-    totalHoursWorked: number;
-  };
-}
-
-// Expense Report types
-export interface ExpenseItem {
-  id: string;
-  title: string;
-  description: string;
-  amount: number;
-  category: string;
-  categoryId: string;
-  date: string;
-  vendor?: string;
-  spentBy: string;
-  spentById: string;
-  receipt?: string;
-  status: 'pending' | 'approved' | 'paid' | 'rejected';
-  paymentMethod?: string;
-}
-
-export interface ExpenseReportData {
-  expenses: ExpenseItem[];
-  summary: {
-    totalExpenses: number;
-    averageExpense: number;
-    topCategory: string;
-    pendingApprovals: number;
-    monthlyBudget: number;
-    budgetUsed: number;
-  };
-}
-
-// Profit Report types
-export interface ProfitCalculation {
-  date: string;
-  revenue: number;
-  costOfGoods: number;
-  operatingExpenses: number;
-  grossProfit: number;
-  netProfit: number;
-  profitMargin: number;
-}
-
-export interface ProfitReportData {
-  calculations: ProfitCalculation[];
-  summary: {
-    totalRevenue: number;
-    totalCosts: number;
-    totalExpenses: number;
-    grossProfit: number;
-    netProfit: number;
-    averageProfitMargin: number;
-  };
-  comparison: PeriodComparison;
-}
-
-// Main report types
-export type ReportType = 'stock' | 'sales' | 'worker' | 'expense' | 'profit';
-
-export interface ReportCategory {
-  id: ReportType;
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-  color: string;
-  bgColor: string;
-}
-
-// Import report components
-import ReportCard from "@/components/reports/ReportCard";
-import DateFilter from "@/components/reports/DateFilter";
-import StockReport from "@/components/reports/StockReport";
-import SalesReport from "@/components/reports/SalesReport";
-import WorkerReport from "@/components/reports/WorkerReport";
-import ExpenseReport from "@/components/reports/ExpenseReport";
-import ProfitReport from "@/components/reports/ProfitReport";
-import ErrorBoundary from "@/components/reports/ErrorBoundary";
-import LoadingState from "@/components/reports/LoadingState";
-import { useToast } from "@/components/ui/use-toast";
+/**
+ * Reports Page
+ *
+ * Displays non-clickable report bars for different report categories
+ */
 
 const Reports = () => {
-  // Hooks
-  const { toast } = useToast();
+  /**
+   * Handle viewing a report
+   */
+  const handleViewReport = (reportType: string, reportTitle: string) => {
+    toast.info(`Opening ${reportTitle}...`, {
+      description: "Report viewer will be implemented soon"
+    });
+    console.log(`Viewing ${reportType} report`);
+  };
 
-  // State management
-  const [activeReport, setActiveReport] = useState<ReportType | null>(null);
-  const [dateFilter, setDateFilter] = useState<DateFilterState>({
-    preset: 'month',
-    customRange: undefined
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Handle downloading a report as PDF
+   */
+  const handleDownloadPDF = (reportType: string, reportTitle: string) => {
+    toast.success(`Downloading ${reportTitle} PDF...`, {
+      description: "PDF generation will be implemented soon"
+    });
+    console.log(`Downloading ${reportType} report as PDF`);
+  };
 
-  // Report categories configuration
-  const reportCategories: ReportCategory[] = [
+  // Report categories with their respective icons and descriptions
+  const reportCategories = [
     {
-      id: 'stock',
-      title: 'Stock Report',
-      description: 'Track inventory movements - what stock came in, went out, and current remaining quantities',
+      id: "general",
+      title: "General Report",
+      description: "Comprehensive overview of all business activities and key performance indicators",
+      icon: FileText,
+      color: "from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-100 dark:bg-blue-900/30"
+    },
+    {
+      id: "stock",
+      title: "Stock Report",
+      description: "Detailed inventory levels, stock movements, and product availability analysis",
       icon: Package,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100 dark:bg-blue-900/30'
+      color: "from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30",
+      iconColor: "text-green-600",
+      iconBg: "bg-green-100 dark:bg-green-900/30"
     },
     {
-      id: 'sales',
-      title: 'Sales Report',
-      description: 'Detailed sales data showing what was sold (by kg/box), which worker made the sale, and revenue amounts',
+      id: "sales",
+      title: "Sales Report",
+      description: "Sales performance metrics, revenue trends, and customer transaction analysis",
+      icon: ShoppingCart,
+      color: "from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30",
+      iconColor: "text-purple-600",
+      iconBg: "bg-purple-100 dark:bg-purple-900/30"
+    },
+    {
+      id: "expense",
+      title: "Expense Report",
+      description: "Business expenditure breakdown, cost analysis, and budget tracking",
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100 dark:bg-green-900/30'
+      color: "from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30",
+      iconColor: "text-orange-600",
+      iconBg: "bg-orange-100 dark:bg-orange-900/30"
     },
     {
-      id: 'worker',
-      title: 'Worker Report',
-      description: 'Performance tracking showing which worker sold what products, their work schedules, and individual sales performance metrics',
-      icon: Users,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100 dark:bg-purple-900/30'
-    },
-    {
-      id: 'expense',
-      title: 'Expense Report',
-      description: 'Financial tracking of all expenditures including what money was spent, on which categories, and by which person',
-      icon: Receipt,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100 dark:bg-red-900/30'
-    },
-    {
-      id: 'profit',
-      title: 'Profit Report',
-      description: 'Comprehensive profit analysis showing daily/weekly/monthly profit calculations (Revenue - Cost - Expenses)',
+      id: "profit-loss",
+      title: "Profit and Loss Report",
+      description: "Financial performance analysis including revenue, costs, and net profit calculations",
       icon: TrendingUp,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100 dark:bg-orange-900/30'
+      color: "from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30",
+      iconColor: "text-red-600",
+      iconBg: "bg-red-100 dark:bg-red-900/30"
+    },
+    {
+      id: "smart",
+      title: "Smart Report",
+      description: "AI-powered insights and predictive analytics for business intelligence",
+      icon: Brain,
+      color: "from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30",
+      iconColor: "text-cyan-600",
+      iconBg: "bg-cyan-100 dark:bg-cyan-900/30"
     }
   ];
 
-  // Mock statistics for report cards
-  const getReportStats = (reportId: ReportType) => {
-    switch (reportId) {
-      case 'stock':
-        return {
-          value: '285.5 kg',
-          label: 'Current Stock',
-          trend: { value: 12.5, isPositive: true }
-        };
-      case 'sales':
-        return {
-          value: '₣37,650',
-          label: 'Total Revenue',
-          trend: { value: 18.3, isPositive: true }
-        };
-      case 'worker':
-        return {
-          value: '5 Active',
-          label: 'Workers',
-          trend: { value: 8.7, isPositive: true }
-        };
-      case 'expense':
-        return {
-          value: '₣4,521',
-          label: 'Total Expenses',
-          trend: { value: -5.2, isPositive: false }
-        };
-      case 'profit':
-        return {
-          value: '₣2,358',
-          label: 'Net Profit',
-          trend: { value: 24.1, isPositive: true }
-        };
-      default:
-        return undefined;
-    }
-  };
-
-  // Handle report selection with loading and error handling
-  const handleReportSelect = async (reportId: ReportType) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // In a real app, you might fetch report-specific data here
-      // const reportData = await fetchReportData(reportId, dateFilter);
-
-      setActiveReport(reportId);
-
-      toast({
-        title: "Report loaded successfully",
-        description: `${reportCategories.find(cat => cat.id === reportId)?.title} is ready to view.`,
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load report';
-      setError(errorMessage);
-
-      toast({
-        title: "Error loading report",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle back to overview
-  const handleBackToOverview = () => {
-    setActiveReport(null);
-    setError(null);
-  };
-
-  // Handle date filter changes with error handling
-  const handleDateFilterChange = (newFilter: DateFilterState) => {
-    try {
-      setDateFilter(newFilter);
-
-      // In a real app, you might refetch data when date filter changes
-      // refetchReportData(activeReport, newFilter);
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update date filter';
-      toast({
-        title: "Error updating filter",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Render specific report component with error boundary
-  const renderReportComponent = () => {
-    if (!activeReport) return null;
-
-    const commonProps = {
-      dateFilter,
-      onDateFilterChange: handleDateFilterChange
-    };
-
-    // Show loading state
-    if (isLoading) {
-      return <LoadingState type="full" title="Loading Report" description="Fetching your report data..." />;
-    }
-
-    // Show error state
-    if (error) {
-      return (
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertTriangle className="h-12 w-12 text-red-600 mb-4" />
-            <CardTitle className="text-red-700 dark:text-red-400 mb-2">
-              Failed to Load Report
-            </CardTitle>
-            <CardDescription className="text-red-600 dark:text-red-300 text-center mb-4">
-              {error}
-            </CardDescription>
-            <Button
-              variant="outline"
-              onClick={() => handleReportSelect(activeReport)}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Render report component wrapped in error boundary
-    return (
-      <ErrorBoundary>
-        {(() => {
-          switch (activeReport) {
-            case 'stock':
-              return <StockReport {...commonProps} />;
-            case 'sales':
-              return <SalesReport {...commonProps} />;
-            case 'worker':
-              return <WorkerReport {...commonProps} />;
-            case 'expense':
-              return <ExpenseReport {...commonProps} />;
-            case 'profit':
-              return <ProfitReport {...commonProps} />;
-            default:
-              return null;
-          }
-        })()}
-      </ErrorBoundary>
-    );
-  };
-
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
-        {!activeReport ? (
-          // Reports Overview
-          <>
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3">
-                  <BarChart3 className="h-8 w-8 text-primary" />
-                  Reports & Analytics
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  Comprehensive reporting system for your fish selling business
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Reports</h1>
+          <p className="text-muted-foreground">
+            Comprehensive business reporting and analytics dashboard
+          </p>
+        </div>
+
+        {/* Report Categories Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {reportCategories.map((report) => {
+            const IconComponent = report.icon;
+
+            return (
+              <Card
+                key={report.id}
+                className={`border-0 shadow-md bg-gradient-to-br ${report.color} hover:shadow-lg transition-all duration-200 cursor-default`}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 ${report.iconBg} rounded-xl flex items-center justify-center`}>
+                      <IconComponent className={`h-6 w-6 ${report.iconColor}`} />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {report.title}
+                      </CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-4">
+                    {report.description}
+                  </p>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                    <Button
+                      onClick={() => handleViewReport(report.id, report.title)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm h-9"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View Report
+                    </Button>
+                    <Button
+                      onClick={() => handleDownloadPDF(report.id, report.title)}
+                      variant="outline"
+                      className="flex-1 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm h-9"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download PDF
+                    </Button>
+                  </div>
+
+                  {/* Visual indicator that this is a report category */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                      <BarChart3 className="h-3 w-3" />
+                      <span>Report Category</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <PieChart className="h-3 w-3 text-gray-400" />
+                      <LineChart className="h-3 w-3 text-gray-400" />
+                      <Activity className="h-3 w-3 text-gray-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Additional Information */}
+        <Card className="border-dashed border-2 border-gray-200 dark:border-gray-700">
+          <CardContent className="p-8 text-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                <FileText className="h-8 w-8 text-gray-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Report Categories Overview
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 max-w-md">
+                  These report categories provide comprehensive insights into different aspects of your fish selling business.
+                  Each category offers detailed analytics and performance metrics to help you make informed decisions.
                 </p>
               </div>
-
-              {/* Global date filter */}
-              <div className="flex items-center gap-3">
-                <DateFilter value={dateFilter} onChange={handleDateFilterChange} />
-              </div>
             </div>
-
-            {/* Report Categories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {reportCategories.map((category) => (
-                <ReportCard
-                  key={category.id}
-                  category={category}
-                  onClick={() => handleReportSelect(category.id)}
-                  stats={getReportStats(category.id)}
-                  className="hover:shadow-xl transition-all duration-300"
-                />
-              ))}
-            </div>
-
-            {/* Quick Stats Overview */}
-            <Card className="border-2 border-dashed border-muted-foreground/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Quick Overview
-                </CardTitle>
-                <CardDescription>
-                  Key metrics at a glance for the selected period
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">₣37,650</div>
-                    <div className="text-sm text-muted-foreground">Total Revenue</div>
-                  </div>
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">₣4,521</div>
-                    <div className="text-sm text-muted-foreground">Total Expenses</div>
-                  </div>
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">₣2,358</div>
-                    <div className="text-sm text-muted-foreground">Net Profit</div>
-                  </div>
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">285.5kg</div>
-                    <div className="text-sm text-muted-foreground">Current Stock</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          // Specific Report View
-          <>
-            {/* Back Navigation */}
-            <div className="flex items-center gap-4 mb-6">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBackToOverview}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Reports
-              </Button>
-
-              <div className="flex items-center gap-2">
-                {reportCategories.map((category) => (
-                  category.id === activeReport && (
-                    <Badge key={category.id} variant="secondary" className="gap-2">
-                      <category.icon className="h-3 w-3" />
-                      {category.title}
-                    </Badge>
-                  )
-                ))}
-              </div>
-            </div>
-
-            {/* Render Active Report */}
-            {renderReportComponent()}
-          </>
-        )}
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );

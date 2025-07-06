@@ -23,8 +23,7 @@ import {
   Settings,
   Clock,
   AlertTriangle,
-  CheckCircle2,
-  Toggle
+  CheckCircle2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,16 +43,25 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { contactsApi, Contact, CreateContactInput } from "@/lib/api";
+import { toast } from "sonner";
 
 const Customers = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [chatFilter, setChatFilter] = useState("all"); // New filter state for chat tab
   const [chatSearchQuery, setChatSearchQuery] = useState(""); // Search state for chat tab
-  const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
+  const [isEditContactOpen, setIsEditContactOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+
+  // Real data state
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Automatic messaging settings state
   const [autoSettings, setAutoSettings] = useState({
@@ -63,114 +71,87 @@ const Customers = () => {
     criticalStockThreshold: 5,
     lowStockMessage: "Alert: Stock for {product} is running low. Current quantity: {quantity}. Please consider restocking soon.",
     criticalStockMessage: "URGENT: Critical stock alert for {product}. Only {quantity} units remaining. Immediate restocking required!",
-    selectedRecipients: [] as number[]
+    selectedRecipients: [] as string[]
   });
-  const [newContact, setNewContact] = useState({
-    name: "",
-    contact: "",
+  const [newContact, setNewContact] = useState<CreateContactInput>({
+    company_name: "",
+    contact_name: "",
     email: "",
-    phone: "",
+    phone_number: "",
     address: "",
-    type: "customer"
+    contact_type: "customer"
   });
 
-  // Mock data for different types of people
-  const peopleData = [
-    {
-      id: 1,
-      name: "Ocean View Restaurant",
-      type: "customer",
-      contact: "Sarah Johnson",
-      email: "sarah@oceanview.com",
-      phone: "+1 (555) 123-4567",
-      address: "123 Coastal Drive, Seaside City",
-      status: "Active"
-    },
-    {
-      id: 2,
-      name: "Fresh Fish Suppliers Ltd",
-      type: "supplier",
-      contact: "Mike Chen",
-      email: "mike@freshfish.com",
-      phone: "+1 (555) 234-5678",
-      address: "456 Harbor Street, Port City",
-      status: "Active"
-    },
-    {
-      id: 3,
-      name: "Cold Storage Solutions",
-      type: "vendor",
-      contact: "Emma Rodriguez",
-      email: "emma@coldstorage.com",
-      phone: "+1 (555) 345-6789",
-      address: "789 Industrial Ave, Storage City",
-      status: "Active"
-    },
-    {
-      id: 4,
-      name: "Seaside Bistro",
-      type: "customer",
-      contact: "John Smith",
-      email: "john@seasidebistro.com",
-      phone: "+1 (555) 456-7890",
-      address: "321 Beach Road, Coastal Town",
-      status: "Active"
-    },
-    {
-      id: 5,
-      name: "Atlantic Fish Co",
-      type: "supplier",
-      contact: "Lisa Wang",
-      email: "lisa@atlanticfish.com",
-      phone: "+1 (555) 567-8901",
-      address: "654 Fisherman's Wharf, Harbor City",
-      status: "Active"
-    },
-    {
-      id: 6,
-      name: "Packaging Solutions Inc",
-      type: "vendor",
-      contact: "David Wilson",
-      email: "david@packaging.com",
-      phone: "+1 (555) 678-9012",
-      address: "987 Business Park, Industrial Zone",
-      status: "Active"
-    }
-  ];
+  const [editContact, setEditContact] = useState<CreateContactInput>({
+    company_name: "",
+    contact_name: "",
+    email: "",
+    phone_number: "",
+    address: "",
+    contact_type: "customer"
+  });
 
-  // Mock data for sent automatic messages
-  const sentMessages = [
-    {
-      id: 1,
-      type: "low_stock",
-      product: "Atlantic Salmon",
-      quantity: 8,
-      threshold: 10,
-      recipients: ["Ocean View Restaurant", "Seaside Bistro"],
-      sentAt: "2024-01-15 14:30:00",
-      message: "Alert: Stock for Atlantic Salmon is running low. Current quantity: 8. Please consider restocking soon."
-    },
-    {
-      id: 2,
-      type: "critical_stock",
-      product: "Fresh Tuna",
-      quantity: 3,
-      threshold: 5,
-      recipients: ["Ocean View Restaurant"],
-      sentAt: "2024-01-15 16:45:00",
-      message: "URGENT: Critical stock alert for Fresh Tuna. Only 3 units remaining. Immediate restocking required!"
-    },
-    {
-      id: 3,
-      type: "low_stock",
-      product: "Sea Bass",
-      quantity: 7,
-      threshold: 10,
-      recipients: ["Seaside Bistro", "Ocean View Restaurant"],
-      sentAt: "2024-01-14 09:15:00",
-      message: "Alert: Stock for Sea Bass is running low. Current quantity: 7. Please consider restocking soon."
+  // Fetch contacts on component mount
+  useEffect(() => {
+    fetchContacts();
+  }, []);
+
+  const fetchContacts = async (showToast = true) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await contactsApi.getAll();
+
+      // Handle the API response structure: { data: Contact[], pagination: {...} }
+      if (response && response.data && Array.isArray(response.data)) {
+        setContacts(response.data);
+        console.log(`✅ Successfully loaded ${response.data.length} contacts`);
+      } else {
+        setContacts([]);
+        console.warn('⚠️ No contacts data received from API');
+      }
+    } catch (err: any) {
+      console.error('Error fetching contacts:', err);
+
+      let errorMessage = 'Failed to load contacts';
+
+      if (err?.response?.status === 401) {
+        errorMessage = 'You are not authorized to view contacts. Please log in again.';
+      } else if (err?.response?.status === 403) {
+        errorMessage = 'You do not have permission to view contacts.';
+      } else if (err?.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+
+      if (showToast) {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Convert Contact to the format expected by the UI
+  const convertContactToUIFormat = (contact: Contact) => ({
+    id: contact.contact_id,
+    name: contact.company_name || contact.contact_name,
+    type: contact.contact_type,
+    contact: contact.contact_name,
+    email: contact.email || '',
+    phone: contact.phone_number || '',
+    address: contact.address || '',
+    status: 'Active'
+  });
+
+  // Use only real data from the database
+  const peopleData = contacts.map(convertContactToUIFormat);
+
+  // Sent messages history - will be populated when real messages are sent
+  const sentMessages: any[] = [];
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -251,7 +232,7 @@ const Customers = () => {
     return matchesFilter && matchesSearch;
   });
 
-  const toggleContactSelection = (id: number) => {
+  const toggleContactSelection = (id: string) => {
     setSelectedContacts(prev =>
       prev.includes(id)
         ? prev.filter(contactId => contactId !== id)
@@ -268,21 +249,149 @@ const Customers = () => {
     setSelectedContacts([]);
   };
 
-  const handleAddContact = () => {
-    // Here you would implement the actual contact creation logic
-    console.log("Adding new contact:", newContact);
-    alert(`Contact "${newContact.name}" added successfully!`);
+  /**
+   * Validate contact form data with comprehensive checks
+   * @param contactData - The contact data to validate
+   * @returns Array of validation error messages
+   */
+  const validateContactForm = (contactData: CreateContactInput = newContact) => {
+    const errors: string[] = [];
 
-    // Reset form and close dialog
-    setNewContact({
-      name: "",
-      contact: "",
-      email: "",
-      phone: "",
-      address: "",
-      type: "customer"
-    });
-    setIsAddContactOpen(false);
+    // Required field validation
+    if (!contactData.contact_name.trim()) {
+      errors.push('Contact name is required');
+    } else if (contactData.contact_name.trim().length < 2) {
+      errors.push('Contact name must be at least 2 characters long');
+    } else if (contactData.contact_name.trim().length > 200) {
+      errors.push('Contact name must be less than 200 characters');
+    }
+
+    // Company name validation (if provided)
+    if (contactData.company_name && contactData.company_name.trim().length > 200) {
+      errors.push('Company name must be less than 200 characters');
+    }
+
+    // Email validation (if provided)
+    if (contactData.email && contactData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(contactData.email.trim())) {
+        errors.push('Please enter a valid email address');
+      } else if (contactData.email.trim().length > 255) {
+        errors.push('Email address must be less than 255 characters');
+      }
+    }
+
+    // Phone validation (if provided)
+    if (contactData.phone_number && contactData.phone_number.trim()) {
+      const cleanPhone = contactData.phone_number.replace(/[\s\-\(\)]/g, '');
+      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+      if (!phoneRegex.test(cleanPhone)) {
+        errors.push('Please enter a valid phone number (e.g., +1-555-123-4567)');
+      } else if (contactData.phone_number.trim().length > 20) {
+        errors.push('Phone number must be less than 20 characters');
+      }
+    }
+
+    // Address validation (if provided)
+    if (contactData.address && contactData.address.trim().length > 500) {
+      errors.push('Address must be less than 500 characters');
+    }
+
+    // Contact name length validation
+    if (newContact.contact_name.trim().length > 200) {
+      errors.push('Contact name must be less than 200 characters');
+    }
+
+    // Company name length validation
+    if (newContact.company_name && newContact.company_name.length > 200) {
+      errors.push('Company name must be less than 200 characters');
+    }
+
+    // Email length validation
+    if (newContact.email && newContact.email.length > 255) {
+      errors.push('Email must be less than 255 characters');
+    }
+
+    // Phone length validation
+    if (newContact.phone_number && newContact.phone_number.length > 20) {
+      errors.push('Phone number must be less than 20 characters');
+    }
+
+    return errors;
+  };
+
+  /**
+   * Handle adding a new contact with comprehensive validation and error handling
+   */
+  const handleAddContact = async () => {
+    try {
+      console.log("📞 Adding new contact:", newContact);
+
+      // Validate form
+      const validationErrors = validateContactForm();
+      if (validationErrors.length > 0) {
+        // Show first error as toast, log all errors
+        toast.error(validationErrors[0]);
+        console.warn('❌ Validation errors:', validationErrors);
+        return;
+      }
+
+      // Show loading state
+      const loadingToast = toast.loading('Creating contact...');
+
+      // Clean up the data before sending
+      const cleanedContact: CreateContactInput = {
+        contact_name: newContact.contact_name.trim(),
+        contact_type: newContact.contact_type,
+        company_name: newContact.company_name?.trim() || undefined,
+        email: newContact.email?.trim() || undefined,
+        phone_number: newContact.phone_number?.trim() || undefined,
+        address: newContact.address?.trim() || undefined,
+      };
+
+      const response = await contactsApi.create(cleanedContact);
+
+      if (response.data) {
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToast);
+        toast.success(`Contact "${cleanedContact.contact_name}" added successfully!`);
+
+        // Refresh the contacts list
+        await fetchContacts();
+
+        // Reset form and close dialog
+        setNewContact({
+          company_name: "",
+          contact_name: "",
+          email: "",
+          phone_number: "",
+          address: "",
+          contact_type: "customer"
+        });
+        setIsAddContactOpen(false);
+      }
+    } catch (err: any) {
+      console.error('❌ Error adding contact:', err);
+
+      // Handle specific error messages from the API
+      let errorMessage = 'Failed to add contact. Please try again.';
+
+      if (err?.response?.status === 409) {
+        errorMessage = 'A contact with this email already exists.';
+      } else if (err?.response?.status === 400) {
+        errorMessage = err?.response?.data?.message || 'Invalid contact data provided.';
+      } else if (err?.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (err?.response?.status === 403) {
+        errorMessage = 'You do not have permission to add contacts.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      toast.error(errorMessage);
+    }
   };
 
   // Handle chat filter change and clear selections that are no longer visible
@@ -305,11 +414,146 @@ const Customers = () => {
     setSelectedContacts(prev => prev.filter(id => newFilteredIds.includes(id)));
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof CreateContactInput, value: string) => {
     setNewContact(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    try {
+      if (window.confirm(`Are you sure you want to delete "${contactName}"?\n\nThis action cannot be undone.`)) {
+        await contactsApi.delete(contactId);
+        toast.success(`Contact "${contactName}" deleted successfully!`);
+
+        // Refresh the contacts list
+        await fetchContacts();
+
+        // Remove from selected contacts if it was selected
+        setSelectedContacts(prev => prev.filter(id => id !== contactId));
+
+        // Remove from auto settings recipients if selected
+        setAutoSettings(prev => ({
+          ...prev,
+          selectedRecipients: prev.selectedRecipients.filter(id => id !== contactId)
+        }));
+      }
+    } catch (err: any) {
+      console.error('Error deleting contact:', err);
+
+      // Handle specific error messages from the API
+      if (err?.response?.status === 404) {
+        toast.error('Contact not found. It may have already been deleted.');
+        // Refresh the list to sync with server state
+        await fetchContacts();
+      } else if (err?.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else if (err?.message) {
+        toast.error(err.message);
+      } else {
+        toast.error('Failed to delete contact. Please try again.');
+      }
+    }
+  };
+
+  /**
+   * Handle editing a contact - opens edit dialog with contact data
+   */
+  const handleEditContact = (contactId: string) => {
+    const contact = contacts.find(c => c.contact_id === contactId);
+    if (contact) {
+      setEditingContact(contact);
+      setEditContact({
+        company_name: contact.company_name || "",
+        contact_name: contact.contact_name,
+        email: contact.email || "",
+        phone_number: contact.phone_number || "",
+        address: contact.address || "",
+        contact_type: contact.contact_type
+      });
+      setIsEditContactOpen(true);
+    } else {
+      toast.error('Contact not found');
+    }
+  };
+
+  /**
+   * Handle updating a contact with comprehensive validation and error handling
+   */
+  const handleUpdateContact = async () => {
+    if (!editingContact) return;
+
+    try {
+      console.log("📞 Updating contact:", editingContact.contact_id);
+
+      // Validate form using the same validation function
+      const validationErrors = validateContactForm(editContact);
+      if (validationErrors.length > 0) {
+        toast.error(validationErrors[0]);
+        console.warn('❌ Validation errors:', validationErrors);
+        return;
+      }
+
+      // Show loading state
+      const loadingToast = toast.loading('Updating contact...');
+
+      // Clean up the data before sending
+      const cleanedContact = {
+        contact_name: editContact.contact_name.trim(),
+        contact_type: editContact.contact_type,
+        company_name: editContact.company_name?.trim() || undefined,
+        email: editContact.email?.trim() || undefined,
+        phone_number: editContact.phone_number?.trim() || undefined,
+        address: editContact.address?.trim() || undefined,
+      };
+
+      const response = await contactsApi.update(editingContact.contact_id, cleanedContact);
+
+      if (response.data) {
+        // Dismiss loading toast and show success
+        toast.dismiss(loadingToast);
+        toast.success(`Contact "${cleanedContact.contact_name}" updated successfully!`);
+
+        // Refresh the contacts list
+        await fetchContacts();
+
+        // Close dialog and reset state
+        setIsEditContactOpen(false);
+        setEditingContact(null);
+        setEditContact({
+          company_name: "",
+          contact_name: "",
+          email: "",
+          phone_number: "",
+          address: "",
+          contact_type: "customer"
+        });
+      }
+    } catch (err: any) {
+      console.error('❌ Error updating contact:', err);
+
+      // Handle specific error messages from the API
+      let errorMessage = 'Failed to update contact. Please try again.';
+
+      if (err?.response?.status === 409) {
+        errorMessage = 'A contact with this email already exists.';
+      } else if (err?.response?.status === 400) {
+        errorMessage = err?.response?.data?.message || 'Invalid contact data provided.';
+      } else if (err?.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (err?.response?.status === 403) {
+        errorMessage = 'You do not have permission to update contacts.';
+      } else if (err?.response?.status === 404) {
+        errorMessage = 'Contact not found. It may have been deleted.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      toast.error(errorMessage);
+    }
   };
 
   return (
@@ -328,7 +572,7 @@ const Customers = () => {
                 Add Contact
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-sm">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-blue-600" />
@@ -339,7 +583,7 @@ const Customers = () => {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-4">
+              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm font-medium">
@@ -348,20 +592,20 @@ const Customers = () => {
                     <Input
                       id="name"
                       placeholder="Enter company or person name"
-                      value={newContact.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      value={newContact.company_name || ""}
+                      onChange={(e) => handleInputChange("company_name", e.target.value)}
                       className="text-sm"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contact" className="text-sm font-medium">
-                      Contact Person
+                      Contact Person *
                     </Label>
                     <Input
                       id="contact"
                       placeholder="Contact person name"
-                      value={newContact.contact}
-                      onChange={(e) => handleInputChange("contact", e.target.value)}
+                      value={newContact.contact_name}
+                      onChange={(e) => handleInputChange("contact_name", e.target.value)}
                       className="text-sm"
                     />
                   </div>
@@ -388,8 +632,8 @@ const Customers = () => {
                     <Input
                       id="phone"
                       placeholder="+1 (555) 123-4567"
-                      value={newContact.phone}
-                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      value={newContact.phone_number || ""}
+                      onChange={(e) => handleInputChange("phone_number", e.target.value)}
                       className="text-sm"
                     />
                   </div>
@@ -399,7 +643,7 @@ const Customers = () => {
                   <Label htmlFor="type" className="text-sm font-medium">
                     Contact Type *
                   </Label>
-                  <Select value={newContact.type} onValueChange={(value) => handleInputChange("type", value)}>
+                  <Select value={newContact.contact_type} onValueChange={(value: 'supplier' | 'customer') => handleInputChange("contact_type", value)}>
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Select contact type" />
                     </SelectTrigger>
@@ -416,12 +660,6 @@ const Customers = () => {
                           Supplier
                         </div>
                       </SelectItem>
-                      <SelectItem value="vendor">
-                        <div className="flex items-center gap-2">
-                          <Truck className="h-4 w-4" />
-                          Vendor
-                        </div>
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -433,9 +671,9 @@ const Customers = () => {
                   <Textarea
                     id="address"
                     placeholder="Enter full address"
-                    value={newContact.address}
+                    value={newContact.address || ""}
                     onChange={(e) => handleInputChange("address", e.target.value)}
-                    className="text-sm min-h-[60px] resize-none"
+                    className="text-sm min-h-[50px] resize-none"
                   />
                 </div>
               </div>
@@ -450,11 +688,147 @@ const Customers = () => {
                 </Button>
                 <Button
                   onClick={handleAddContact}
-                  disabled={!newContact.name || !newContact.email || !newContact.phone}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  disabled={!newContact.contact_name.trim() || loading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
                 >
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   Add Contact
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Contact Dialog */}
+          <Dialog open={isEditContactOpen} onOpenChange={setIsEditContactOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Edit className="h-5 w-5 text-green-600" />
+                  Edit Contact
+                </DialogTitle>
+                <DialogDescription>
+                  Update the contact information below.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-contact-name" className="text-sm font-medium">
+                    Contact Name *
+                  </Label>
+                  <Input
+                    id="edit-contact-name"
+                    placeholder="Enter contact name"
+                    value={editContact.contact_name}
+                    onChange={(e) => setEditContact(prev => ({ ...prev, contact_name: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-company-name" className="text-sm font-medium">
+                    Company Name
+                  </Label>
+                  <Input
+                    id="edit-company-name"
+                    placeholder="Enter company name"
+                    value={editContact.company_name || ""}
+                    onChange={(e) => setEditContact(prev => ({ ...prev, company_name: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email" className="text-sm font-medium">
+                      Email
+                    </Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      placeholder="Enter email"
+                      value={editContact.email || ""}
+                      onChange={(e) => setEditContact(prev => ({ ...prev, email: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone" className="text-sm font-medium">
+                      Phone
+                    </Label>
+                    <Input
+                      id="edit-phone"
+                      placeholder="Enter phone"
+                      value={editContact.phone_number || ""}
+                      onChange={(e) => setEditContact(prev => ({ ...prev, phone_number: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-contact-type" className="text-sm font-medium">
+                    Contact Type *
+                  </Label>
+                  <Select
+                    value={editContact.contact_type}
+                    onValueChange={(value: 'supplier' | 'customer') =>
+                      setEditContact(prev => ({ ...prev, contact_type: value }))
+                    }
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Select contact type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">
+                        <div className="flex items-center gap-2">
+                          <Store className="h-4 w-4" />
+                          Customer
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="supplier">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          Supplier
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-address" className="text-sm font-medium">
+                    Address
+                  </Label>
+                  <Textarea
+                    id="edit-address"
+                    placeholder="Enter full address"
+                    value={editContact.address || ""}
+                    onChange={(e) => setEditContact(prev => ({ ...prev, address: e.target.value }))}
+                    className="text-sm min-h-[50px] resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditContactOpen(false);
+                    setEditingContact(null);
+                  }}
+                  className="text-sm"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateContact}
+                  disabled={!editContact.contact_name.trim() || loading}
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-50"
+                >
+                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                  Update Contact
                 </Button>
               </div>
             </DialogContent>
@@ -516,8 +890,24 @@ const Customers = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {filteredPeople.map((person) => (
+                {loading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="text-gray-500">Loading contacts...</div>
+                  </div>
+                ) : error ? (
+                  <div className="flex flex-col justify-center items-center py-8">
+                    <div className="text-red-500 mb-4 text-center">{error}</div>
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchContacts()}
+                      className="text-sm"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {filteredPeople.map((person) => (
                     <Card key={person.id} className="hover:shadow-md transition-shadow duration-200 border border-gray-200 dark:border-gray-700">
                       <CardHeader className="pb-2 p-4">
                         <div className="flex justify-between items-start">
@@ -556,11 +946,7 @@ const Customers = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 px-2 text-xs hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950"
-                              onClick={() => {
-                                // Handle edit functionality
-                                console.log("Edit contact:", person.id);
-                                // You can implement edit modal or navigation here
-                              }}
+                              onClick={() => handleEditContact(person.id)}
                             >
                               <Edit className="h-3 w-3 mr-1" />
                               Edit
@@ -569,13 +955,7 @@ const Customers = () => {
                               variant="outline"
                               size="sm"
                               className="h-7 px-2 text-xs hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-950 text-red-600 hover:text-red-700"
-                              onClick={() => {
-                                // Handle delete functionality
-                                if (window.confirm(`Are you sure you want to delete ${person.name}?`)) {
-                                  console.log("Delete contact:", person.id);
-                                  // You can implement delete functionality here
-                                }
-                              }}
+                              onClick={() => handleDeleteContact(person.id, person.name)}
                             >
                               <Trash2 className="h-3 w-3 mr-1" />
                               Delete
@@ -584,20 +964,33 @@ const Customers = () => {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
-                {filteredPeople.length === 0 && (
+                {!loading && !error && filteredPeople.length === 0 && (
                   <div className="text-center py-8">
                     <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No people found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      {contacts.length === 0 ? "No contacts yet" : "No people found"}
+                    </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      {searchQuery.trim()
+                      {contacts.length === 0
+                        ? "Start building your contact list by adding your first contact."
+                        : searchQuery.trim()
                         ? `No contacts match "${searchQuery}" in the selected category.`
                         : "No contacts match your current filter selection."
                       }
                     </p>
-                    {(searchQuery.trim() || selectedFilter !== "all") && (
+                    {contacts.length === 0 ? (
+                      <Button
+                        className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => setIsAddContactOpen(true)}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Your First Contact
+                      </Button>
+                    ) : (searchQuery.trim() || selectedFilter !== "all") && (
                       <Button
                         variant="outline"
                         className="mt-4"
@@ -696,37 +1089,59 @@ const Customers = () => {
                     </div>
 
                     <div className="max-h-96 overflow-y-auto space-y-2">
-                      {filteredChatPeople.map((person) => (
-                        <div
-                          key={person.id}
-                          className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedContacts.includes(person.id)
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 dark:border-blue-400'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                          }`}
-                          onClick={() => toggleContactSelection(person.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-md">
-                                {getTypeIcon(person.type)}
+                      {filteredChatPeople.length > 0 ? (
+                        filteredChatPeople.map((person) => (
+                          <div
+                            key={person.id}
+                            className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                              selectedContacts.includes(person.id)
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 dark:border-blue-400'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                            }`}
+                            onClick={() => toggleContactSelection(person.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-md">
+                                  {getTypeIcon(person.type)}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900 dark:text-gray-100">{person.name}</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">{person.contact}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-medium text-gray-900 dark:text-gray-100">{person.name}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">{person.contact}</p>
+                              <div className="flex items-center gap-2">
+                                <Badge className={getTypeColor(person.type)} variant="outline">
+                                  {person.type}
+                                </Badge>
+                                {selectedContacts.includes(person.id) && (
+                                  <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                )}
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge className={getTypeColor(person.type)} variant="outline">
-                                {person.type}
-                              </Badge>
-                              {selectedContacts.includes(person.id) && (
-                                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                              )}
                             </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <MessageCircle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-600 dark:text-gray-400 text-sm">
+                            {contacts.length === 0
+                              ? "No contacts available to message. Add some contacts first."
+                              : "No contacts match your search criteria."
+                            }
+                          </p>
+                          {contacts.length === 0 && (
+                            <Button
+                              variant="outline"
+                              className="mt-3"
+                              onClick={() => setIsAddContactOpen(true)}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Contact
+                            </Button>
+                          )}
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </CardContent>

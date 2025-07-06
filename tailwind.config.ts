@@ -124,5 +124,31 @@ export default {
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+	plugins: [
+		require("tailwindcss-animate"),
+		// Custom scrollbar plugin
+		function({ addUtilities }: any) {
+			const newUtilities = {
+				'.scrollbar-thin': {
+					'scrollbar-width': 'thin',
+				},
+				'.scrollbar-thin::-webkit-scrollbar': {
+					height: '8px',
+					width: '8px',
+				},
+				'.scrollbar-thumb-primary::-webkit-scrollbar-thumb': {
+					'background-color': 'hsl(var(--primary))',
+					'border-radius': '4px',
+				},
+				'.scrollbar-thumb-primary::-webkit-scrollbar-thumb:hover': {
+					'background-color': 'hsl(var(--primary) / 0.8)',
+				},
+				'.scrollbar-track-muted::-webkit-scrollbar-track': {
+					'background-color': 'hsl(var(--muted))',
+					'border-radius': '4px',
+				},
+			}
+			addUtilities(newUtilities)
+		}
+	],
 } satisfies Config;

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>File Upload Test</h1>
+    
+    <div class="form-group">
+        <label for="authToken">Auth Token (JWT):</label>
+        <input type="text" id="authToken" placeholder="Enter your JWT token here">
+        <small>Get this from localStorage.getItem('auth_token') in your browser console</small>
+    </div>
+
+    <div class="form-group">
+        <label for="folderId">Folder ID:</label>
+        <input type="text" id="folderId" placeholder="Enter folder UUID">
+        <small>Get this from the folders API or database</small>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description (optional):</label>
+        <textarea id="description" placeholder="File description"></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="fileInput">Select File(s):</label>
+        <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.txt">
+    </div>
+
+    <button onclick="uploadSingleFile()">Upload Single File</button>
+    <button onclick="uploadMultipleFiles()">Upload Multiple Files</button>
+    <button onclick="testCloudinaryConnection()">Test Cloudinary Connection</button>
+
+    <div id="result"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5004/api';
+
+        function showResult(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+
+        function getAuthHeaders() {
+            const token = document.getElementById('authToken').value;
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        async function uploadSingleFile() {
+            const fileInput = document.getElementById('fileInput');
+            const folderId = document.getElementById('folderId').value;
+            const description = document.getElementById('description').value;
+
+            if (!fileInput.files.length) {
+                showResult('Please select a file', true);
+                return;
+            }
+
+            if (!folderId) {
+                showResult('Please enter a folder ID', true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('folder_id', folderId);
+            if (description) {
+                formData.append('description', description);
+            }
+
+            try {
+                showResult('Uploading file...');
+                
+                const response = await fetch(`${API_BASE_URL}/files/upload`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showResult(`
+                        <h3>Upload Successful!</h3>
+                        <p><strong>File ID:</strong> ${result.data.file.file_id}</p>
+                        <p><strong>File Name:</strong> ${result.data.file.file_name}</p>
+                        <p><strong>File URL:</strong> <a href="${result.data.file.file_url}" target="_blank">${result.data.file.file_url}</a></p>
+                        <p><strong>Size:</strong> ${result.data.metadata.size}</p>
+                        <p><strong>Type:</strong> ${result.data.metadata.mime_type}</p>
+                        <p><strong>Cloudinary Public ID:</strong> ${result.data.cloudinary.public_id}</p>
+                    `);
+                } else {
+                    showResult(`Upload failed: ${result.message || result.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                showResult(`Network error: ${error.message}`, true);
+            }
+        }
+
+        async function uploadMultipleFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const folderId = document.getElementById('folderId').value;
+            const description = document.getElementById('description').value;
+
+            if (!fileInput.files.length) {
+                showResult('Please select files', true);
+                return;
+            }
+
+            if (!folderId) {
+                showResult('Please enter a folder ID', true);
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of fileInput.files) {
+                formData.append('files', file);
+            }
+            formData.append('folder_id', folderId);
+            if (description) {
+                formData.append('description', description);
+            }
+
+            try {
+                showResult('Uploading files...');
+                
+                const response = await fetch(`${API_BASE_URL}/files/upload-multiple`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showResult(`
+                        <h3>Upload Results</h3>
+                        <p><strong>Total Files:</strong> ${result.data.summary.total}</p>
+                        <p><strong>Successful:</strong> ${result.data.summary.successful}</p>
+                        <p><strong>Failed:</strong> ${result.data.summary.failed}</p>
+                        ${result.data.successful.map(file => `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd;">
+                                <strong>${file.file.file_name}</strong><br>
+                                <a href="${file.file.file_url}" target="_blank">${file.file.file_url}</a>
+                            </div>
+                        `).join('')}
+                        ${result.data.failed.map(failure => `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #f00; color: #f00;">
+                                Error: ${failure.error}
+                            </div>
+                        `).join('')}
+                    `);
+                } else {
+                    showResult(`Upload failed: ${result.message || result.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                showResult(`Network error: ${error.message}`, true);
+            }
+        }
+
+        async function testCloudinaryConnection() {
+            try {
+                showResult('Testing Cloudinary connection...');
+                
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    headers: getAuthHeaders()
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(`
+                        <h3>Server Health Check</h3>
+                        <p>Server is running and accessible</p>
+                        <p>Now test file upload to verify Cloudinary integration</p>
+                    `);
+                } else {
+                    showResult(`Health check failed: ${result.message || 'Server not responding'}`, true);
+                }
+            } catch (error) {
+                showResult(`Connection error: ${error.message}`, true);
+            }
+        }
+
+        // Auto-fill folder ID if available in URL params
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const folderId = urlParams.get('folder_id');
+            if (folderId) {
+                document.getElementById('folderId').value = folderId;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -47,6 +47,7 @@
     "camelcase-css": "^2.0.1",
     "caniuse-lite": "^1.0.30001726",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
