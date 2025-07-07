@@ -330,6 +330,56 @@ export const expenseCategoriesApi = {
 };
 
 /**
+ * Expenses API functions
+ */
+export const expensesApi = {
+  /**
+   * Get all expenses
+   */
+  getAll: () => apiRequest<any[]>('/expenses'),
+
+  /**
+   * Create a new expense
+   */
+  create: (data: {
+    title: string;
+    category_id: string;
+    amount: number;
+    date: string;
+    status?: string;
+    receipt_url?: string | null;
+  }) =>
+    apiRequest('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Update an existing expense
+   */
+  update: (id: string, data: {
+    title?: string;
+    category_id?: string;
+    amount?: number;
+    date?: string;
+    status?: string;
+    receipt_url?: string | null;
+  }) =>
+    apiRequest(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Delete an expense
+   */
+  delete: (id: string) =>
+    apiRequest(`/expenses/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+/**
  * Folders API functions
  */
 export const foldersApi = {

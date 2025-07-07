@@ -53,7 +53,7 @@ const envSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   
-  // Email Configuration (Optional)
+  // Email Configuration (Required for messaging)
   EMAIL_HOST: z.string().optional(),
   EMAIL_PORT: z.string().transform(Number).optional(),
   EMAIL_USER: z.string().optional(),

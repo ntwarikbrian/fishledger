@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { messagingService, type DeliveryMethod } from "@/lib/api/services/messaging";
 import {
   Users,
   MessageCircle,
@@ -35,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -58,6 +60,9 @@ const Customers = () => {
   const [chatSearchQuery, setChatSearchQuery] = useState(""); // Search state for chat tab
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [messageSubject, setMessageSubject] = useState("");
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('email');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
@@ -245,13 +250,63 @@ const Customers = () => {
     );
   };
 
-  const handleSendMessage = () => {
-    if (selectedContacts.length === 0 || !message.trim()) return;
+  const handleSendMessage = async () => {
+    if (selectedContacts.length === 0 || !message.trim() || !messageSubject.trim()) {
+      toast.error("Please select contacts, enter a subject, and write a message");
+      return;
+    }
 
-    // Here you would implement the actual message sending logic
-    alert(`Message sent to ${selectedContacts.length} contact(s)!`);
-    setMessage("");
-    setSelectedContacts([]);
+    setIsSendingMessage(true);
+
+    try {
+      console.log('📨 Sending message to contacts:', selectedContacts);
+
+      const result = await messagingService.sendMessageToContacts(
+        selectedContacts,
+        messageSubject,
+        message,
+        deliveryMethod
+      );
+
+      if (result.success && result.data) {
+        const { successfulSends, failedSends, totalRecipients } = result.data;
+
+        if (successfulSends === totalRecipients) {
+          toast.success(`Message sent successfully to all ${totalRecipients} contact(s)!`);
+        } else if (successfulSends > 0) {
+          toast.warning(`Message sent to ${successfulSends} out of ${totalRecipients} contacts. ${failedSends} failed.`);
+        } else {
+          toast.error(`Failed to send message to any contacts. Please check your email configuration.`);
+        }
+
+        // Clear form on success
+        if (successfulSends > 0) {
+          setMessage("");
+          setMessageSubject("");
+          setSelectedContacts([]);
+        }
+      } else {
+        throw new Error(result.message || 'Failed to send message');
+      }
+    } catch (error: any) {
+      console.error('❌ Error sending message:', error);
+
+      let errorMessage = 'Failed to send message. Please try again.';
+
+      if (error?.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (error?.response?.status === 403) {
+        errorMessage = 'You do not have permission to send messages.';
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+    } finally {
+      setIsSendingMessage(false);
+    }
   };
 
   /**
@@ -1164,10 +1219,43 @@ const Customers = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Delivery Method
+                    </label>
+                    <Select value={deliveryMethod} onValueChange={(value: DeliveryMethod) => setDeliveryMethod(value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select delivery method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">
+                          <div className="flex items-center gap-2">
+                            <span>📧</span>
+                            <span>Email</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="sms" disabled>
+                          <div className="flex items-center gap-2">
+                            <span>📱</span>
+                            <span>SMS (Coming Soon)</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="whatsapp" disabled>
+                          <div className="flex items-center gap-2">
+                            <span>💬</span>
+                            <span>WhatsApp (Coming Soon)</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Message Subject
                     </label>
                     <Input
                       placeholder="Enter message subject..."
+                      value={messageSubject}
+                      onChange={(e) => setMessageSubject(e.target.value)}
                       className="w-full"
                     />
                   </div>
@@ -1212,19 +1300,30 @@ const Customers = () => {
                       variant="outline"
                       onClick={() => {
                         setMessage("");
+                        setMessageSubject("");
                         setSelectedContacts([]);
                       }}
+                      disabled={isSendingMessage}
                       className="flex-1"
                     >
                       Clear All
                     </Button>
                     <Button
                       onClick={handleSendMessage}
-                      disabled={selectedContacts.length === 0 || !message.trim()}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      disabled={selectedContacts.length === 0 || !message.trim() || !messageSubject.trim() || isSendingMessage}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                     >
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Message
+                      {isSendingMessage ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send {deliveryMethod === 'email' ? 'Email' : deliveryMethod.toUpperCase()}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>

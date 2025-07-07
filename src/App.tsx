@@ -12,11 +12,12 @@ import Dashboard from "./pages/Index";
 import ProductInventory from "./pages/ProductInventory";
 import Sales from "./pages/Sales";
 import Customers from "./pages/Customers";
-import QuickMath from "./pages/QuickMath";
+import Transactions from "./pages/Transactions";
 import Staff from "./pages/Staff";
 import Expenses from "./pages/Expenses";
 import Documents from "./pages/Documents";
 import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -43,11 +44,12 @@ const App = () => (
             <Route path="/inventory" element={<AuthGuard><ProductInventory /></AuthGuard>} />
             <Route path="/sales" element={<AuthGuard><Sales /></AuthGuard>} />
             <Route path="/customers" element={<AuthGuard><Customers /></AuthGuard>} />
-            <Route path="/quick-math" element={<AuthGuard><QuickMath /></AuthGuard>} />
+            <Route path="/transactions" element={<AuthGuard><Transactions /></AuthGuard>} />
             <Route path="/staff" element={<AuthGuard><Staff /></AuthGuard>} />
             <Route path="/expenses" element={<AuthGuard><Expenses /></AuthGuard>} />
             <Route path="/documents" element={<AuthGuard><Documents /></AuthGuard>} />
             <Route path="/reports" element={<AuthGuard><Reports /></AuthGuard>} />
+            <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

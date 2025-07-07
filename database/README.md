@@ -47,21 +47,21 @@ database/
 ├── schemas/                    # Individual table schemas
 │   ├── users.sql
 │   ├── workers.sql
-│   ├── fish_categories.sql
-│   ├── suppliers.sql
-│   ├── fish_products.sql
+│   ├── product_categories.sql
+│   ├── products.sql
 │   ├── stock_movements.sql
 │   ├── contacts.sql
-│   ├── sales.sql
-│   ├── sale_items.sql
-│   ├── expense_categories.sql
-│   ├── expenses.sql
-│   ├── document_folders.sql
-│   ├── documents.sql
-│   ├── worker_tasks.sql
-│   ├── worker_attendance.sql
+│   ├── messages.sql
+│   ├── automatic_messages.sql
 │   ├── message_settings.sql
-│   └── message_history.sql
+│   ├── message_templates.sql
+│   ├── sales.sql
+│   ├── expenses.sql
+│   ├── expense_categories.sql
+│   ├── folders.sql
+│   ├── files.sql
+│   ├── worker_tasks.sql
+│   ├── worker_permissions.sql
 └── README.md                   # This file
 ```
 
@@ -217,9 +217,11 @@ For questions or issues with the database schema:
   task id, task title, sub-tasks, assigned to, priority, due date and time, status (pending, inprogress,completed, overdue) and progress percentage column and created at column.
   4. expense category table: category name, description and budget.
   5. expense table :expense id, category, amount, date, added by and status(rejected ,pending ,paid)
-  6. contacts table: company name, contact name, email, phone number, contact type(supplier or customer), address and added by
-  7. message table will have: recipent id, recipient_type, message subject, message content, stauts, sent_at and sent_by
-  8.automatic messages table: product, current quantity, recipent id, recipient_type, quantity needed, quantiy trigged, message_template, created_at and updated at.
+  6. contacts table: company name, contact name, email, phone number, contact type(supplier or customer), address, email_verified, preferred_contact_method, email_notifications, last_contacted, total_messages_sent, notes and added by
+  7. message table will have: recipent id, recipient_type, recipient_email, message_type, delivery_method, message subject, message content, status, error_message, sent_at, delivered_at, sent_by, created_at and updated_at
+  8. automatic messages table: product, current quantity, recipent id, recipient_type, quantity needed, quantiy trigged, message_template, created_at and updated at.
+  9. message_settings table: user_id, email configuration (host, port, user, password, from, from_name), security settings (TLS, SSL), messaging preferences (auto_send, daily_limit, retry settings), notification settings, template settings (signature, logo), created_at and updated_at
+  10. message_templates table: user_id, template_name, template_category, template_type, subject_template, content_template, template settings (is_active, is_default, use_signature), usage statistics (usage_count, last_used), available_variables, created_at and updated_at
   9.folders table: folder id, folder name, description, folder color, folder icon, files it contains, size, created by
   10. file table:
   file id, file name, image url, description, folder id, date and added by

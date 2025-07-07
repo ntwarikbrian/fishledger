@@ -1,7 +1,7 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Calculator, User } from "lucide-react";
+import { Home, Fish, Package, Users, TrendingUp, FileText, MenuIcon, DollarSign, FolderOpen, LogOut, Receipt, User, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,11 +38,12 @@ const Sidebar = () => {
     { name: t('navigation.inventory'), href: "/inventory", icon: Fish, key: "inventory" },
     { name: t('navigation.sales'), href: "/sales", icon: TrendingUp, key: "sales" },
     { name: t('navigation.customers'), href: "/customers", icon: Users, key: "customers" },
-    { name: "Quick Math", href: "/quick-math", icon: Calculator, key: "quickmath" },
+    { name: "Transactions", href: "/transactions", icon: Receipt, key: "transactions" },
     { name: t('navigation.expenses'), href: "/expenses", icon: DollarSign, key: "expenses" },
     { name: t('navigation.documents'), href: "/documents", icon: FolderOpen, key: "documents" },
     { name: t('navigation.reports'), href: "/reports", icon: FileText, key: "reports" },
     { name: t('navigation.staff'), href: "/staff", icon: Users, key: "staff" },
+    { name: t('navigation.settings'), href: "/settings", icon: Settings, key: "settings" },
   ];
 
   // Handle logout functionality

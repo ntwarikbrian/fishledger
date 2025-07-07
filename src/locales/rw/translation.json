@@ -271,6 +271,8 @@
     "networkError": "Ikibazo cy'umuyoboro. Reba neza umuyoboro wawe"
   },
   "settings": {
+    "title": "Igenamiterere",
+    "description": "Gucunga igenamiterere ry'konti yawe n'ibyo uhitamo",
     "languagePreferences": "Ihitamo ry'ururimi",
     "languageDescription": "Hitamo ururimi rwiza rw'interface",
     "currentLanguage": "Ururimi rw'ubu",
@@ -284,6 +286,62 @@
     "languageChangeDescription": "Ururimi rw'interface rwahinduwe",
     "languageChangeError": "Guhindura ururimi ntibyakunze",
     "languageChangeErrorDescription": "Nyamuneka ongera ugerageze",
-    "language": "Ururimi"
+    "language": "Ururimi",
+    "profile": {
+      "title": "Amakuru y'ukoresha",
+      "description": "Gucunga amakuru y'ubucuruzi n'ibya gakondo",
+      "businessName": "Izina ry'ubucuruzi",
+      "ownerName": "Izina ry'umunyangabo",
+      "email": "Aderesi ya imeyili",
+      "phone": "Nimero ya telefoni",
+      "address": "Aderesi y'ubucuruzi",
+      "taxId": "Nimero y'umusoro / Uruhushya rw'ubucuruzi",
+      "edit": "Hindura",
+      "cancel": "Kuraguza",
+      "save": "Bika impinduka",
+      "saving": "Kubika..."
+    },
+    "billing": {
+      "title": "Uko kwishyura kimeze",
+      "description": "Gucunga kwiyandikisha kwawe n'amakuru y'kwishyura",
+      "currentPlan": "Gahunda y'ubu",
+      "status": "Uko bimeze",
+      "nextBilling": "Kwishyura gutaha",
+      "amount": "Amafaranga",
+      "updatePayment": "Kuvugurura uburyo bwo kwishyura",
+      "viewHistory": "Kureba amateka y'kwishyura",
+      "upgradePlan": "Kuzamura gahunda"
+    },
+    "reports": {
+      "title": "Raporo zikora mu buryo bwikora",
+      "description": "Gushyiraho raporo zikora mu buryo bwikora no kuzitanga",
+      "enableReporting": "Gushoboza raporo zikora mu buryo bwikora",
+      "enableReportingDesc": "Gukora no kohereza raporo mu buryo bwikora",
+      "frequency": "Inshuro raporo zikora",
+      "dailyReports": "Raporo za buri munsi",
+      "dailyReportsDesc": "Incamake y'ibicuruzwa n'ibicuruzwa bya buri munsi",
+      "weeklyReports": "Raporo z'icyumweru",
+      "weeklyReportsDesc": "Imikorere n'isesengura ry'icyumweru",
+      "monthlyReports": "Raporo z'ukwezi",
+      "monthlyReportsDesc": "Raporo y'ubucuruzi yuzuye y'ukwezi",
+      "saveSettings": "Bika igenamiterere ry'raporo"
+    },
+    "preferences": {
+      "title": "Ururimi n'isura",
+      "description": "Guhindura ururimi n'isura yawe",
+      "theme": "Isura",
+      "savePreferences": "Bika ibyo uhitamo"
+    },
+    "notifications": {
+      "title": "Igenamiterere ry'ubutumwa",
+      "description": "Gucunga uko uhabwa ubutumwa n'iburira",
+      "emailNotifications": "Ubutumwa bwa imeyili",
+      "emailNotificationsDesc": "Kwakira ubutumwa binyuze muri imeyili",
+      "smsNotifications": "Ubutumwa bwa SMS",
+      "smsNotificationsDesc": "Kwakira ubutumwa binyuze muri SMS (Bizaza vuba)",
+      "lowStockAlerts": "Iburira ry'ibicuruzwa bike",
+      "lowStockAlertsDesc": "Kumenyeshwa iyo ibicuruzwa bigabanutse",
+      "saveNotifications": "Bika igenamiterere ry'ubutumwa"
+    }
   }
 }

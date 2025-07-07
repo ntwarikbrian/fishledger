@@ -49,6 +49,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useExpenseCategories } from "@/hooks/use-expense-categories";
+import { useExpenses } from "@/hooks/use-expenses";
 import { toast } from "sonner";
 
 // Types for expenses
@@ -86,13 +87,54 @@ const Expenses = () => {
     budget: ''
   });
 
+  // Form state for adding expenses
+  const [expenseForm, setExpenseForm] = useState({
+    title: '',
+    amount: '',
+    category_id: '',
+    date: new Date().toISOString().split('T')[0],
+    status: 'pending',
+    receipt_url: ''
+  });
+
+  // Receipt upload state
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [selectedReceiptFile, setSelectedReceiptFile] = useState<File | null>(null);
+
+  // Loading state for expense submission
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
+
+  // Edit/Delete state for categories
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<any>(null);
+  const [isDeleteCategoryOpen, setIsDeleteCategoryOpen] = useState(false);
+
+  // Edit/Delete state for expenses
+  const [editingExpense, setEditingExpense] = useState<any>(null);
+  const [isEditExpenseOpen, setIsEditExpenseOpen] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<any>(null);
+  const [isDeleteExpenseOpen, setIsDeleteExpenseOpen] = useState(false);
+
   // Use expense categories hook
   const {
     categories: backendCategories,
     loading: categoriesLoading,
     error: categoriesError,
-    createCategory
+    createCategory,
+    updateCategory,
+    deleteCategory
   } = useExpenseCategories();
+
+  // Use expenses hook
+  const {
+    expenses,
+    loading: expensesLoading,
+    error: expensesError,
+    createExpense,
+    updateExpense,
+    deleteExpense
+  } = useExpenses();
 
   // Handle category form submission
   const handleCreateCategory = async () => {
@@ -119,6 +161,256 @@ const Expenses = () => {
       toast.success('Category created successfully');
     } else {
       toast.error('Failed to create category');
+    }
+  };
+
+  // Handle expense form submission
+  const handleCreateExpense = async () => {
+    // Validate required fields
+    if (!expenseForm.title.trim()) {
+      toast.error('Expense title is required');
+      return;
+    }
+
+    if (!expenseForm.amount || parseFloat(expenseForm.amount) <= 0) {
+      toast.error('Amount must be greater than 0');
+      return;
+    }
+
+    if (!expenseForm.category_id) {
+      toast.error('Please select a category');
+      return;
+    }
+
+    if (!expenseForm.date) {
+      toast.error('Date is required');
+      return;
+    }
+
+    try {
+      setIsSubmittingExpense(true);
+
+      const expenseData = {
+        title: expenseForm.title.trim(),
+        amount: parseFloat(expenseForm.amount),
+        category_id: expenseForm.category_id,
+        date: expenseForm.date,
+        status: expenseForm.status,
+        receipt_url: expenseForm.receipt_url || null
+      };
+
+      const success = await createExpense(expenseData);
+
+      if (success) {
+        // Reset form
+        setExpenseForm({
+          title: '',
+          amount: '',
+          category_id: '',
+          date: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          receipt_url: ''
+        });
+        setSelectedReceiptFile(null);
+
+        toast.success('Expense added successfully!');
+      } else {
+        toast.error('Failed to create expense. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      toast.error('Failed to create expense. Please try again.');
+    } finally {
+      setIsSubmittingExpense(false);
+    }
+  };
+
+  // Handle category edit
+  const handleEditCategory = (category: any) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      category_name: category.category_name,
+      description: category.description || '',
+      budget: category.budget.toString()
+    });
+    setIsEditCategoryOpen(true);
+  };
+
+  // Handle category update
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) return;
+
+    if (!categoryForm.category_name.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    const budgetValue = categoryForm.budget ? parseFloat(categoryForm.budget) : 0;
+    if (categoryForm.budget && (isNaN(budgetValue) || budgetValue < 0)) {
+      toast.error('Budget must be a positive number');
+      return;
+    }
+
+    const success = await updateCategory(editingCategory.category_id, {
+      category_name: categoryForm.category_name.trim(),
+      description: categoryForm.description.trim() || undefined,
+      budget: budgetValue,
+    });
+
+    if (success) {
+      setCategoryForm({ category_name: '', description: '', budget: '' });
+      setIsEditCategoryOpen(false);
+      setEditingCategory(null);
+      toast.success('Category updated successfully!');
+    }
+  };
+
+  // Handle category delete
+  const handleDeleteCategory = (category: any) => {
+    setDeletingCategory(category);
+    setIsDeleteCategoryOpen(true);
+  };
+
+  // Confirm category deletion
+  const confirmDeleteCategory = async () => {
+    if (!deletingCategory) return;
+
+    const success = await deleteCategory(deletingCategory.category_id);
+    if (success) {
+      setIsDeleteCategoryOpen(false);
+      setDeletingCategory(null);
+      toast.success('Category deleted successfully!');
+    }
+  };
+
+  // Handle expense edit
+  const handleEditExpense = (expense: any) => {
+    setEditingExpense(expense);
+    setExpenseForm({
+      title: expense.title,
+      amount: expense.amount.toString(),
+      category_id: expense.category_id,
+      date: expense.date,
+      status: expense.status,
+      receipt_url: expense.receipt_url || ''
+    });
+    setIsEditExpenseOpen(true);
+  };
+
+  // Handle expense update
+  const handleUpdateExpense = async () => {
+    if (!editingExpense) return;
+
+    if (!expenseForm.title.trim()) {
+      toast.error('Expense title is required');
+      return;
+    }
+
+    if (!expenseForm.amount || parseFloat(expenseForm.amount) <= 0) {
+      toast.error('Amount must be greater than 0');
+      return;
+    }
+
+    const success = await updateExpense(editingExpense.expense_id, {
+      title: expenseForm.title.trim(),
+      amount: parseFloat(expenseForm.amount),
+      category_id: expenseForm.category_id,
+      date: expenseForm.date,
+      status: expenseForm.status
+    });
+
+    if (success) {
+      setExpenseForm({
+        title: '',
+        amount: '',
+        category_id: '',
+        date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        receipt_url: ''
+      });
+      setIsEditExpenseOpen(false);
+      setEditingExpense(null);
+      toast.success('Expense updated successfully!');
+    }
+  };
+
+  // Handle expense delete
+  const handleDeleteExpense = (expense: any) => {
+    setDeletingExpense(expense);
+    setIsDeleteExpenseOpen(true);
+  };
+
+  // Confirm expense deletion
+  const confirmDeleteExpense = async () => {
+    if (!deletingExpense) return;
+
+    const success = await deleteExpense(deletingExpense.expense_id);
+    if (success) {
+      setIsDeleteExpenseOpen(false);
+      setDeletingExpense(null);
+      toast.success('Expense deleted successfully!');
+    }
+  };
+
+  // Handle receipt file upload to Cloudinary
+  const handleReceiptUpload = async (file: File): Promise<string | null> => {
+    try {
+      setUploadingReceipt(true);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'expense_receipts'); // You'll need to create this preset in Cloudinary
+      formData.append('folder', 'expenses/receipts');
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to upload receipt');
+      }
+
+      const data = await response.json();
+      return data.secure_url;
+    } catch (error) {
+      console.error('Error uploading receipt:', error);
+      toast.error('Failed to upload receipt. Please try again.');
+      return null;
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  // Handle receipt file selection
+  const handleReceiptFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (JPEG, PNG, WebP) or PDF');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setSelectedReceiptFile(file);
+
+    // Upload to Cloudinary
+    const uploadedUrl = await handleReceiptUpload(file);
+    if (uploadedUrl) {
+      setExpenseForm(prev => ({ ...prev, receipt_url: uploadedUrl }));
+      toast.success('Receipt uploaded successfully!');
     }
   };
 
@@ -149,142 +441,39 @@ const Expenses = () => {
     return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"; // Default color
   };
 
-  // Transform backend categories to display format
-  const displayCategories = backendCategories.map(category => ({
-    id: category.category_id,
-    name: category.category_name,
-    description: category.description || '',
-    icon: getCategoryIcon(category.category_name),
-    color: getCategoryColor(category.category_name),
-    totalBudget: category.budget > 0 ? category.budget : undefined,
-    spent: 0 // TODO: Calculate actual spent amount from expenses
-  }));
-
-  // Mock data for expense categories
-  const expenseCategories: ExpenseCategory[] = [
-    {
-      id: "office-supplies",
-      name: "Office Supplies",
-      description: "Stationery, equipment, and office materials",
-      icon: Briefcase,
-      color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-      totalBudget: 2000,
-      spent: 1250
-    },
-    {
-      id: "utilities",
-      name: "Utilities",
-      description: "Electricity, water, internet, and phone bills",
-      icon: Zap,
-      color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-      totalBudget: 1500,
-      spent: 890
-    },
-    {
-      id: "transportation",
-      name: "Transportation",
-      description: "Vehicle maintenance, fuel, and delivery costs",
-      icon: Car,
-      color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-      totalBudget: 3000,
-      spent: 2100
-    },
-    {
-      id: "maintenance",
-      name: "Maintenance & Repairs",
-      description: "Equipment repairs and facility maintenance",
-      icon: Wrench,
-      color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-      totalBudget: 2500,
-      spent: 1800
-    },
-    {
-      id: "marketing",
-      name: "Marketing & Advertising",
-      description: "Promotional materials and advertising costs",
-      icon: TrendingUp,
-      color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-      totalBudget: 1800,
-      spent: 950
-    },
-    {
-      id: "food-beverage",
-      name: "Food & Beverage",
-      description: "Staff meals and business entertainment",
-      icon: Utensils,
-      color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
-      totalBudget: 800,
-      spent: 420
-    }
-  ];
-
-  // Mock data for expenses
-  const expenses: Expense[] = [
-    {
-      id: "exp-001",
-      title: "Office Printer Paper",
-      description: "A4 paper for office printing needs",
-      amount: 85.50,
-      category: "office-supplies",
-      date: "2024-01-15",
-      vendor: "Office Depot",
-      status: "paid"
-    },
-    {
-      id: "exp-002",
-      title: "Monthly Internet Bill",
-      description: "High-speed internet service for January",
-      amount: 120.00,
-      category: "utilities",
-      date: "2024-01-10",
-      vendor: "TechNet ISP",
-      status: "paid"
-    },
-    {
-      id: "exp-003",
-      title: "Vehicle Fuel",
-      description: "Fuel for delivery truck",
-      amount: 95.75,
-      category: "transportation",
-      date: "2024-01-12",
-      vendor: "Shell Gas Station",
-      status: "approved"
-    },
-    {
-      id: "exp-004",
-      title: "Refrigeration Unit Repair",
-      description: "Emergency repair for main storage refrigerator",
-      amount: 450.00,
-      category: "maintenance",
-      date: "2024-01-08",
-      vendor: "CoolTech Repairs",
-      status: "pending"
-    },
-    {
-      id: "exp-005",
-      title: "Social Media Ads",
-      description: "Facebook and Instagram advertising campaign",
-      amount: 200.00,
-      category: "marketing",
-      date: "2024-01-05",
-      vendor: "Meta Business",
-      status: "paid"
-    }
-  ];
-
-  // Get category by ID
-  const getCategoryById = (id: string) => {
-    return expenseCategories.find(cat => cat.id === id);
+  // Calculate spent amounts per category from expenses
+  const calculateSpentByCategory = (categoryId: string): number => {
+    return expenses
+      .filter(expense => expense.category_id === categoryId && expense.status !== 'rejected')
+      .reduce((total, expense) => total + expense.amount, 0);
   };
 
-  // Filter expenses by category
+  // Transform backend categories to display format with real spent amounts
+  const displayCategories = backendCategories.map(category => {
+    const spent = calculateSpentByCategory(category.category_id);
+    return {
+      id: category.category_id,
+      name: category.category_name,
+      description: category.description || '',
+      icon: getCategoryIcon(category.category_name),
+      color: getCategoryColor(category.category_name),
+      totalBudget: category.budget > 0 ? category.budget : undefined,
+      spent: spent
+    };
+  });
+
+
+
+
+
+  // Filter expenses by category (using actual expenses from hook)
   const filteredExpenses = selectedCategory === "all"
     ? expenses
-    : expenses.filter(expense => expense.category === selectedCategory);
+    : expenses.filter(expense => expense.category_id === selectedCategory);
 
   // Calculate total expenses
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const monthlyBudget = expenseCategories.reduce((sum, cat) => sum + (cat.totalBudget || 0), 0);
+  const monthlyBudget = backendCategories.reduce((sum, cat) => sum + (cat.budget || 0), 0);
 
   return (
     <AppLayout>
@@ -405,6 +594,87 @@ const Expenses = () => {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+
+                  {/* Edit Category Dialog */}
+                  <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Edit Category</DialogTitle>
+                        <DialogDescription>
+                          Update the expense category details
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="edit-category-name" className="text-right">
+                            Name
+                          </Label>
+                          <Input
+                            id="edit-category-name"
+                            placeholder="Category name"
+                            className="col-span-3"
+                            value={categoryForm.category_name}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, category_name: e.target.value }))}
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="edit-category-description" className="text-right">
+                            Description
+                          </Label>
+                          <Textarea
+                            id="edit-category-description"
+                            placeholder="Category description"
+                            className="col-span-3"
+                            value={categoryForm.description}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, description: e.target.value }))}
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="edit-category-budget" className="text-right">
+                            Budget
+                          </Label>
+                          <Input
+                            id="edit-category-budget"
+                            type="number"
+                            placeholder="0.00"
+                            className="col-span-3"
+                            value={categoryForm.budget}
+                            onChange={(e) => setCategoryForm(prev => ({ ...prev, budget: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsEditCategoryOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="button" onClick={handleUpdateCategory}>
+                          <Save className="mr-2 h-4 w-4" />
+                          Update Category
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Delete Category Dialog */}
+                  <Dialog open={isDeleteCategoryOpen} onOpenChange={setIsDeleteCategoryOpen}>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Delete Category</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to delete "{deletingCategory?.category_name}"? This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsDeleteCategoryOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="button" variant="destructive" onClick={confirmDeleteCategory}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Category
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -445,10 +715,19 @@ const Expenses = () => {
                                 </div>
                               </div>
                               <div className="flex space-x-1">
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditCategory(backendCategories.find(cat => cat.category_id === category.id))}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteCategory(backendCategories.find(cat => cat.category_id === category.id))}
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -456,25 +735,45 @@ const Expenses = () => {
 
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span>Spent: ${category.spent.toFixed(2)}</span>
+                                <span className="font-medium text-green-600">Spent: ${category.spent.toFixed(2)}</span>
                                 {category.totalBudget && (
-                                  <span>Budget: ${category.totalBudget.toFixed(2)}</span>
+                                  <span className="text-muted-foreground">Budget: ${category.totalBudget.toFixed(2)}</span>
                                 )}
                               </div>
-                              {category.totalBudget && (
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full ${
-                                      budgetUsed > 90 ? 'bg-red-500' :
-                                      budgetUsed > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                                    }`}
-                                    style={{ width: `${Math.min(budgetUsed, 100)}%` }}
-                                  ></div>
-                                </div>
+
+                              {category.totalBudget ? (
+                                <>
+                                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div
+                                      className={`h-2.5 rounded-full transition-all duration-300 ${
+                                        budgetUsed > 100 ? 'bg-red-500' :
+                                        budgetUsed > 90 ? 'bg-orange-500' :
+                                        budgetUsed > 70 ? 'bg-yellow-500' : 'bg-green-500'
+                                      }`}
+                                      style={{ width: `${Math.min(budgetUsed, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <p className={`text-xs font-medium ${
+                                      budgetUsed > 100 ? 'text-red-600' :
+                                      budgetUsed > 90 ? 'text-orange-600' :
+                                      budgetUsed > 70 ? 'text-yellow-600' : 'text-green-600'
+                                    }`}>
+                                      {budgetUsed.toFixed(1)}% used
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      ${(category.totalBudget - category.spent).toFixed(2)} remaining
+                                    </p>
+                                  </div>
+                                  {budgetUsed > 100 && (
+                                    <p className="text-xs text-red-600 font-medium">
+                                      ⚠️ Over budget by ${(category.spent - category.totalBudget).toFixed(2)}
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">No budget set</p>
                               )}
-                              <p className="text-xs text-muted-foreground">
-                                {category.totalBudget ? `${budgetUsed.toFixed(1)}% of budget used` : 'No budget set'}
-                              </p>
                             </div>
                           </CardContent>
                         </Card>
@@ -489,7 +788,7 @@ const Expenses = () => {
           {/* All Expenses Tab */}
           <TabsContent value="all-expenses" className="space-y-4">
             {/* Compact Overview Cards - Only in All Expenses Tab */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Total Expenses Card */}
               <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 hover:shadow-lg transition-all duration-200">
                 <CardContent className="p-4">
@@ -525,14 +824,14 @@ const Expenses = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        {((totalExpenses / monthlyBudget) * 100).toFixed(1)}% used
+                        {monthlyBudget > 0 ? ((totalExpenses / monthlyBudget) * 100).toFixed(1) : '0.0'}% used
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Categories Card */}
+              {/* Budget Remaining Card */}
               <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 hover:shadow-lg transition-all duration-200">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -541,12 +840,45 @@ const Expenses = () => {
                         <Tag className="h-5 w-5 text-purple-600" />
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Categories</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">{expenseCategories.length}</p>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Budget Remaining</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          ${monthlyBudget > 0 ? (monthlyBudget - totalExpenses).toFixed(2) : '0.00'}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Active</p>
+                      <p className={`text-xs font-medium ${
+                        monthlyBudget > 0 && totalExpenses > monthlyBudget ? 'text-red-600' :
+                        monthlyBudget > 0 && (totalExpenses / monthlyBudget) > 0.9 ? 'text-orange-600' :
+                        'text-green-600'
+                      }`}>
+                        {monthlyBudget > 0 ? (
+                          totalExpenses > monthlyBudget ? 'Over Budget' :
+                          (totalExpenses / monthlyBudget) > 0.9 ? 'Near Limit' : 'On Track'
+                        ) : 'No Budget'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Categories Count Card */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 hover:shadow-lg transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
+                        <Tag className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Categories</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{backendCategories.length}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                        {displayCategories.filter(cat => cat.spent > 0).length} active
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -575,9 +907,9 @@ const Expenses = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Categories</SelectItem>
-                        {displayCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
+                        {backendCategories.map((category) => (
+                          <SelectItem key={category.category_id} value={category.category_id}>
+                            {category.category_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -594,25 +926,28 @@ const Expenses = () => {
                         <th className="text-left py-3 px-2 text-sm font-medium">Category</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Amount</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Date</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium">Receipt</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Status</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredExpenses.map((expense) => {
-                        const category = getCategoryById(expense.category);
+                        const category = expense.expense_categories;
                         return (
-                          <tr key={expense.id} className="border-b hover:bg-muted/50">
+                          <tr key={expense.expense_id} className="border-b hover:bg-muted/50">
                             <td className="py-3 px-2">
                               <div>
                                 <div className="font-medium text-sm">{expense.title}</div>
-                                <div className="text-xs text-muted-foreground">{expense.description}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Added by {expense.users?.owner_name || 'Unknown'}
+                                </div>
                               </div>
                             </td>
                             <td className="py-3 px-2">
                               {category && (
-                                <Badge variant="secondary" className={category.color}>
-                                  {category.name}
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                                  {category.category_name}
                                 </Badge>
                               )}
                             </td>
@@ -626,11 +961,25 @@ const Expenses = () => {
                               </div>
                             </td>
                             <td className="py-3 px-2">
+                              {expense.receipt_url ? (
+                                <a
+                                  href={expense.receipt_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center text-blue-600 hover:text-blue-700 text-sm"
+                                >
+                                  <FileText className="mr-1 h-3 w-3" />
+                                  View
+                                </a>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No receipt</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-2">
                               <Badge
                                 variant="secondary"
                                 className={`${
                                   expense.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                                  expense.status === 'approved' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
                                   expense.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
                                   'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                                 }`}
@@ -640,10 +989,19 @@ const Expenses = () => {
                             </td>
                             <td className="py-3 px-2">
                               <div className="flex space-x-1">
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditExpense(expense)}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteExpense(expense)}
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -693,6 +1051,8 @@ const Expenses = () => {
                         <Input
                           id="expense-title"
                           placeholder="Enter expense title"
+                          value={expenseForm.title}
+                          onChange={(e) => setExpenseForm({...expenseForm, title: e.target.value})}
                           className="pl-10 h-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all bg-white dark:bg-gray-800"
                         />
                       </div>
@@ -709,6 +1069,8 @@ const Expenses = () => {
                           type="number"
                           step="0.01"
                           placeholder="0.00"
+                          value={expenseForm.amount}
+                          onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})}
                           className="pl-10 h-10 font-medium border border-gray-300 dark:border-gray-600 rounded-lg focus:border-green-500 focus:ring-1 focus:ring-green-500/30 transition-all bg-white dark:bg-gray-800"
                         />
                       </div>
@@ -721,7 +1083,7 @@ const Expenses = () => {
                       <Label htmlFor="expense-category" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                         Category *
                       </Label>
-                      <Select>
+                      <Select value={expenseForm.category_id} onValueChange={(value) => setExpenseForm({...expenseForm, category_id: value})}>
                         <SelectTrigger className="h-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all bg-white dark:bg-gray-800">
                           <div className="flex items-center">
                             <Tag className="mr-2 h-4 w-4 text-gray-400" />
@@ -729,17 +1091,14 @@ const Expenses = () => {
                           </div>
                         </SelectTrigger>
                         <SelectContent className="rounded-lg">
-                          {displayCategories.map((category) => {
-                            const IconComponent = category.icon;
-                            return (
-                              <SelectItem key={category.id} value={category.id}>
-                                <div className="flex items-center space-x-2">
-                                  <IconComponent className="h-4 w-4" />
-                                  <span>{category.name}</span>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
+                          {backendCategories.map((category) => (
+                            <SelectItem key={category.category_id} value={category.category_id}>
+                              <div className="flex items-center space-x-2">
+                                <Tag className="h-4 w-4" />
+                                <span>{category.category_name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -753,36 +1112,21 @@ const Expenses = () => {
                         <Input
                           id="expense-date"
                           type="date"
+                          value={expenseForm.date}
+                          onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
                           className="pl-10 h-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all bg-white dark:bg-gray-800"
-                          defaultValue={new Date().toISOString().split('T')[0]}
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Row 3: Description */}
-                  <div className="group">
-                    <Label htmlFor="expense-description" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                      Description
-                    </Label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-3 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
-                      <Textarea
-                        id="expense-description"
-                        placeholder="Brief description of the expense..."
-                        className="pl-10 pt-2.5 min-h-[80px] border border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all bg-white dark:bg-gray-800 resize-none"
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 4: Status and Receipt */}
+                  {/* Row 3: Status and Receipt */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="group">
                       <Label htmlFor="expense-status" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                         Status
                       </Label>
-                      <Select defaultValue="pending">
+                      <Select value={expenseForm.status} onValueChange={(value) => setExpenseForm({...expenseForm, status: value})}>
                         <SelectTrigger className="h-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all bg-white dark:bg-gray-800">
                           <SelectValue />
                         </SelectTrigger>
@@ -793,22 +1137,10 @@ const Expenses = () => {
                               <span>Pending</span>
                             </div>
                           </SelectItem>
-                          <SelectItem value="approved">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              <span>Approved</span>
-                            </div>
-                          </SelectItem>
                           <SelectItem value="paid">
                             <div className="flex items-center space-x-2">
                               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                               <span>Paid</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="rejected">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                              <span>Rejected</span>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -817,21 +1149,47 @@ const Expenses = () => {
 
                     <div className="group">
                       <Label htmlFor="expense-receipt" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                        Receipt
+                        Receipt (Optional)
                       </Label>
                       <div className="relative">
                         <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 text-center hover:border-blue-400 transition-colors bg-gray-50/50 dark:bg-gray-800/50">
-                          <div className="flex items-center justify-center space-x-2">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Upload file</span>
-                          </div>
+                          {uploadingReceipt ? (
+                            <div className="flex items-center justify-center space-x-2">
+                              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                              <span className="text-sm text-blue-600">Uploading...</span>
+                            </div>
+                          ) : selectedReceiptFile ? (
+                            <div className="flex items-center justify-center space-x-2">
+                              <FileText className="h-4 w-4 text-green-600" />
+                              <span className="text-sm text-green-600">{selectedReceiptFile.name}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center space-x-2">
+                              <FileText className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">Upload receipt (Image or PDF)</span>
+                            </div>
+                          )}
                           <Input
                             id="expense-receipt"
                             type="file"
                             accept="image/*,.pdf"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={handleReceiptFileChange}
+                            disabled={uploadingReceipt}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                           />
                         </div>
+                        {expenseForm.receipt_url && (
+                          <div className="mt-2">
+                            <a
+                              href={expenseForm.receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-700 underline"
+                            >
+                              View uploaded receipt
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -845,15 +1203,132 @@ const Expenses = () => {
                   >
                     Cancel
                   </Button>
-                  <Button className="h-9 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-md hover:shadow-lg transition-all">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Expense
+                  <Button
+                    onClick={handleCreateExpense}
+                    disabled={isSubmittingExpense}
+                    className="h-9 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingExpense ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Expense
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Edit Expense Dialog */}
+        <Dialog open={isEditExpenseOpen} onOpenChange={setIsEditExpenseOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Expense</DialogTitle>
+              <DialogDescription>
+                Update the expense details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expense-title">Expense Title *</Label>
+                  <Input
+                    id="edit-expense-title"
+                    placeholder="Enter expense title"
+                    value={expenseForm.title}
+                    onChange={(e) => setExpenseForm({...expenseForm, title: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expense-amount">Amount *</Label>
+                  <Input
+                    id="edit-expense-amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Category *</Label>
+                  <Select value={expenseForm.category_id} onValueChange={(value) => setExpenseForm({...expenseForm, category_id: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {backendCategories.map((category) => (
+                        <SelectItem key={category.category_id} value={category.category_id}>
+                          {category.category_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expense-date">Date *</Label>
+                  <Input
+                    id="edit-expense-date"
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={expenseForm.status} onValueChange={(value) => setExpenseForm({...expenseForm, status: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditExpenseOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleUpdateExpense}>
+                <Save className="mr-2 h-4 w-4" />
+                Update Expense
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Expense Dialog */}
+        <Dialog open={isDeleteExpenseOpen} onOpenChange={setIsDeleteExpenseOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Delete Expense</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{deletingExpense?.title}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDeleteExpenseOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="destructive" onClick={confirmDeleteExpense}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Expense
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

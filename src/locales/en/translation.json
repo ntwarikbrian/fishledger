@@ -217,7 +217,6 @@
     "sent": "Sent",
     "draft": "Draft",
     "messageStatus": "Message Status",
-    "sent": "Sent",
     "pending": "Pending",
     "failed": "Failed"
   },
@@ -271,6 +270,8 @@
     "networkError": "Network error. Please check your connection"
   },
   "settings": {
+    "title": "Settings",
+    "description": "Manage your account settings and preferences",
     "languagePreferences": "Language Preferences",
     "languageDescription": "Choose your preferred language for the interface",
     "currentLanguage": "Current Language",
@@ -284,6 +285,62 @@
     "languageChangeDescription": "The interface language has been updated",
     "languageChangeError": "Failed to change language",
     "languageChangeErrorDescription": "Please try again",
-    "language": "Language"
+    "language": "Language",
+    "profile": {
+      "title": "User Details",
+      "description": "Manage your business and personal information",
+      "businessName": "Business Name",
+      "ownerName": "Owner Name",
+      "email": "Email Address",
+      "phone": "Phone Number",
+      "address": "Business Address",
+      "taxId": "Tax ID / Business License",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save Changes",
+      "saving": "Saving..."
+    },
+    "billing": {
+      "title": "Payment Status",
+      "description": "Manage your subscription and billing information",
+      "currentPlan": "Current Plan",
+      "status": "Status",
+      "nextBilling": "Next Billing",
+      "amount": "Amount",
+      "updatePayment": "Update Payment Method",
+      "viewHistory": "View Billing History",
+      "upgradePlan": "Upgrade Plan"
+    },
+    "reports": {
+      "title": "Automatic Reporting",
+      "description": "Configure automatic report generation and delivery",
+      "enableReporting": "Enable Automatic Reporting",
+      "enableReportingDesc": "Automatically generate and send reports",
+      "frequency": "Report Frequency",
+      "dailyReports": "Daily Reports",
+      "dailyReportsDesc": "Daily sales and inventory summary",
+      "weeklyReports": "Weekly Reports",
+      "weeklyReportsDesc": "Weekly performance and analytics",
+      "monthlyReports": "Monthly Reports",
+      "monthlyReportsDesc": "Comprehensive monthly business report",
+      "saveSettings": "Save Report Settings"
+    },
+    "preferences": {
+      "title": "Language & Theme",
+      "description": "Customize your language and appearance preferences",
+      "theme": "Theme",
+      "savePreferences": "Save Preferences"
+    },
+    "notifications": {
+      "title": "Notification Settings",
+      "description": "Manage how you receive notifications and alerts",
+      "emailNotifications": "Email Notifications",
+      "emailNotificationsDesc": "Receive notifications via email",
+      "smsNotifications": "SMS Notifications",
+      "smsNotificationsDesc": "Receive notifications via SMS (Coming Soon)",
+      "lowStockAlerts": "Low Stock Alerts",
+      "lowStockAlertsDesc": "Get notified when inventory is running low",
+      "saveNotifications": "Save Notification Settings"
+    }
   }
 }

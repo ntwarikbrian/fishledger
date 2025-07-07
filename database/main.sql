@@ -83,11 +83,15 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 -- Expenses table
 CREATE TABLE IF NOT EXISTS expenses (
     expense_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL, -- Title/name of the expense
     category_id UUID NOT NULL REFERENCES expense_categories(category_id),
     amount DECIMAL(12,2) NOT NULL,
     date DATE NOT NULL,
     added_by UUID NOT NULL REFERENCES users(user_id), -- user_id or worker_id
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('rejected', 'pending', 'paid'))
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
+    receipt_url TEXT, -- URL to uploaded receipt image/document
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- =====================================================
@@ -104,7 +108,15 @@ CREATE TABLE IF NOT EXISTS contacts (
     phone_number VARCHAR(20),
     contact_type VARCHAR(20) NOT NULL CHECK (contact_type IN ('supplier', 'customer')),
     address TEXT,
-    added_by UUID NOT NULL REFERENCES users(user_id)
+    email_verified BOOLEAN DEFAULT FALSE,
+    preferred_contact_method VARCHAR(20) DEFAULT 'email' CHECK (preferred_contact_method IN ('email', 'phone', 'both')),
+    email_notifications BOOLEAN DEFAULT TRUE,
+    last_contacted TIMESTAMP WITH TIME ZONE,
+    total_messages_sent INTEGER DEFAULT 0,
+    notes TEXT,
+    added_by UUID NOT NULL REFERENCES users(user_id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 -- =====================================================
 -- 7. MESSAGES TABLE
@@ -116,11 +128,18 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recipient_id UUID NOT NULL, -- Single recipient ID (user, worker, or contact)
     recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('user', 'worker', 'contact')),
+    recipient_email VARCHAR(255), -- Email address of the recipient (extracted from contacts/users/workers)
+    message_type VARCHAR(20) DEFAULT 'email' CHECK (message_type IN ('email', 'internal')), -- Type of message
+    delivery_method VARCHAR(20) DEFAULT 'email' CHECK (delivery_method IN ('email', 'system')), -- How message is delivered
     subject VARCHAR(200),
     content TEXT NOT NULL,
-    status VARCHAR(20) DEFAULT 'sent' CHECK (status IN ('sent', 'failed', 'pending')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('sent', 'failed', 'pending')),
+    error_message TEXT, -- Store error details if delivery fails
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    sent_by UUID NOT NULL REFERENCES users(user_id) -- user_id or worker_id
+    delivered_at TIMESTAMP WITH TIME ZONE, -- When message was successfully delivered
+    sent_by UUID NOT NULL REFERENCES users(user_id), -- user_id who sent the message
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =====================================================
@@ -225,6 +244,83 @@ CREATE TABLE IF NOT EXISTS automatic_messages (
     quantity_needed INTEGER NOT NULL,
     quantity_triggered INTEGER NOT NULL, -- Threshold that triggered the message
     message_template TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- 9. MESSAGE SETTINGS TABLE
+-- Stores email configuration and messaging preferences
+-- =====================================================
+
+-- Message settings table for email configuration and messaging preferences
+CREATE TABLE IF NOT EXISTS message_settings (
+    setting_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id), -- Owner of these settings
+
+    -- Email Configuration
+    email_host VARCHAR(255) DEFAULT 'smtp.gmail.com', -- SMTP server host
+    email_port INTEGER DEFAULT 587, -- SMTP server port
+    email_user VARCHAR(255), -- Email username/address for sending
+    email_password VARCHAR(255), -- Email password (encrypted)
+    email_from VARCHAR(255), -- Default "from" email address
+    email_from_name VARCHAR(200), -- Default "from" name
+
+    -- Email Security Settings
+    email_use_tls BOOLEAN DEFAULT TRUE, -- Use TLS encryption
+    email_use_ssl BOOLEAN DEFAULT FALSE, -- Use SSL encryption
+
+    -- Messaging Preferences
+    auto_send_enabled BOOLEAN DEFAULT TRUE, -- Enable automatic message sending
+    daily_message_limit INTEGER DEFAULT 100, -- Daily message sending limit
+    retry_failed_messages BOOLEAN DEFAULT TRUE, -- Retry failed messages
+    max_retry_attempts INTEGER DEFAULT 3, -- Maximum retry attempts for failed messages
+
+    -- Notification Settings
+    notify_on_send_success BOOLEAN DEFAULT FALSE, -- Notify when message sent successfully
+    notify_on_send_failure BOOLEAN DEFAULT TRUE, -- Notify when message fails to send
+
+    -- Template Settings
+    default_signature TEXT, -- Default email signature
+    business_logo_url TEXT, -- URL to business logo for emails
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- 10. MESSAGE TEMPLATES TABLE
+-- Stores reusable message templates for different scenarios
+-- =====================================================
+
+-- Message templates table for reusable message templates
+CREATE TABLE IF NOT EXISTS message_templates (
+    template_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id), -- Owner of this template
+
+    -- Template Information
+    template_name VARCHAR(200) NOT NULL, -- Name/title of the template
+    template_category VARCHAR(50) NOT NULL CHECK (template_category IN ('inventory', 'promotion', 'notification', 'order', 'general')), -- Category of template
+    template_type VARCHAR(20) DEFAULT 'email' CHECK (template_type IN ('email', 'internal')), -- Type of template
+
+    -- Template Content
+    subject_template VARCHAR(200), -- Subject line template with placeholders
+    content_template TEXT NOT NULL, -- Message content template with placeholders
+
+    -- Template Settings
+    is_active BOOLEAN DEFAULT TRUE, -- Whether template is active/available
+    is_default BOOLEAN DEFAULT FALSE, -- Whether this is the default template for its category
+    use_signature BOOLEAN DEFAULT TRUE, -- Whether to append user's signature
+
+    -- Usage Statistics
+    usage_count INTEGER DEFAULT 0, -- How many times this template has been used
+    last_used TIMESTAMP WITH TIME ZONE, -- When this template was last used
+
+    -- Template Variables/Placeholders Documentation
+    available_variables JSONB, -- JSON array of available placeholder variables
+
+    -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

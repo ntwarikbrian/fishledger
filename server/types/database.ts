@@ -236,6 +236,8 @@ export interface ContactQueryParams {
 
 export type RecipientType = 'user' | 'worker' | 'contact';
 export type MessageStatus = 'sent' | 'failed' | 'pending';
+export type MessageType = 'email' | 'internal';
+export type DeliveryMethod = 'email' | 'sms' | 'whatsapp' | 'system';
 
 /**
  * Message interface
@@ -244,11 +246,18 @@ export interface Message {
   message_id: string; // UUID
   recipient_id: string; // UUID
   recipient_type: RecipientType;
+  recipient_email?: string; // Email address of the recipient
+  message_type: MessageType; // Type of message
+  delivery_method: DeliveryMethod; // How message is delivered
   subject?: string;
   content: string;
   status: MessageStatus;
+  error_message?: string; // Error details if delivery fails
   sent_at: Date;
+  delivered_at?: Date; // When message was successfully delivered
   sent_by: string; // UUID reference to users
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -257,6 +266,9 @@ export interface Message {
 export interface CreateMessageInput {
   recipient_id: string;
   recipient_type: RecipientType;
+  recipient_email?: string;
+  message_type?: MessageType;
+  delivery_method?: DeliveryMethod;
   subject?: string;
   content: string;
   sent_by: string;

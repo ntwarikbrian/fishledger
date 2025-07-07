@@ -13,7 +13,7 @@ LocalFishing is a comprehensive fish management system designed for local fish s
 - **Document Management**: Upload, organize, and manage business documents with folder structure
 - **Expense Tracking**: Monitor business expenses with categorization and reporting
 - **Reports & Analytics**: Generate comprehensive sales, profit, expense, and stock reports
-- **Message System**: Internal communication system for staff coordination
+- **Message System**: Email messaging system for customer and staff communication
 - **Authentication**: Secure user authentication with role-based access control
 
 ## Architecture
@@ -24,6 +24,7 @@ This is a full-stack TypeScript application with:
 - **Backend**: Express.js + TypeScript + Node.js
 - **Database**: PostgreSQL (hosted on Supabase)
 - **File Storage**: Cloudinary for document and image management
+- **Email Service**: Gmail SMTP for messaging functionality
 - **Authentication**: JWT-based authentication system
 
 ## Getting Started
@@ -84,6 +85,9 @@ JWT_SECRET=your_jwt_secret_key
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+EMAIL_FROM=your_email@gmail.com
 ```
 
 ### Database Setup
@@ -98,6 +102,31 @@ CLOUDINARY_API_SECRET=your_cloudinary_api_secret
    # Copy and paste the contents of main.sql
    ```
 3. **Set up Row Level Security (RLS)** policies as needed for your security requirements
+
+### Email Configuration
+
+For the messaging system to work, you need to configure email settings:
+
+1. **Set email environment variables** in your `.env` file:
+   ```sh
+   EMAIL_HOST=smtp.gmail.com
+   EMAIL_PORT=587
+   EMAIL_USER=your_email@gmail.com
+   EMAIL_PASSWORD=your_app_password
+   EMAIL_FROM=your_email@gmail.com
+   ```
+
+2. **For Gmail users**: Generate an App Password:
+   - Enable 2-Factor Authentication on your Google account
+   - Go to Google Account → Security → App passwords
+   - Generate a password for "Mail" and use it as `EMAIL_PASSWORD`
+
+3. **Test email configuration**:
+   ```sh
+   cd server; npm run test:email
+   ```
+
+📖 **Detailed setup guide**: See [server/EMAIL_SETUP.md](server/EMAIL_SETUP.md) for complete instructions.
 
 ### Development
 
