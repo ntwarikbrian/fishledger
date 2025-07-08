@@ -1,4 +1,5 @@
 
+import React from 'react';
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,562 +9,1038 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Fish, Package, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Sparkles, Waves, ChevronDown, Activity, Archive, BarChart3, Check, CheckCircle, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, ChevronLeft, ChevronRight, Package, AlertTriangle, Zap, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useUser, getUserDisplayName } from "@/hooks/use-user";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine, PieChart, Pie, Cell } from "recharts";
+
+/**
+ * Revenue Chart Component
+ * Displays profit and investment data over time with area chart
+ */
+const RevenueChart = () => {
+  const { t, i18n } = useTranslation();
+
+  // Sample data for the revenue chart
+  const revenueData = [
+    { month: "Jan", profit: 65000, invest: 45000, isCurrentMonth: false },
+    { month: "Feb", profit: 85000, invest: 55000, isCurrentMonth: false },
+    { month: "Mar", profit: 95000, invest: 65000, isCurrentMonth: false },
+    { month: "Apr", profit: 75000, invest: 50000, isCurrentMonth: false },
+    { month: "May", profit: 88000, invest: 58000, isCurrentMonth: true },
+    { month: "Jun", profit: 105000, invest: 70000, isCurrentMonth: false },
+    { month: "Jul", profit: 98000, invest: 68000, isCurrentMonth: false },
+    { month: "Aug", profit: 110000, invest: 75000, isCurrentMonth: false },
+    { month: "Sep", profit: 120000, invest: 80000, isCurrentMonth: false },
+  ];
+
+  const chartConfig = React.useMemo(() => ({
+    profit: {
+      label: t('dashboard.profit', 'Profit'),
+      color: "hsl(var(--chart-1))",
+    },
+    invest: {
+      label: t('dashboard.invest', 'Investment'),
+      color: "hsl(var(--chart-2))",
+    },
+  }), [t, i18n.language]);
+
+  // Custom tick component for highlighting current month
+  const CustomXAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    const isCurrentMonth = revenueData.find(item => item.month === payload.value)?.isCurrentMonth;
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        {isCurrentMonth && (
+          <circle
+            cx={0}
+            cy={-5}
+            r={12}
+            fill="#000"
+            className="dark:fill-white"
+          />
+        )}
+        <text
+          x={0}
+          y={0}
+          dy={16}
+          textAnchor="middle"
+          fill={isCurrentMonth ? "#fff" : "#6b7280"}
+          fontSize="10"
+          className={isCurrentMonth ? "dark:fill-black" : ""}
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+
+  // Custom label component for showing values on chart
+  const CustomLabel = (props: any) => {
+    const { x, y, value, dataKey } = props;
+    if (dataKey === 'profit' && value > 100000) {
+      return (
+        <g>
+          <rect
+            x={x - 20}
+            y={y - 25}
+            width={40}
+            height={16}
+            fill="#22c55e"
+            rx={8}
+            opacity={0.9}
+          />
+          <text
+            x={x}
+            y={y - 15}
+            textAnchor="middle"
+            fill="white"
+            fontSize="10"
+            fontWeight="500"
+          >
+            ${(value / 1000).toFixed(0)}K
+          </text>
+        </g>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="w-full">
+      {/* Legend */}
+      <div className="flex items-center gap-4 md:gap-6 mb-4 md:mb-6">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-500"></div>
+          <span className="text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400">Profit</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-yellow-400"></div>
+          <span className="text-xs md:text-sm font-medium text-gray-600 dark:text-gray-400">Invest</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <ChartContainer config={chartConfig} className="h-[200px] md:h-[300px] w-full">
+        <AreaChart
+          data={revenueData}
+          margin={{
+            top: 10,
+            right: 10,
+            left: 0,
+            bottom: 10,
+          }}
+        >
+          <defs>
+            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#22c55e" stopOpacity={0.1}/>
+            </linearGradient>
+            <linearGradient id="investGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#eab308" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#eab308" stopOpacity={0.1}/>
+            </linearGradient>
+          </defs>
+
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
+            tick={<CustomXAxisTick />}
+            className="text-gray-500"
+            interval={0}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 10, fill: '#6b7280' }}
+            tickFormatter={(value) => `${value / 1000}K`}
+            className="text-gray-500"
+            width={30}
+          />
+
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value, name) => [
+                  `$${(value as number).toLocaleString()}`,
+                  name === 'profit' ? 'Profit' : 'Invest'
+                ]}
+                labelFormatter={(label) => `Month: ${label}`}
+              />
+            }
+          />
+
+          {/* Reference line for current month */}
+          <ReferenceLine
+            x="May"
+            stroke="#6b7280"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+          />
+
+          <Area
+            type="monotone"
+            dataKey="invest"
+            stroke="#eab308"
+            strokeWidth={2}
+            fill="url(#investGradient)"
+            fillOpacity={0.6}
+            dot={{ fill: '#eab308', strokeWidth: 0, r: 3 }}
+            activeDot={{ r: 4, fill: '#eab308' }}
+          />
+          <Area
+            type="monotone"
+            dataKey="profit"
+            stroke="#22c55e"
+            strokeWidth={2}
+            fill="url(#profitGradient)"
+            fillOpacity={0.6}
+            dot={{ fill: '#22c55e', strokeWidth: 0, r: 3 }}
+            activeDot={{ r: 4, fill: '#22c55e' }}
+            label={<CustomLabel />}
+          />
+        </AreaChart>
+      </ChartContainer>
+    </div>
+  );
+};
+
+/**
+ * Financial Overview Component
+ * Displays revenue, profit, expense, and damaged values with beautiful donut chart
+ */
+const FinancialOverviewChart = () => {
+  const { t, i18n } = useTranslation();
+
+  // Sample data for financial overview - memoized to handle language changes properly
+  const financialData = React.useMemo(() => [
+    { name: t('dashboard.revenue', 'Revenue'), value: 45, amount: 16500, color: "#22c55e", icon: "💰" }, // green-500
+    { name: t('dashboard.profit', 'Profit'), value: 30, amount: 8200, color: "#3b82f6", icon: "📈" }, // blue-500
+    { name: t('dashboard.expense', 'Expense'), value: 20, amount: 6800, color: "#f59e0b", icon: "💸" }, // amber-500
+    { name: t('dashboard.damaged', 'Damaged'), value: 5, amount: 1500, color: "#ef4444", icon: "⚠️" }, // red-500
+  ], [t, i18n.language]);
+
+  // Calculate total for center display
+  const totalAmount = React.useMemo(() =>
+    financialData.reduce((sum, item) => sum + item.amount, 0),
+    [financialData]
+  );
+
+  return (
+    <Card key={`financial-overview-${i18n.language}`} className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+      <CardHeader className="pb-4">
+        <div>
+          <CardTitle className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            {t('dashboard.financialOverview', 'Financial Overview')}
+          </CardTitle>
+          <CardDescription className="text-sm text-gray-600 dark:text-gray-400">
+            {t('dashboard.revenueExpensesAndDamages', 'Revenue, Profit, Expenses & Damages')}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-col items-center space-y-6">
+          {/* Donut Chart */}
+          <div className="relative w-32 h-32 md:w-40 md:h-40 financial-chart-container">
+            <ChartContainer config={{}} className="w-full h-full">
+              <PieChart key={i18n.language}>
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#16a34a" stopOpacity={1}/>
+                  </linearGradient>
+                  <linearGradient id="profitGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#2563eb" stopOpacity={1}/>
+                  </linearGradient>
+                  <linearGradient id="expenseGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#d97706" stopOpacity={1}/>
+                  </linearGradient>
+                  <linearGradient id="damagedGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#dc2626" stopOpacity={1}/>
+                  </linearGradient>
+                </defs>
+                <Pie
+                  data={financialData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={65}
+                  paddingAngle={3}
+                  dataKey="value"
+                  className="md:inner-radius-[50] md:outer-radius-[80]"
+                  animationBegin={0}
+                  animationDuration={1000}
+                >
+                  {financialData.map((_, index) => {
+                    const gradientIds = ["url(#revenueGradient)", "url(#profitGradient)", "url(#expenseGradient)", "url(#damagedGradient)"];
+                    return (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={gradientIds[index]}
+                        stroke="rgba(255,255,255,0.2)"
+                        strokeWidth={1}
+                      />
+                    );
+                  })}
+                </Pie>
+                <ChartTooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">{data.icon}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{data.name}</span>
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Amount: <span className="font-bold text-gray-900 dark:text-gray-100">${data.amount.toLocaleString()}</span>
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Percentage: <span className="font-bold text-gray-900 dark:text-gray-100">{data.value}%</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </PieChart>
+            </ChartContainer>
+
+            {/* Center Text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
+                ${(totalAmount / 1000).toFixed(0)}K
+              </span>
+              <span className="text-[10px] md:text-xs text-gray-600 dark:text-gray-400 text-center">
+                {t('dashboard.totalValue', 'Total Value')}
+              </span>
+            </div>
+          </div>
+
+          {/* Beautiful Legend */}
+          <div className="grid grid-cols-2 gap-3 w-full">
+            {financialData.map((item, index) => (
+              <div key={`${item.name}-${index}-${i18n.language}`} className="financial-legend-item flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                <div className="flex items-center gap-2 flex-1">
+                  <div
+                    className="w-3 h-3 rounded-full shadow-sm"
+                    style={{ backgroundColor: item.color }}
+                  ></div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                      {item.name}
+                    </span>
+                    <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                      ${(item.amount / 1000).toFixed(1)}K
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                  {item.value}%
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary Stats */}
+          <div className="w-full pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-sm font-bold text-green-600 dark:text-green-400">
+                  ${((financialData[0].amount + financialData[1].amount) / 1000).toFixed(1)}K
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{t('dashboard.netPositive', 'Net Positive')}</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-red-600 dark:text-red-400">
+                  ${((financialData[2].amount + financialData[3].amount) / 1000).toFixed(1)}K
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{t('dashboard.totalCosts', 'Total Costs')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const Dashboard = () => {
   const { t } = useTranslation();
   usePageTitle('navigation.dashboard', 'Dashboard');
+  const userInfo = useUser();
 
-  const [isVisible, setIsVisible] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [currentView, setCurrentView] = useState('top-selling');
+  const [mobileChartView, setMobileChartView] = useState(0); // 0 = Revenue Chart, 1 = Financial Overview
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
-  useEffect(() => {
-    // Trigger animations on mount
-    setIsVisible(true);
-
-    // Update time every minute
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // View options for the dropdown
-  const viewOptions = [
-    {
-      id: 'top-selling',
-      label: 'Top Selling Fish',
-      icon: TrendingUp,
-      description: 'Best performing fish products this month'
-    },
-    {
-      id: 'recent-activity',
-      label: 'Recent Sales Activity',
-      icon: Activity,
-      description: 'Overview of the latest sales and order activities'
-    },
-    {
-      id: 'low-stock',
-      label: 'Low Stock Items',
-      icon: Archive,
-      description: 'Fish products with low inventory levels'
-    },
-    {
-      id: 'damaged-expired',
-      label: 'Damaged or Expired',
-      icon: AlertTriangle,
-      description: 'Fish products that are damaged or expired'
-    }
-  ];
-
-  const getCurrentViewData = () => {
-    const currentViewOption = viewOptions.find(option => option.id === currentView);
-    return currentViewOption || viewOptions[0];
+  // Mobile chart navigation functions
+  const nextChart = () => {
+    setMobileChartView((prev) => (prev + 1) % 2);
   };
 
-  // Data for different views
-  const topSellingData = [
-    {
-      name: 'Atlantic Salmon',
-      sales: 245,
-      revenue: '$4,890',
-      stock: 'In Stock',
-      color: 'bg-blue-500'
-    },
-    {
-      name: 'Rainbow Trout',
-      sales: 189,
-      revenue: '$3,780',
-      stock: 'In Stock',
-      color: 'bg-purple-500'
-    },
-    {
-      name: 'Tilapia Fillets',
-      sales: 156,
-      revenue: '$2,340',
-      stock: 'Low Stock',
-      color: 'bg-green-500'
-    },
-    {
-      name: 'Sea Bass',
-      sales: 134,
-      revenue: '$2,010',
-      stock: 'In Stock',
-      color: 'bg-orange-500'
-    },
-    {
-      name: 'Cod Fillets',
-      sales: 98,
-      revenue: '$1,470',
-      stock: 'In Stock',
-      color: 'bg-indigo-500'
-    }
-  ];
+  const prevChart = () => {
+    setMobileChartView((prev) => (prev - 1 + 2) % 2);
+  };
 
-  const recentActivityData = [
-    { activity: 'Sale Completed', customer: 'Ocean View Restaurant', product: 'Atlantic Salmon (15kg)', amount: '$277.50', date: 'Jan 22, 2024', status: 'Completed' },
-    { activity: 'Sale Delivered', customer: 'Fresh Market Co', product: 'Tilapia Fillets (20 boxes)', amount: '$259.80', date: 'Jan 22, 2024', status: 'Completed' },
-    { activity: 'Payment Received', customer: 'John Smith', product: 'Atlantic Salmon (2 boxes)', amount: '$51.98', date: 'Jan 21, 2024', status: 'Completed' },
-    { activity: 'Stock Added', customer: 'Supplier', product: 'Rainbow Trout (50kg)', amount: '$750.00', date: 'Jan 21, 2024', status: 'Completed' },
-    { activity: 'New Customer', customer: 'Seaside Bistro', product: 'Registration', amount: '-', date: 'Jan 20, 2024', status: 'Active' }
-  ];
+  // Touch handlers for swipe navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
 
-  const lowStockData = [
-    { name: 'Tilapia Fillets', currentStock: 12, minStock: 50, status: 'Critical', color: 'bg-red-500', percentage: 24 },
-    { name: 'Cod Fillets', currentStock: 18, minStock: 40, status: 'Low', color: 'bg-yellow-500', percentage: 45 },
-    { name: 'Mackerel', currentStock: 25, minStock: 60, status: 'Low', color: 'bg-orange-500', percentage: 42 },
-    { name: 'Sardines', currentStock: 8, minStock: 30, status: 'Critical', color: 'bg-red-500', percentage: 27 },
-    { name: 'Tuna Steaks', currentStock: 15, minStock: 35, status: 'Low', color: 'bg-yellow-500', percentage: 43 }
-  ];
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
 
-  const damagedExpiredData = [
-    { name: 'Tilapia Fillets', quantity: 15, reason: 'Expired', date: 'Jan 22, 2024', loss: '$225.00', batch: 'TF-2024-001', status: 'Disposed' },
-    { name: 'Atlantic Salmon', quantity: 8, reason: 'Damaged in Transit', date: 'Jan 21, 2024', loss: '$160.00', batch: 'AS-2024-003', status: 'Insurance Claim' },
-    { name: 'Cod Fillets', quantity: 12, reason: 'Expired', date: 'Jan 20, 2024', loss: '$180.00', batch: 'CF-2024-002', status: 'Disposed' },
-    { name: 'Sea Bass', quantity: 6, reason: 'Freezer Malfunction', date: 'Jan 19, 2024', loss: '$90.00', batch: 'SB-2024-001', status: 'Disposed' },
-    { name: 'Rainbow Trout', quantity: 10, reason: 'Expired', date: 'Jan 18, 2024', loss: '$200.00', batch: 'RT-2024-004', status: 'Disposed' },
-    { name: 'Mackerel', quantity: 20, reason: 'Quality Issues', date: 'Jan 17, 2024', loss: '$120.00', batch: 'MC-2024-001', status: 'Returned to Supplier' }
-  ];
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
 
-  // Render functions for different views
-  const renderTopSellingView = () => (
-    <div className="space-y-4">
-      {topSellingData.map((fish, index) => (
-        <div key={index} className="group p-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/20 dark:hover:to-purple-900/20 transition-all duration-300 hover:shadow-md">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${fish.color} animate-pulse`} />
-              <div>
-                <h3 className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  {fish.name}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {fish.sales} units sold
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="font-bold text-gray-800 dark:text-gray-200">
-                {fish.revenue}
-              </div>
-              <div className="flex items-center gap-1 text-sm">
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  fish.stock === 'In Stock'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                }`}>
-                  {fish.stock}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
 
-  const renderRecentActivityView = () => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-3 px-2 text-sm">Activity</th>
-            <th className="text-left py-3 px-2 text-sm">Customer</th>
-            <th className="text-left py-3 px-2 text-sm">Product</th>
-            <th className="text-left py-3 px-2 text-sm">Amount</th>
-            <th className="text-left py-3 px-2 text-sm">Date</th>
-            <th className="text-right py-3 px-2 text-sm">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {recentActivityData.map((activity, index) => (
-            <tr key={index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-              <td className="py-3 px-2">
-                <div className="flex items-center gap-2">
-                  {activity.activity === 'Sale Completed' && <CheckCircle className="h-4 w-4 text-green-600" />}
-                  {activity.activity === 'Sale Delivered' && <Package className="h-4 w-4 text-green-600" />}
-                  {activity.activity === 'Payment Received' && <DollarSign className="h-4 w-4 text-green-600" />}
-                  {activity.activity === 'Stock Added' && <Plus className="h-4 w-4 text-blue-600" />}
-                  {activity.activity === 'New Customer' && <Users className="h-4 w-4 text-purple-600" />}
-                  <div>
-                    <div className="font-medium">{activity.activity}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="py-3 px-2">{activity.customer}</td>
-              <td className="py-3 px-2 text-muted-foreground">{activity.product}</td>
-              <td className="py-3 px-2 font-medium">{activity.amount}</td>
-              <td className="py-3 px-2">{activity.date}</td>
-              <td className="py-3 px-2 text-right">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                  activity.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                  activity.status === 'Processing' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                  activity.status === 'Active' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
-                  activity.status === 'Cancelled' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                  'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                }`}>
-                  {activity.status}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderLowStockView = () => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-3 px-2 text-sm">Product</th>
-            <th className="text-left py-3 px-2 text-sm">Current Stock</th>
-            <th className="text-left py-3 px-2 text-sm">Minimum Stock</th>
-            <th className="text-left py-3 px-2 text-sm">Stock Level</th>
-            <th className="text-left py-3 px-2 text-sm">Need to Restock</th>
-            <th className="text-right py-3 px-2 text-sm">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lowStockData.map((item, index) => (
-            <tr key={index} className="border-b hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
-              <td className="py-3 px-2">
-                <div className="flex items-center gap-2">
-                  <Archive className="h-4 w-4 text-red-600" />
-                  <div>
-                    <div className="font-medium">{item.name}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="py-3 px-2">
-                <span className="font-medium">{item.currentStock} units</span>
-              </td>
-              <td className="py-3 px-2 text-muted-foreground">
-                {item.minStock} units
-              </td>
-              <td className="py-3 px-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-[100px]">
-                    <div
-                      className={`h-2 rounded-full ${item.color} transition-all duration-1000 ease-out`}
-                      style={{ width: `${item.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground min-w-[40px]">
-                    {item.percentage}%
-                  </span>
-                </div>
-              </td>
-              <td className="py-3 px-2 font-medium text-red-600">
-                {item.minStock - item.currentStock} units
-              </td>
-              <td className="py-3 px-2 text-right">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                  item.status === 'Critical'
-                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                }`}>
-                  {item.status}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderDamagedExpiredView = () => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-3 px-2 text-sm">Product</th>
-            <th className="text-left py-3 px-2 text-sm">Quantity</th>
-            <th className="text-left py-3 px-2 text-sm">Reason</th>
-            <th className="text-left py-3 px-2 text-sm">Date</th>
-            <th className="text-left py-3 px-2 text-sm">Loss Value</th>
-            <th className="text-left py-3 px-2 text-sm">Batch #</th>
-            <th className="text-right py-3 px-2 text-sm">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {damagedExpiredData.map((item, index) => (
-            <tr key={index} className="border-b hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
-              <td className="py-3 px-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <div>
-                    <div className="font-medium">{item.name}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="py-3 px-2">
-                <span className="font-medium text-red-600">{item.quantity} units</span>
-              </td>
-              <td className="py-3 px-2">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                  item.reason === 'Expired' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-                  item.reason === 'Damaged in Transit' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                  item.reason === 'Freezer Malfunction' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
-                  item.reason === 'Quality Issues' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                  'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-                }`}>
-                  {item.reason}
-                </span>
-              </td>
-              <td className="py-3 px-2 text-muted-foreground">
-                {item.date}
-              </td>
-              <td className="py-3 px-2">
-                <span className="font-bold text-red-600">{item.loss}</span>
-              </td>
-              <td className="py-3 px-2 text-muted-foreground font-mono text-xs">
-                {item.batch}
-              </td>
-              <td className="py-3 px-2 text-right">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                  item.status === 'Disposed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
-                  item.status === 'Insurance Claim' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                  item.status === 'Returned to Supplier' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                  'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                }`}>
-                  {item.status}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'top-selling':
-        return renderTopSellingView();
-      case 'recent-activity':
-        return renderRecentActivityView();
-      case 'low-stock':
-        return renderLowStockView();
-      case 'damaged-expired':
-        return renderDamagedExpiredView();
-      default:
-        return renderTopSellingView();
+    if (isLeftSwipe) {
+      nextChart();
+    } else if (isRightSwipe) {
+      prevChart();
     }
   };
 
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return t('dashboard.goodMorning', 'Good Morning');
-    if (hour < 17) return t('dashboard.goodAfternoon', 'Good Afternoon');
-    return t('dashboard.goodEvening', 'Good Evening');
-  };
 
-  const formatTime = () => {
-    return currentTime.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
 
-  const formatDate = () => {
-    return currentTime.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+
+
+
+
+
+
+
+
 
   return (
     <AppLayout>
       <div className="space-y-4">
-        {/* Beautiful Welcome Section */}
-        <div className="relative overflow-hidden welcome-glow rounded-3xl">
-          {/* Background Gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 rounded-3xl" />
-
-          {/* Animated Background Elements */}
-          <div className="absolute inset-0 overflow-hidden rounded-3xl">
-            <div className="floating-element absolute -top-2 -right-2 w-16 h-16 bg-blue-200/30 dark:bg-blue-800/20 rounded-full" />
-            <div className="floating-element absolute top-4 right-8 w-12 h-12 bg-purple-200/30 dark:bg-purple-800/20 rounded-full" />
-            <div className="floating-element absolute bottom-2 left-4 w-14 h-14 bg-indigo-200/30 dark:bg-indigo-800/20 rounded-full" />
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-blue-100/10 to-purple-100/10 dark:from-blue-900/10 dark:to-purple-900/10 rounded-full blur-3xl animate-pulse" />
-          </div>
-
-          {/* Content */}
-          <div className="relative p-4 md:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              {/* Welcome Text */}
-              <div className="space-y-2">
-                <div className={`transform transition-all duration-1000 ease-out ${
-                  isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="relative">
-                      <Waves className="h-6 w-6 text-blue-500 animate-pulse" />
-                      <Sparkles className="h-3 w-3 text-yellow-400 absolute -top-0.5 -right-0.5 animate-spin" style={{ animationDuration: '3s' }} />
-                    </div>
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                      FishSell Pro
-                    </span>
-                  </div>
-
-                  <h1 className="text-2xl lg:text-3xl font-bold leading-tight">
-                    <span className="gradient-text">
-                      {getGreeting()}, Admin!
-                    </span>
-                    <span className="ml-2 text-gray-800 dark:text-gray-100">👋</span>
-                  </h1>
-
-                  <p className="text-sm text-muted-foreground/80 font-medium">
-                    Ready to dive into today's fish sales insights
-                  </p>
-                </div>
-              </div>
-
-              {/* Time and Date */}
-              <div className={`transform transition-all duration-1000 ease-out ${
-                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-              }`} style={{ transitionDelay: '200ms' }}>
-                <div className="text-right lg:text-right">
-                  <div className="text-xl lg:text-2xl font-bold text-gray-800 dark:text-gray-200 mb-0.5">
-                    {formatTime()}
-                  </div>
-                  <div className="text-xs text-muted-foreground font-medium">
-                    {formatDate()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Stats Bar */}
-            <div className={`mt-4 transform transition-all duration-1000 ease-out ${
-              isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-            }`} style={{ transitionDelay: '400ms' }}>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse group-hover:animate-bounce" />
-                  <span className="font-medium">{t('dashboard.systemOnline', 'System Online')}</span>
-                </div>
-                <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
-                  <Fish className="h-3 w-3 text-blue-500 group-hover:animate-pulse" />
-                  <span className="font-medium">{t('dashboard.productsActive', '12 Products Active')}</span>
-                </div>
-                <div className="group flex items-center gap-1.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all duration-300 cursor-pointer hover:scale-105">
-                  <TrendingUp className="h-3 w-3 text-green-500 group-hover:animate-bounce" />
-                  <span className="font-medium">{t('dashboard.salesUp', 'Sales Up 15%')}</span>
-                </div>
+        {/* Welcome Section */}
+        {userInfo.isAuthenticated && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl p-6 border border-blue-100 dark:border-blue-900/30">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">☀️</div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {t('common.hello', 'Hello')} {getUserDisplayName(userInfo)} 👋
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('dashboard.overview', 'Welcome back to your dashboard overview')}
+                </p>
               </div>
             </div>
           </div>
-        </div>
-        
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{t('dashboard.totalRevenue', 'Total Revenue')}</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">$18,450</div>
-              <p className="text-xs text-muted-foreground">{t('dashboard.revenueGrowth', '+15% from last month')}</p>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          {/* Mobile: Horizontal scrolling container */}
+          <div className="md:hidden overflow-hidden relative">
+            <div className="flex gap-4 animate-scroll-horizontal min-w-max">
+              {/* First set of cards */}
+              {/* Mobile cards will be rendered here */}
+              {/* Total Revenue Card - Mobile */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    {/* Icon at top left */}
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                      <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    {/* Circular clickable arrow at top right */}
+                    <button className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors">
+                      <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </button>
+                  </div>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{t('dashboard.productsInStock', 'Products in Stock')}</CardTitle>
-              <Package className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">{t('dashboard.fishTypes', '5 different fish types')}</p>
-            </CardContent>
-          </Card>
+                  {/* Title */}
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.totalRevenue', 'Total Revenue')}
+                    </h3>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{t('dashboard.lowStockItems', 'Low Stock Items')}</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">4</div>
-              <p className="text-xs text-muted-foreground">{t('dashboard.needRestocking', 'Need restocking')}</p>
-            </CardContent>
-          </Card>
+                    {/* Main figure */}
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      $18,450
+                    </div>
 
-          <Card className="hover-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{t('dashboard.activeCustomers', 'Active Customers')}</CardTitle>
-              <Users className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">24</div>
-              <p className="text-xs text-muted-foreground">{t('dashboard.newCustomers', '6 new this month')}</p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Dynamic Data View Card */}
-        <Card className="hover-card">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const IconComponent = getCurrentViewData().icon;
-                  return <IconComponent className="h-5 w-5 text-green-600" />;
-                })()}
-                <div>
-                  <CardTitle>{getCurrentViewData().label}</CardTitle>
-                  <CardDescription>{getCurrentViewData().description}</CardDescription>
+                    {/* Growth indicator */}
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                        +15%
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.fromLastMonth', 'from last month')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Products in Stock Card - Mobile */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    {/* Icon at top left */}
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                      <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    {/* Circular clickable arrow at top right */}
+                    <button className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
+                      <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </button>
+                  </div>
+
+                  {/* Title */}
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.productsInStock', 'Products in Stock')}
+                    </h3>
+
+                    {/* Main figure */}
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      12
+                    </div>
+
+                    {/* Growth indicator */}
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                        5 {t('dashboard.types', 'types')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.differentFish', 'different fish')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Low Stock Items Card - Mobile */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    {/* Icon at top left */}
+                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
+                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    {/* Circular clickable arrow at top right */}
+                    <button className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors">
+                      <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </button>
+                  </div>
+
+                  {/* Title */}
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.lowStockItems', 'Low Stock Items')}
+                    </h3>
+
+                    {/* Main figure */}
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      4
+                    </div>
+
+                    {/* Growth indicator */}
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        {t('dashboard.critical', 'Critical')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.needRestocking', 'need restocking')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Damaged Items Card - Mobile */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    {/* Icon at top left */}
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                      <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    {/* Circular clickable arrow at top right */}
+                    <button className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors">
+                      <ArrowDownRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    </button>
+                  </div>
+
+                  {/* Title */}
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.damagedItems', 'Damaged Items')}
+                    </h3>
+
+                    {/* Main figure */}
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      7
+                    </div>
+
+                    {/* Growth indicator */}
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                        -2 {t('dashboard.today', 'today')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.needDisposal', 'need disposal')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Second set of cards for seamless infinite scroll */}
+              {/* Total Revenue Card - Mobile (Duplicate) */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                      <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <button className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors">
+                      <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.totalRevenue', 'Total Revenue')}
+                    </h3>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      $18,450
+                    </div>
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                        +15%
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.fromLastMonth', 'from last month')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Products in Stock Card - Mobile (Duplicate) */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                      <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <button className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
+                      <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.productsInStock', 'Products in Stock')}
+                    </h3>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      12
+                    </div>
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                        5 {t('dashboard.types', 'types')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.differentFish', 'different fish')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Low Stock Items Card - Mobile (Duplicate) */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
+                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <button className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors">
+                      <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.lowStockItems', 'Low Stock Items')}
+                    </h3>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      4
+                    </div>
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        {t('dashboard.critical', 'Critical')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.needRestocking', 'need restocking')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Damaged Items Card - Mobile (Duplicate) */}
+              <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 min-w-[280px]">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                      <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <button className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors">
+                      <ArrowDownRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('dashboard.damagedItems', 'Damaged Items')}
+                    </h3>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      7
+                    </div>
+                    <div className="flex items-center mt-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                        -2 {t('dashboard.today', 'today')}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {t('dashboard.needDisposal', 'need disposal')}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Desktop: Grid layout */}
+          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Revenue Card - Desktop */}
+            <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  {/* Icon at top left */}
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                    <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  {/* Circular clickable arrow at top right */}
+                  <button className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors">
+                    <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </button>
                 </div>
+
+                {/* Title */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {t('dashboard.totalRevenue', 'Total Revenue')}
+                  </h3>
+
+                  {/* Main figure */}
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                    $18,450
+                  </div>
+
+                  {/* Growth indicator */}
+                  <div className="flex items-center mt-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                      +15%
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {t('dashboard.fromLastMonth', 'from last month')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Products in Stock Card - Desktop */}
+            <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  {/* Icon at top left */}
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                    <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  {/* Circular clickable arrow at top right */}
+                  <button className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
+                    <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </button>
+                </div>
+
+                {/* Title */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {t('dashboard.productsInStock', 'Products in Stock')}
+                  </h3>
+
+                  {/* Main figure */}
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                    12
+                  </div>
+
+                  {/* Growth indicator */}
+                  <div className="flex items-center mt-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                      5 {t('dashboard.types', 'types')}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {t('dashboard.differentFish', 'different fish')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Low Stock Items Card - Desktop */}
+            <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  {/* Icon at top left */}
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  {/* Circular clickable arrow at top right */}
+                  <button className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors">
+                    <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </button>
+                </div>
+
+                {/* Title */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {t('dashboard.lowStockItems', 'Low Stock Items')}
+                  </h3>
+
+                  {/* Main figure */}
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                    4
+                  </div>
+
+                  {/* Growth indicator */}
+                  <div className="flex items-center mt-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                      {t('dashboard.critical', 'Critical')}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {t('dashboard.needRestocking', 'need restocking')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Damaged Items Card - Desktop */}
+            <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  {/* Icon at top left */}
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                    <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  {/* Circular clickable arrow at top right */}
+                  <button className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors">
+                    <ArrowDownRight className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  </button>
+                </div>
+
+                {/* Title */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {t('dashboard.damagedItems', 'Damaged Items')}
+                  </h3>
+
+                  {/* Main figure */}
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                    7
+                  </div>
+
+                  {/* Growth indicator */}
+                  <div className="flex items-center mt-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                      -2 {t('dashboard.today', 'today')}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      {t('dashboard.needDisposal', 'need disposal')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Revenue Chart and Financial Overview Section */}
+
+        {/* Desktop Layout - Side by side */}
+        <div className="hidden lg:grid lg:grid-cols-3 gap-6">
+          {/* Revenue Chart - Takes 2/3 width on desktop */}
+          <div className="lg:col-span-2">
+            <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                      <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                        {t('dashboard.revenue', 'Revenue')}
+                      </CardTitle>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          $16,500
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          {t('dashboard.comparedToLastMonth', '+15% Compared to last month')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monthly Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        {t('dashboard.monthly', 'Monthly')}
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-32">
+                      <DropdownMenuItem>{t('dashboard.weekly', 'Weekly')}</DropdownMenuItem>
+                      <DropdownMenuItem>{t('dashboard.monthly', 'Monthly')}</DropdownMenuItem>
+                      <DropdownMenuItem>{t('dashboard.quarterly', 'Quarterly')}</DropdownMenuItem>
+                      <DropdownMenuItem>{t('dashboard.yearly', 'Yearly')}</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <RevenueChart />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Financial Overview - Takes 1/3 width on desktop */}
+          <div className="lg:col-span-1">
+            <FinancialOverviewChart />
+          </div>
+        </div>
+
+        {/* Mobile Layout - Slideshow */}
+        <div className="lg:hidden">
+          {/* Navigation Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className={`nav-dot w-2 h-2 rounded-full transition-colors ${mobileChartView === 0 ? 'bg-green-600 active' : 'bg-gray-300'}`}></div>
+                <div className={`nav-dot w-2 h-2 rounded-full transition-colors ${mobileChartView === 1 ? 'bg-blue-600 active' : 'bg-gray-300'}`}></div>
+              </div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {mobileChartView === 0 ? t('dashboard.revenueChart', 'Revenue Chart') : t('dashboard.financialOverview', 'Financial Overview')}
+              </span>
+            </div>
+
+            {/* Navigation Arrows */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={prevChart}
+                className="nav-arrow p-2 h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={nextChart}
+                className="nav-arrow p-2 h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Slideshow Container */}
+          <div
+            className="relative overflow-hidden mobile-chart-slideshow"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div
+              className="flex mobile-chart-slide"
+              style={{ transform: `translateX(-${mobileChartView * 100}%)` }}
+            >
+              {/* Revenue Chart Slide */}
+              <div className="w-full flex-shrink-0">
+                <Card className="hover-card rounded-2xl border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+                  <CardHeader className="pb-4">
+                    <div className="space-y-3">
+                      {/* Header with title and dropdown */}
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {t('dashboard.revenue', 'Revenue')}
+                        </CardTitle>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-32">
+                            <DropdownMenuItem>{t('dashboard.weekly', 'Weekly')}</DropdownMenuItem>
+                            <DropdownMenuItem>{t('dashboard.monthly', 'Monthly')}</DropdownMenuItem>
+                            <DropdownMenuItem>{t('dashboard.quarterly', 'Quarterly')}</DropdownMenuItem>
+                            <DropdownMenuItem>{t('dashboard.yearly', 'Yearly')}</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {/* Amount */}
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        $16500
+                      </div>
+
+                      {/* Comparison text */}
+                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                        {t('dashboard.comparedToLastMonth', '+15% Compared to last month')}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <RevenueChart />
+                  </CardContent>
+                </Card>
               </div>
 
-              {/* View Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    View
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  {viewOptions.map((option) => {
-                    const IconComponent = option.icon;
-                    return (
-                      <DropdownMenuItem
-                        key={option.id}
-                        onClick={() => setCurrentView(option.id)}
-                        className="flex items-center gap-3 cursor-pointer"
-                      >
-                        <IconComponent className="h-4 w-4" />
-                        <span className="flex-1">{option.label}</span>
-                        {currentView === option.id && (
-                          <Check className="h-4 w-4 text-green-600" />
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Financial Overview Slide */}
+              <div className="w-full flex-shrink-0">
+                <FinancialOverviewChart />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="transition-all duration-300 ease-in-out">
-              {renderCurrentView()}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+
       </div>
     </AppLayout>
   );

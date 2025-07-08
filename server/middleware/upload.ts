@@ -12,7 +12,7 @@ import { uploadConfig } from '../config/environment.js';
  * Validates file types and sizes
  */
 const fileFilter = (
-  req: Request,
+  _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ): void => {
@@ -86,6 +86,109 @@ export const uploadSingle = multerConfig.single('file');
  * Maximum 10 files per request
  */
 export const uploadMultiple = multerConfig.array('files', 10);
+
+/**
+ * Image-only file filter for receipts and images
+ * More restrictive filter that only allows common image formats
+ */
+const imageOnlyFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+): void => {
+  // Allowed image types only
+  const allowedImageTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/bmp',
+    'image/tiff',
+    'image/svg+xml'
+  ];
+
+  // Check if file type is an allowed image format
+  if (!allowedImageTypes.includes(file.mimetype.toLowerCase())) {
+    const error = new Error(`Only image files are allowed. Received: ${file.mimetype}`);
+    error.name = 'INVALID_IMAGE_TYPE';
+    return cb(error);
+  }
+
+  // File is valid
+  cb(null, true);
+};
+
+/**
+ * Multer configuration for image-only uploads (receipts, etc.)
+ * More restrictive configuration for image uploads only
+ */
+const imageOnlyMulterConfig = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: uploadConfig.maxFileSize, // Max file size from config
+    files: 5, // Maximum number of image files per request
+    fields: 10, // Maximum number of non-file fields
+  },
+  fileFilter: imageOnlyFilter,
+});
+
+/**
+ * Single image upload middleware
+ * Handles single image upload with field name 'file'
+ * Only allows image formats
+ */
+export const uploadSingleImage = imageOnlyMulterConfig.single('file');
+
+/**
+ * Receipt-specific file filter for expense receipts
+ * Only allows JPEG, GIF, PNG, and WebP formats
+ */
+const receiptOnlyFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+): void => {
+  // Allowed receipt image types only (JPEG, GIF, PNG, WebP)
+  const allowedReceiptTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif'
+  ];
+
+  // Check if file type is an allowed receipt format
+  if (!allowedReceiptTypes.includes(file.mimetype.toLowerCase())) {
+    const error = new Error(`Upload required image format. Only JPEG, GIF, PNG, and WebP are allowed. Received: ${file.mimetype}`);
+    error.name = 'INVALID_RECEIPT_FORMAT';
+    return cb(error);
+  }
+
+  // File is valid
+  cb(null, true);
+};
+
+/**
+ * Multer configuration for receipt-only uploads
+ * Restricted to JPEG, GIF, PNG, and WebP formats only
+ */
+const receiptOnlyMulterConfig = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: uploadConfig.maxFileSize, // Max file size from config
+    files: 1, // Only one receipt file per request
+    fields: 5, // Maximum number of non-file fields
+  },
+  fileFilter: receiptOnlyFilter,
+});
+
+/**
+ * Single receipt upload middleware
+ * Handles single receipt upload with field name 'file'
+ * Only allows JPEG, GIF, PNG, and WebP formats
+ */
+export const uploadSingleReceipt = receiptOnlyMulterConfig.single('file');
 
 /**
  * Mixed fields upload middleware
@@ -185,7 +288,7 @@ export const validateUpload = (
  */
 export const handleUploadError = (
   error: any,
-  req: Request,
+  _req: Request,
   res: any,
   next: any
 ): void => {
@@ -240,6 +343,16 @@ export const handleUploadError = (
       success: false,
       message: error.message,
       error: 'INVALID_FILE_TYPE',
+      timestamp: new Date(),
+    });
+  }
+
+  // Handle receipt format errors
+  if (error.name === 'INVALID_RECEIPT_FORMAT') {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      error: 'INVALID_RECEIPT_FORMAT',
       timestamp: new Date(),
     });
   }

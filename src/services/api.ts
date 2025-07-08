@@ -216,6 +216,11 @@ export const authAPI = {
     return apiClient.get<AuthResponse>('/auth/profile');
   },
 
+  // Update user profile
+  updateProfile: async (data: any): Promise<AuthResponse> => {
+    return apiClient.put<AuthResponse>('/auth/profile', data);
+  },
+
   // Get existing users
   getExistingUsers: async (): Promise<any> => {
     return apiClient.get('/auth/existing-users');

@@ -26,62 +26,62 @@ i18n
         translation: rwTranslation
       }
     },
-    
+
     // Fallback language if detection fails
     fallbackLng: 'en',
-    
+
     // Debug mode (set to false in production)
     debug: process.env.NODE_ENV === 'development',
-    
+
     // Language detection options
     detection: {
       // Order of language detection methods
       order: ['localStorage', 'navigator', 'htmlTag'],
-      
+
       // Cache user language preference
       caches: ['localStorage'],
-      
+
       // Key to store language in localStorage
       lookupLocalStorage: 'i18nextLng',
-      
+
       // Don't lookup from path, subdomain, etc.
       lookupFromPathIndex: 0,
       lookupFromSubdomainIndex: 0,
-      
+
       // Exclude certain detection methods
       excludeCacheFor: ['cimode']
     },
-    
+
     // Interpolation options
     interpolation: {
       // React already does escaping
       escapeValue: false,
-      
+
       // Format function for numbers, dates, etc.
-      format: function(value, format, lng) {
+      format: function(value: any, format?: string, lng?: string): string {
         if (format === 'currency') {
           // Format currency based on language
           if (lng === 'rw') {
             return new Intl.NumberFormat('rw-RW', {
               style: 'currency',
               currency: 'RWF'
-            }).format(value);
+            }).format(Number(value));
           } else {
             return new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD'
-            }).format(value);
+            }).format(Number(value));
           }
         }
-        
+
         if (format === 'number') {
-          return new Intl.NumberFormat(lng).format(value);
+          return new Intl.NumberFormat(lng).format(Number(value));
         }
-        
+
         if (format === 'date') {
           return new Intl.DateTimeFormat(lng).format(new Date(value));
         }
-        
+
         if (format === 'datetime') {
           return new Intl.DateTimeFormat(lng, {
             year: 'numeric',
@@ -91,118 +91,19 @@ i18n
             minute: '2-digit'
           }).format(new Date(value));
         }
-        
-        return value;
+
+        return String(value);
       }
     },
-    
+
     // React options
     react: {
       // Use Suspense for async loading
-      useSuspense: false,
-      
-      // Bind i18n instance to React component
-      bindI18n: 'languageChanged',
-      
-      // Bind store to React component
-      bindI18nStore: '',
-      
-      // How to handle trans component defaultValue
-      transEmptyNodeValue: '',
-      
-      // Transform the defaultValue
-      transSupportBasicHtmlNodes: true,
-      transKeepBasicHtmlNodesFor: ['br', 'strong', 'i', 'p'],
-      
-      // Unescape passed in values
-      unescape: true
+      useSuspense: false
     },
-    
-    // Backend options (if using backend plugin)
-    backend: {
-      // Path where resources get loaded from
-      loadPath: '/locales/{{lng}}/{{ns}}.json',
-      
-      // Path to post missing resources
-      addPath: '/locales/add/{{lng}}/{{ns}}',
-      
-      // Allow cross domain requests
-      crossDomain: false,
-      
-      // Allow credentials on cross domain requests
-      withCredentials: false,
-      
-      // Define how long to wait for loading a resource
-      requestOptions: {
-        mode: 'cors',
-        credentials: 'same-origin',
-        cache: 'default'
-      }
-    },
-    
-    // Namespace options
-    ns: ['translation'],
-    defaultNS: 'translation',
-    
-    // Key separator
-    keySeparator: '.',
-    
-    // Namespace separator
-    nsSeparator: ':',
-    
-    // Plural separator
-    pluralSeparator: '_',
-    
-    // Context separator
-    contextSeparator: '_',
-    
-    // Save missing keys
-    saveMissing: process.env.NODE_ENV === 'development',
-    
-    // Missing key handler
-    missingKeyHandler: function(lng, ns, key, fallbackValue) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn(`Missing translation key: ${key} for language: ${lng}`);
-      }
-    },
-    
-    // Post processor
-    postProcess: false,
-    
-    // Return null for empty values
-    returnNull: false,
-    
-    // Return empty string for empty values
-    returnEmptyString: false,
-    
-    // Return objects
-    returnObjects: false,
-    
-    // Join arrays
-    joinArrays: false,
-    
-    // Return details
-    returnedObjectHandler: function(key, value, options) {
-      return value;
-    },
-    
-    // Parse missing key handler
-    parseMissingKeyHandler: function(key) {
-      return key;
-    },
-    
-    // Append namespace to missing key
-    appendNamespaceToMissingKey: false,
-    
-    // Append namespace to CIMode
-    appendNamespaceToCIMode: false,
-    
-    // Override options
-    overloadTranslationOptionHandler: function(args) {
-      return {
-        defaultValue: args[1]
-      };
-    }
+
+    // Save missing keys in development
+    saveMissing: process.env.NODE_ENV === 'development'
   });
 
 // Export configured i18n instance

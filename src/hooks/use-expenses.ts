@@ -92,6 +92,29 @@ export const useExpenses = () => {
   };
 
   /**
+   * Create a new expense with file upload
+   */
+  const createExpenseWithFile = async (data: CreateExpenseData, file?: File): Promise<boolean> => {
+    try {
+      setError(null);
+
+      const response = await expensesApi.createWithFile(data, file);
+
+      if (response.success) {
+        // Refresh the expenses list
+        await fetchExpenses();
+        return true;
+      } else {
+        setError(response.error || 'Failed to create expense');
+        return false;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      return false;
+    }
+  };
+
+  /**
    * Update an existing expense
    */
   const updateExpense = async (id: string, data: UpdateExpenseData): Promise<boolean> => {
@@ -148,6 +171,7 @@ export const useExpenses = () => {
     error,
     fetchExpenses,
     createExpense,
+    createExpenseWithFile,
     updateExpense,
     deleteExpense,
   };

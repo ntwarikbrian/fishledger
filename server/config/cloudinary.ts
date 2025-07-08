@@ -88,13 +88,13 @@ export const getUploadOptions = (
   let baseOptions: CloudinaryUploadOptions;
 
   if (mimeType.startsWith('image/')) {
-    baseOptions = defaultUploadOptions.image;
+    baseOptions = defaultUploadOptions.image!;
   } else if (mimeType.startsWith('video/')) {
-    baseOptions = defaultUploadOptions.video;
+    baseOptions = defaultUploadOptions.video!;
   } else if (mimeType === 'application/pdf' || mimeType.includes('document')) {
-    baseOptions = defaultUploadOptions.document;
+    baseOptions = defaultUploadOptions.document!;
   } else {
-    baseOptions = defaultUploadOptions.auto;
+    baseOptions = defaultUploadOptions.auto!;
   }
 
   return { ...baseOptions, ...customOptions };

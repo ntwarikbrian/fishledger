@@ -78,7 +78,8 @@ interface Expense {
 const Expenses = () => {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedFilter, setSelectedFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("all-expenses"); // Track active tab for dynamic header
 
   // Form state for adding categories
   const [categoryForm, setCategoryForm] = useState({
@@ -97,8 +98,7 @@ const Expenses = () => {
     receipt_url: ''
   });
 
-  // Receipt upload state
-  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  // Receipt file state
   const [selectedReceiptFile, setSelectedReceiptFile] = useState<File | null>(null);
 
   // Loading state for expense submission
@@ -132,6 +132,7 @@ const Expenses = () => {
     loading: expensesLoading,
     error: expensesError,
     createExpense,
+    createExpenseWithFile,
     updateExpense,
     deleteExpense
   } = useExpenses();
@@ -199,7 +200,8 @@ const Expenses = () => {
         receipt_url: expenseForm.receipt_url || null
       };
 
-      const success = await createExpense(expenseData);
+      // Use the new API method that handles file uploads
+      const success = await createExpenseWithFile(expenseData, selectedReceiptFile || undefined);
 
       if (success) {
         // Reset form
@@ -352,48 +354,24 @@ const Expenses = () => {
     }
   };
 
-  // Handle receipt file upload to Cloudinary
-  const handleReceiptUpload = async (file: File): Promise<string | null> => {
-    try {
-      setUploadingReceipt(true);
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', 'expense_receipts'); // You'll need to create this preset in Cloudinary
-      formData.append('folder', 'expenses/receipts');
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to upload receipt');
-      }
-
-      const data = await response.json();
-      return data.secure_url;
-    } catch (error) {
-      console.error('Error uploading receipt:', error);
-      toast.error('Failed to upload receipt. Please try again.');
-      return null;
-    } finally {
-      setUploadingReceipt(false);
-    }
-  };
 
   // Handle receipt file selection
   const handleReceiptFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please select a valid image file (JPEG, PNG, WebP) or PDF');
+    // Validate file type (only specific receipt formats allowed)
+    const allowedReceiptTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif'
+    ];
+
+    if (!allowedReceiptTypes.includes(file.type.toLowerCase())) {
+      toast.error('Upload required image format. Only JPEG, GIF, PNG, and WebP are allowed.');
       return;
     }
 
@@ -405,12 +383,49 @@ const Expenses = () => {
     }
 
     setSelectedReceiptFile(file);
+    toast.success('Receipt file selected successfully!');
+  };
 
-    // Upload to Cloudinary
-    const uploadedUrl = await handleReceiptUpload(file);
-    if (uploadedUrl) {
-      setExpenseForm(prev => ({ ...prev, receipt_url: uploadedUrl }));
-      toast.success('Receipt uploaded successfully!');
+  // Function to handle category click - redirect to all expenses with filter
+  const handleCategoryClick = (categoryId: string) => {
+    setActiveTab("all-expenses"); // Switch to all expenses tab
+    setSelectedFilter(categoryId); // Set the category filter
+  };
+
+  // Function to get filter label for display
+  const getFilterLabel = () => {
+    if (selectedFilter === "all") return "All Expenses";
+    if (selectedFilter === "pending") return "Pending Expenses";
+    if (selectedFilter === "no-receipt") return "Expenses Without Receipts";
+
+    // Find category name
+    const category = backendCategories.find(cat => cat.category_id === selectedFilter);
+    return category ? `${category.category_name} Expenses` : "Filtered Expenses";
+  };
+
+  // Function to get header content based on active tab
+  const getHeaderContent = () => {
+    switch (activeTab) {
+      case "all-expenses":
+        return {
+          title: "All Expenses",
+          description: "View and manage all your business expenses in one place"
+        };
+      case "add-expense":
+        return {
+          title: "Add New Expense",
+          description: "Record and track new business expenses with receipt uploads"
+        };
+      case "categories":
+        return {
+          title: "Expense Categories",
+          description: "Organize and manage expense categories with budget allocations"
+        };
+      default:
+        return {
+          title: "Expenses Management",
+          description: "Track and manage business expenses across different categories"
+        };
     }
   };
 
@@ -466,10 +481,19 @@ const Expenses = () => {
 
 
 
-  // Filter expenses by category (using actual expenses from hook)
-  const filteredExpenses = selectedCategory === "all"
-    ? expenses
-    : expenses.filter(expense => expense.category_id === selectedCategory);
+  // Filter expenses by selected filter (category, status, or receipt)
+  const filteredExpenses = (() => {
+    if (selectedFilter === "all") {
+      return expenses;
+    } else if (selectedFilter === "pending") {
+      return expenses.filter(expense => expense.status === "pending");
+    } else if (selectedFilter === "no-receipt") {
+      return expenses.filter(expense => !expense.receipt_url || expense.receipt_url.trim() === "");
+    } else {
+      // Assume it's a category ID
+      return expenses.filter(expense => expense.category_id === selectedFilter);
+    }
+  })();
 
   // Calculate total expenses
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -478,15 +502,15 @@ const Expenses = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Dynamic Header - Changes based on active tab */}
         <div>
-          <h1 className="text-3xl font-bold">Expenses Management</h1>
-          <p className="text-muted-foreground">Track and manage business expenses across different categories</p>
+          <h1 className="text-3xl font-bold">{getHeaderContent().title}</h1>
+          <p className="text-muted-foreground">{getHeaderContent().description}</p>
         </div>
 
 
         {/* Expense Management Tabs */}
-        <Tabs defaultValue="all-expenses" className="w-full">
+        <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all-expenses">
               <FileText className="mr-2 h-4 w-4" />
@@ -509,7 +533,6 @@ const Expenses = () => {
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>Expense Categories</CardTitle>
-                    <p className="text-sm text-muted-foreground">Manage expense categories and budgets</p>
                   </div>
                   <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
                     <DialogTrigger asChild>
@@ -696,13 +719,24 @@ const Expenses = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <>
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground text-center">
+                        💡 Click on any category to view its expenses
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {displayCategories.map((category) => {
                       const IconComponent = category.icon;
                       const budgetUsed = category.totalBudget ? (category.spent / category.totalBudget) * 100 : 0;
 
                       return (
-                        <Card key={category.id} className="hover:shadow-md transition-shadow">
+                        <Card
+                          key={category.id}
+                          className="hover:shadow-md transition-all duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:scale-[1.02] border-l-4 border-l-transparent hover:border-l-blue-500"
+                          onClick={() => handleCategoryClick(category.id)}
+                          title="Click to view expenses for this category"
+                        >
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center space-x-3">
@@ -718,7 +752,10 @@ const Expenses = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleEditCategory(backendCategories.find(cat => cat.category_id === category.id))}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditCategory(backendCategories.find(cat => cat.category_id === category.id));
+                                  }}
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
@@ -726,7 +763,10 @@ const Expenses = () => {
                                   variant="ghost"
                                   size="sm"
                                   className="text-red-600 hover:text-red-700"
-                                  onClick={() => handleDeleteCategory(backendCategories.find(cat => cat.category_id === category.id))}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCategory(backendCategories.find(cat => cat.category_id === category.id));
+                                  }}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -780,6 +820,7 @@ const Expenses = () => {
                       );
                     })}
                   </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -890,7 +931,6 @@ const Expenses = () => {
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>All Expenses</CardTitle>
-                    <p className="text-sm text-muted-foreground">View and manage all expense records</p>
                   </div>
                   <div className="flex gap-2">
                     <div className="relative w-full sm:w-64">
@@ -900,24 +940,75 @@ const Expenses = () => {
                         className="pl-10 w-full"
                       />
                     </div>
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="w-[180px]">
+                    <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                      <SelectTrigger className="w-[200px]">
                         <Filter className="mr-2 h-4 w-4" />
-                        <SelectValue placeholder="Filter by category" />
+                        <SelectValue placeholder="Filter expenses" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {backendCategories.map((category) => (
-                          <SelectItem key={category.category_id} value={category.category_id}>
-                            {category.category_name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="all">All Expenses</SelectItem>
+
+                        {/* Status Filters */}
+                        <SelectItem value="pending">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                            Pending Status
+                          </div>
+                        </SelectItem>
+
+                        {/* Receipt Filters */}
+                        <SelectItem value="no-receipt">
+                          <div className="flex items-center">
+                            <Receipt className="mr-2 h-4 w-4 text-gray-400" />
+                            No Receipt
+                          </div>
+                        </SelectItem>
+
+                        {/* Category Filters */}
+                        {backendCategories.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1">
+                              Categories
+                            </div>
+                            {backendCategories.map((category) => (
+                              <SelectItem key={category.category_id} value={category.category_id}>
+                                <div className="flex items-center">
+                                  <Tag className="mr-2 h-4 w-4 text-blue-500" />
+                                  {category.category_name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Filter Indicator */}
+                {selectedFilter !== "all" && (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Filter className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          Showing: {getFilterLabel()}
+                        </span>
+                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                          ({filteredExpenses.length} {filteredExpenses.length === 1 ? 'expense' : 'expenses'})
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setSelectedFilter("all")}
+                        className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 underline"
+                      >
+                        Clear filter
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -1018,9 +1109,13 @@ const Expenses = () => {
                     <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-2 text-sm font-semibold">No expenses found</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {selectedCategory === "all"
+                      {selectedFilter === "all"
                         ? "Get started by adding your first expense."
-                        : "No expenses found for the selected category."}
+                        : selectedFilter === "pending"
+                        ? "No pending expenses found."
+                        : selectedFilter === "no-receipt"
+                        ? "No expenses without receipts found."
+                        : "No expenses found for the selected filter."}
                     </p>
                   </div>
                 )}
@@ -1030,11 +1125,7 @@ const Expenses = () => {
 
           {/* Add Expense Tab */}
           <TabsContent value="add-expense" className="space-y-4">
-            {/* Compact Header */}
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Expense</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Record your business expense quickly</p>
-            </div>
+
 
             {/* Compact Form Card */}
             <Card className="max-w-2xl mx-auto shadow-lg border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm">
@@ -1153,12 +1244,7 @@ const Expenses = () => {
                       </Label>
                       <div className="relative">
                         <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 text-center hover:border-blue-400 transition-colors bg-gray-50/50 dark:bg-gray-800/50">
-                          {uploadingReceipt ? (
-                            <div className="flex items-center justify-center space-x-2">
-                              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                              <span className="text-sm text-blue-600">Uploading...</span>
-                            </div>
-                          ) : selectedReceiptFile ? (
+                          {selectedReceiptFile ? (
                             <div className="flex items-center justify-center space-x-2">
                               <FileText className="h-4 w-4 text-green-600" />
                               <span className="text-sm text-green-600">{selectedReceiptFile.name}</span>
@@ -1166,15 +1252,15 @@ const Expenses = () => {
                           ) : (
                             <div className="flex items-center justify-center space-x-2">
                               <FileText className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">Upload receipt (Image or PDF)</span>
+                              <span className="text-sm text-gray-600 dark:text-gray-400">Select receipt (JPEG, GIF, PNG, WebP only)</span>
                             </div>
                           )}
                           <Input
                             id="expense-receipt"
                             type="file"
-                            accept="image/*,.pdf"
+                            accept=".jpg,.jpeg,.png,.webp,.gif"
                             onChange={handleReceiptFileChange}
-                            disabled={uploadingReceipt}
+
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                           />
                         </div>

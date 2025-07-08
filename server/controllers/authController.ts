@@ -497,6 +497,87 @@ export const getProfile = asyncHandler(async (
 });
 
 /**
+ * Update user profile validation schema
+ */
+const updateProfileSchema = z.object({
+  business_name: z.string().min(1, 'Business name is required').max(200, 'Business name too long').optional(),
+  owner_name: z.string().min(1, 'Owner name is required').max(200, 'Owner name too long').optional(),
+  email_address: z.string().email('Invalid email format').optional(),
+  phone_number: z.string().max(20, 'Phone number too long').optional().nullable(),
+});
+
+/**
+ * Update current user profile
+ */
+export const updateProfile = asyncHandler(async (
+  req: AuthenticatedRequest,
+  res: Response,
+  _next: NextFunction
+): Promise<void> => {
+  if (!req.user) {
+    throw createError.unauthorized('Authentication required');
+  }
+
+  // Validate request body
+  const validatedData = updateProfileSchema.parse(req.body);
+
+  // Check if email is being changed and if it's already taken
+  if (validatedData.email_address && validatedData.email_address !== req.user.email_address) {
+    const emailCheck = await query(
+      'SELECT user_id FROM users WHERE email_address = $1 AND user_id != $2',
+      [validatedData.email_address, req.user.user_id]
+    );
+
+    if (emailCheck.rows.length > 0) {
+      throw createError.conflict('Email address is already in use');
+    }
+  }
+
+  // Build dynamic update query
+  const updateFields: string[] = [];
+  const updateValues: any[] = [];
+  let paramCount = 1;
+
+  Object.entries(validatedData).forEach(([key, value]) => {
+    if (value !== undefined) {
+      updateFields.push(`${key} = $${paramCount}`);
+      updateValues.push(value);
+      paramCount++;
+    }
+  });
+
+  if (updateFields.length === 0) {
+    throw createError.badRequest('No fields to update');
+  }
+
+  // Add user_id to the end
+  updateValues.push(req.user.user_id);
+
+  // Execute update query
+  const updateQuery = `
+    UPDATE users
+    SET ${updateFields.join(', ')}
+    WHERE user_id = $${paramCount}
+    RETURNING user_id, business_name, owner_name, email_address, phone_number, created_at, last_login
+  `;
+
+  const result = await query(updateQuery, updateValues);
+
+  if (result.rows.length === 0) {
+    throw createError.notFound('User not found');
+  }
+
+  const updatedUser = result.rows[0];
+
+  res.json({
+    success: true,
+    message: 'Profile updated successfully',
+    data: { user: updatedUser },
+    timestamp: new Date(),
+  });
+});
+
+/**
  * Change password
  */
 export const changePassword = asyncHandler(async (

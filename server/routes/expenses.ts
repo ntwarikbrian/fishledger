@@ -3,9 +3,12 @@
  * Handles expense management endpoints
  */
 
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { supabaseClient } from '../config/supabase-client.js';
+import { uploadSingleReceipt, handleUploadError, validateUpload } from '../middleware/upload.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
+import type { AuthenticatedRequest } from '../types/api.js';
 
 const router = Router();
 
@@ -47,7 +50,7 @@ router.get('/categories', authenticate, requirePermission('view_expenses'), asyn
  * @desc    Create new expense category
  * @access  Private
  */
-router.post('/categories', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+router.post('/categories', authenticate, requirePermission('manage_expenses'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { category_name, description, budget } = req.body;
 
@@ -124,7 +127,7 @@ router.post('/categories', authenticate, requirePermission('manage_expenses'), a
  * @desc    Update expense category
  * @access  Private
  */
-router.put('/categories/:id', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+router.put('/categories/:id', authenticate, requirePermission('manage_expenses'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { category_name, description, budget } = req.body;
@@ -220,7 +223,7 @@ router.put('/categories/:id', authenticate, requirePermission('manage_expenses')
  * @desc    Delete expense category
  * @access  Private
  */
-router.delete('/categories/:id', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+router.delete('/categories/:id', authenticate, requirePermission('manage_expenses'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -287,8 +290,73 @@ router.delete('/categories/:id', authenticate, requirePermission('manage_expense
   }
 });
 
+/**
+ * @route   POST /api/expenses/upload-receipt
+ * @desc    Upload receipt image for expenses
+ * @access  Private
+ */
+router.post('/upload-receipt',
+  authenticate,
+  requirePermission('manage_expenses'),
+  uploadSingleReceipt,
+  handleUploadError,
+  validateUpload,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No receipt file uploaded',
+          error: 'NO_FILE_UPLOADED',
+          timestamp: new Date(),
+        });
+      }
+
+      // File type validation is now handled by uploadSingleReceipt middleware
+      // Only JPEG, GIF, PNG, and WebP formats are allowed
+
+      // Upload to Cloudinary with receipt-specific options
+      const uploadOptions = {
+        folder: 'expenses/receipts',
+        resource_type: 'image' as const,
+        overwrite: false,
+        unique_filename: true,
+        use_filename: true,
+        tags: ['expense', 'receipt'],
+      };
+
+      const cloudinaryResult = await uploadToCloudinary(file.buffer, uploadOptions);
+
+      res.status(200).json({
+        success: true,
+        message: 'Receipt uploaded successfully',
+        data: {
+          url: cloudinaryResult.secure_url,
+          public_id: cloudinaryResult.public_id,
+          file_info: {
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+          },
+        },
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      console.error('Error uploading receipt:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload receipt',
+        error: 'RECEIPT_UPLOAD_ERROR',
+        timestamp: new Date(),
+      });
+    }
+  }
+);
+
 // Get all expenses
-router.get('/', authenticate, requirePermission('view_expenses'), async (req, res) => {
+router.get('/', authenticate, requirePermission('view_expenses'), async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const { data, error } = await supabaseClient
       .from('expenses')
@@ -335,7 +403,7 @@ router.get('/', authenticate, requirePermission('view_expenses'), async (req, re
 
 // Create a new expense
 // Update an expense
-router.put('/:id', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+router.put('/:id', authenticate, requirePermission('manage_expenses'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { title, category_id, amount, date, status, receipt_url } = req.body;
@@ -352,12 +420,24 @@ router.put('/:id', authenticate, requirePermission('manage_expenses'), async (re
 
     // Build update object with only provided fields
     const updateData: any = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (category_id !== undefined) updateData.category_id = category_id;
-    if (amount !== undefined) updateData.amount = parseFloat(amount);
-    if (date !== undefined) updateData.date = date;
-    if (status !== undefined) updateData.status = status;
-    if (receipt_url !== undefined) updateData.receipt_url = receipt_url;
+    if (title !== undefined) {
+      updateData.title = title.trim();
+    }
+    if (category_id !== undefined) {
+      updateData.category_id = category_id;
+    }
+    if (amount !== undefined) {
+      updateData.amount = parseFloat(amount);
+    }
+    if (date !== undefined) {
+      updateData.date = date;
+    }
+    if (status !== undefined) {
+      updateData.status = status;
+    }
+    if (receipt_url !== undefined) {
+      updateData.receipt_url = receipt_url;
+    }
 
     // Validate amount if provided
     if (amount !== undefined && parseFloat(amount) <= 0) {
@@ -452,7 +532,7 @@ router.put('/:id', authenticate, requirePermission('manage_expenses'), async (re
 });
 
 // Delete an expense
-router.delete('/:id', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+router.delete('/:id', authenticate, requirePermission('manage_expenses'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -510,9 +590,16 @@ router.delete('/:id', authenticate, requirePermission('manage_expenses'), async 
   }
 });
 
-router.post('/', authenticate, requirePermission('manage_expenses'), async (req, res) => {
+// Create expense with optional file upload
+router.post('/',
+  authenticate,
+  requirePermission('manage_expenses'),
+  uploadSingleReceipt,
+  handleUploadError,
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { title, category_id, amount, date, status = 'pending', receipt_url } = req.body;
+    const file = req.file; // Get uploaded file if present
 
     // Validate required fields
     if (!title || !category_id || !amount || !date) {
@@ -572,6 +659,33 @@ router.post('/', authenticate, requirePermission('manage_expenses'), async (req,
       });
     }
 
+    // Handle file upload if present
+    let finalReceiptUrl = receipt_url;
+    if (file) {
+      try {
+        // Upload to Cloudinary with receipt-specific options
+        const uploadOptions = {
+          folder: 'expenses/receipts',
+          resource_type: 'image' as const,
+          overwrite: false,
+          unique_filename: true,
+          use_filename: true,
+          tags: ['expense', 'receipt'],
+        };
+
+        const cloudinaryResult = await uploadToCloudinary(file.buffer, uploadOptions);
+        finalReceiptUrl = cloudinaryResult.secure_url;
+      } catch (uploadError) {
+        console.error('Error uploading receipt to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload receipt image',
+          error: 'RECEIPT_UPLOAD_ERROR',
+          timestamp: new Date(),
+        });
+      }
+    }
+
     // Insert the expense
     const { data, error } = await supabaseClient
       .from('expenses')
@@ -581,7 +695,7 @@ router.post('/', authenticate, requirePermission('manage_expenses'), async (req,
         amount: parseFloat(amount),
         date,
         status,
-        receipt_url: receipt_url || null,
+        receipt_url: finalReceiptUrl || null,
         added_by: userId,
       })
       .select(`
@@ -621,16 +735,58 @@ router.post('/', authenticate, requirePermission('manage_expenses'), async (req,
   }
 });
 
-router.get('/:id', authenticate, requirePermission('view_expenses'), (_req, res) => {
-  res.json({ success: true, message: 'Get expense by ID endpoint - Coming soon', timestamp: new Date() });
+// Get expense by ID endpoint
+router.get('/:id', authenticate, requirePermission('view_expenses'), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Validate expense ID
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Expense ID is required',
+        error: 'VALIDATION_ERROR',
+        timestamp: new Date(),
+      });
+    }
+
+    // Fetch expense from database
+    const { data: expense, error } = await supabaseClient
+      .from('expenses')
+      .select('*')
+      .eq('expense_id', id)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found',
+        error: 'EXPENSE_NOT_FOUND',
+        timestamp: new Date(),
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Expense retrieved successfully',
+      data: expense,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error('Error fetching expense:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch expense',
+      error: 'FETCH_EXPENSE_ERROR',
+      timestamp: new Date(),
+    });
+  }
 });
 
-router.put('/:id', authenticate, requirePermission('manage_expenses'), (_req, res) => {
-  res.json({ success: true, message: 'Update expense endpoint - Coming soon', timestamp: new Date() });
-});
 
-router.delete('/:id', authenticate, requirePermission('manage_expenses'), (_req, res) => {
-  res.json({ success: true, message: 'Delete expense endpoint - Coming soon', timestamp: new Date() });
-});
 
 export default router;

@@ -3,6 +3,7 @@
     "appName": "LocalFishing",
     "appSubtitle": "Fish Management System",
     "welcome": "Welcome back",
+    "hello": "Hello",
     "logout": "Logout",
     "login": "Login",
     "register": "Register",

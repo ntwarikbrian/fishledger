@@ -6,15 +6,12 @@
 import { supabaseClient } from '../config/supabase-client.js';
 import {
   uploadToCloudinary,
-  getUploadOptions,
   deleteFromCloudinary,
   CloudinaryUploadOptions
 } from '../config/cloudinary.js';
 import {
   parseFileError,
-  logFileError,
-  FileErrorType,
-  createFileError
+  logFileError
 } from '../utils/fileErrorHandler.js';
 import type {
   CreateFileInput,
@@ -122,11 +119,15 @@ export const uploadFile = async (input: FileUploadInput): Promise<FileUploadResu
       cloudinary_secure_url: cloudinaryResult.secure_url,
       file_type: file.mimetype,
       cloudinary_resource_type: cloudinaryResult.resource_type,
-      description: description || null,
       folder_id: folderId,
       file_size: cloudinaryResult.bytes,
       added_by: userId,
     };
+
+    // Add description only if provided
+    if (description && description.trim()) {
+      fileData.description = description.trim();
+    }
 
     // Save to database
     const { data: savedFile, error: dbError } = await supabaseClient

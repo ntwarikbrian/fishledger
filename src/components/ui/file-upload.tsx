@@ -23,7 +23,7 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 interface FileUploadProps {
   onUpload?: (files: File[]) => void;
@@ -58,7 +58,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Generate unique ID for files
-  const generateId = () => Math.random().toString(36).substr(2, 9);
+  const generateId = () => Math.random().toString(36).substring(2, 11);
 
   // Check if file type is accepted
   const isFileTypeAccepted = (file: File): boolean => {

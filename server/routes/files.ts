@@ -47,7 +47,7 @@ const fileUploadLimiter = rateLimit({
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise fall back to IP
     const user = (req as AuthenticatedRequest).user;
-    return user?.user_id || req.ip;
+    return user?.user_id || req.ip || 'unknown';
   },
 });
 
@@ -286,7 +286,7 @@ router.get('/:id', authenticate, requirePermission('view_files'), asyncHandler(a
     });
   }
 
-  const result = await getFileById(id, userId);
+  const result = await getFileById(id!, userId!);
 
   if (!result.success) {
     const statusCode = result.error === 'File not found' ? 404 : 400;
@@ -324,7 +324,7 @@ router.delete('/:id', authenticate, requirePermission('manage_files'), asyncHand
     });
   }
 
-  const result = await deleteFile(id, userId);
+  const result = await deleteFile(id!, userId!);
 
   if (!result.success) {
     const statusCode = result.error === 'File not found or access denied' ? 404 : 400;

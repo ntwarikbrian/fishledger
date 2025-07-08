@@ -17,12 +17,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useNotifications } from "@/hooks/use-notifications";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { useUser, getUserDisplayName } from "@/hooks/use-user";
 
 const Navbar = () => {
   const { t } = useTranslation();
   const { toggleSidebar, state } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const userInfo = useUser();
 
   // Toggle between light and dark themes
   const toggleTheme = () => {
@@ -74,7 +76,7 @@ const Navbar = () => {
           <span className="sr-only">Expand sidebar</span>
         </Button>
 
-        <h1 className="font-semibold">LocalFishing</h1>
+
       </div>
 
       {/* Right side - Account & action buttons */}

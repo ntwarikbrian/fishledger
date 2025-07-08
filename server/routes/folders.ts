@@ -6,7 +6,8 @@
 import { Router } from 'express';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { supabaseClient } from '../config/supabase-client.js';
-import type { CreateFolderInput, Folder } from '../types/database.js';
+import type { CreateFolderInput } from '../types/database.js';
+import type { AuthenticatedRequest } from '../types/api.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const router = Router();
  * @desc    Get all folders for the authenticated user
  * @access  Private
  */
-router.get('/', authenticate, requirePermission('view_files'), async (req, res) => {
+router.get('/', authenticate, requirePermission('view_files'), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.user_id;
 
@@ -40,7 +41,7 @@ router.get('/', authenticate, requirePermission('view_files'), async (req, res) 
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Folders retrieved successfully',
       data: folders || [],
@@ -48,7 +49,7 @@ router.get('/', authenticate, requirePermission('view_files'), async (req, res) 
     });
   } catch (error) {
     console.error('Error fetching folders:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch folders',
       error: 'FETCH_FOLDERS_ERROR',
@@ -62,7 +63,7 @@ router.get('/', authenticate, requirePermission('view_files'), async (req, res) 
  * @desc    Create a new folder
  * @access  Private
  */
-router.post('/', authenticate, requirePermission('upload_files'), async (req, res) => {
+router.post('/', authenticate, requirePermission('upload_files'), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.user_id;
     const { folder_name, description, color, icon }: CreateFolderInput = req.body;
@@ -106,7 +107,7 @@ router.post('/', authenticate, requirePermission('upload_files'), async (req, re
     // Create new folder
     const folderData: CreateFolderInput = {
       folder_name: folder_name.trim(),
-      description: description?.trim() || null,
+      ...(description?.trim() && { description: description.trim() }),
       color: color || '#3B82F6', // Default blue color
       icon: icon || 'folder', // Default folder icon
       created_by: userId,
@@ -123,7 +124,7 @@ router.post('/', authenticate, requirePermission('upload_files'), async (req, re
       throw error;
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Folder created successfully',
       data: newFolder,
@@ -131,7 +132,7 @@ router.post('/', authenticate, requirePermission('upload_files'), async (req, re
     });
   } catch (error) {
     console.error('Error creating folder:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to create folder',
       error: 'CREATE_FOLDER_ERROR',
@@ -145,7 +146,7 @@ router.post('/', authenticate, requirePermission('upload_files'), async (req, re
  * @desc    Update an existing folder
  * @access  Private
  */
-router.put('/:id', authenticate, requirePermission('upload_files'), async (req, res) => {
+router.put('/:id', authenticate, requirePermission('upload_files'), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.user_id;
     const folderId = req.params.id;
@@ -216,7 +217,7 @@ router.put('/:id', authenticate, requirePermission('upload_files'), async (req, 
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Folder updated successfully',
       data: updatedFolder,
@@ -224,7 +225,7 @@ router.put('/:id', authenticate, requirePermission('upload_files'), async (req, 
     });
   } catch (error) {
     console.error('Error updating folder:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to update folder',
       error: 'UPDATE_FOLDER_ERROR',
@@ -238,7 +239,7 @@ router.put('/:id', authenticate, requirePermission('upload_files'), async (req, 
  * @desc    Delete a folder (only if it's empty)
  * @access  Private
  */
-router.delete('/:id', authenticate, requirePermission('upload_files'), async (req, res) => {
+router.delete('/:id', authenticate, requirePermission('upload_files'), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.user_id;
     const folderId = req.params.id;
@@ -301,7 +302,7 @@ router.delete('/:id', authenticate, requirePermission('upload_files'), async (re
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Folder deleted successfully',
       data: { folder_id: folderId },
@@ -309,7 +310,7 @@ router.delete('/:id', authenticate, requirePermission('upload_files'), async (re
     });
   } catch (error) {
     console.error('Error deleting folder:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to delete folder',
       error: 'DELETE_FOLDER_ERROR',
@@ -323,7 +324,7 @@ router.delete('/:id', authenticate, requirePermission('upload_files'), async (re
  * @desc    Get a specific folder by ID
  * @access  Private
  */
-router.get('/:id', authenticate, requirePermission('view_files'), async (req, res) => {
+router.get('/:id', authenticate, requirePermission('view_files'), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user?.user_id;
     const folderId = req.params.id;
@@ -368,7 +369,7 @@ router.get('/:id', authenticate, requirePermission('view_files'), async (req, re
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Folder retrieved successfully',
       data: folder,
@@ -376,7 +377,7 @@ router.get('/:id', authenticate, requirePermission('view_files'), async (req, re
     });
   } catch (error) {
     console.error('Error fetching folder:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch folder',
       error: 'FETCH_FOLDER_ERROR',

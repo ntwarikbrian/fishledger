@@ -91,7 +91,7 @@ router.post('/', authenticate, requirePermission('manage_inventory'), async (req
       throw error;
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Category created successfully',
       data: newCategory,
@@ -99,7 +99,7 @@ router.post('/', authenticate, requirePermission('manage_inventory'), async (req
     });
   } catch (error) {
     console.error('Error creating category:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to create category',
       error: 'CREATE_CATEGORY_ERROR',
@@ -177,7 +177,7 @@ router.put('/:id', authenticate, requirePermission('manage_inventory'), async (r
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Category updated successfully',
       data: updatedCategory,
@@ -185,7 +185,7 @@ router.put('/:id', authenticate, requirePermission('manage_inventory'), async (r
     });
   } catch (error) {
     console.error('Error updating category:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to update category',
       error: 'UPDATE_CATEGORY_ERROR',
@@ -245,14 +245,14 @@ router.delete('/:id', authenticate, requirePermission('manage_inventory'), async
       throw error;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Category deleted successfully',
       timestamp: new Date(),
     });
   } catch (error) {
     console.error('Error deleting category:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to delete category',
       error: 'DELETE_CATEGORY_ERROR',

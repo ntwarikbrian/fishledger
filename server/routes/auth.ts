@@ -11,6 +11,7 @@ import {
   refreshToken,
   logout,
   getProfile,
+  updateProfile,
   changePassword,
   requestPasswordReset,
   getExistingUsers,
@@ -60,6 +61,13 @@ router.post('/logout', authenticate, logout);
  * @access  Private
  */
 router.get('/profile', authenticate, getProfile);
+
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Update current user profile
+ * @access  Private
+ */
+router.put('/profile', authenticate, updateProfile);
 
 /**
  * @route   PUT /api/auth/change-password

@@ -1,5 +1,5 @@
 ---
-type: "always_apply"
+type: "manual"
 description: "Example description"
 ---
 --i want you to to us e typescript in the frontend and server part.

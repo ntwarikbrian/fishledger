@@ -355,6 +355,41 @@ export const expensesApi = {
     }),
 
   /**
+   * Create a new expense with file upload
+   */
+  createWithFile: (data: {
+    title: string;
+    category_id: string;
+    amount: number;
+    date: string;
+    status?: string;
+    receipt_url?: string | null;
+  }, file?: File) => {
+    const formData = new FormData();
+
+    // Append expense data
+    formData.append('title', data.title);
+    formData.append('category_id', data.category_id);
+    formData.append('amount', data.amount.toString());
+    formData.append('date', data.date);
+    formData.append('status', data.status || 'pending');
+
+    if (data.receipt_url) {
+      formData.append('receipt_url', data.receipt_url);
+    }
+
+    // Append file if provided
+    if (file) {
+      formData.append('file', file);
+    }
+
+    return apiRequest('/expenses', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  /**
    * Update an existing expense
    */
   update: (id: string, data: {
