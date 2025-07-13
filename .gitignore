@@ -28,6 +28,9 @@ server/dist
 .env.production.local
 *.local
 
+# Allow .env.production (contains only URLs, no secrets)
+!.env.production
+
 # Database
 *.db
 *.sqlite

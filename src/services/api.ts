@@ -14,12 +14,14 @@ const getApiBaseUrl = (): string => {
   }
 
   // Default URLs based on mode
+  const isProduction = import.meta.env.VITE_NODE_ENV === 'production' || import.meta.env.NODE_ENV === 'production';
+
   if (apiMode === 'workers') {
-    return import.meta.env.NODE_ENV === 'production'
-      ? 'https://aqua-manage-fish-api.your-subdomain.workers.dev'
+    return isProduction
+      ? 'https://local-fishing-backend.your-username.workers.dev'
       : 'http://localhost:8787';
   } else {
-    return import.meta.env.NODE_ENV === 'production'
+    return isProduction
       ? 'https://your-production-api.com/api'
       : 'http://localhost:5004/api';
   }

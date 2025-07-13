@@ -98,11 +98,11 @@ export const getApiBaseUrl = (): string => {
   }
   
   // Default URLs based on mode and environment
-  const isProduction = import.meta.env.NODE_ENV === 'production';
-  
+  const isProduction = import.meta.env.VITE_NODE_ENV === 'production' || import.meta.env.NODE_ENV === 'production';
+
   if (mode === 'workers') {
     return isProduction
-      ? 'https://aqua-manage-fish-api.your-subdomain.workers.dev'
+      ? 'https://local-fishing-backend.your-username.workers.dev'
       : 'http://localhost:8787';
   } else {
     return isProduction

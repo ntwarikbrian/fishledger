@@ -1,0 +1,25 @@
+# Cloudflare Pages configuration for Local Fishing Frontend
+name = "local-fishing-frontend"
+compatibility_date = "2025-07-10"
+compatibility_flags = ["nodejs_compat"]
+
+# Pages configuration
+pages_build_output_dir = "dist"
+
+# Environment variables for production
+[env.production]
+name = "local-fishing-frontend"
+
+# Environment variables for development/preview
+[env.preview]
+name = "local-fishing-frontend-preview"
+
+# Build configuration
+[build]
+command = "npm run build"
+cwd = "."
+
+# Custom domains (configure these in Cloudflare dashboard)
+# [env.production.route]
+# pattern = "your-domain.com/*"
+# zone_name = "your-domain.com"

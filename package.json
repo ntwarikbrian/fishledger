@@ -7,8 +7,18 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:frontend": "npm run build:prod && wrangler pages deploy dist",
+    "deploy:backend": "cd backend && npm run deploy",
+    "deploy:all": "npm run deploy:backend && npm run deploy:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev\"",
+    "setup:dev": "node dev-setup.js setup",
+    "setup:production": "node setup-production.js",
+    "check:production": "node production-check.js",
+    "start:dev": "node dev-setup.js start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -85,6 +95,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
