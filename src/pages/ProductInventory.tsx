@@ -4,18 +4,20 @@
  * Separated into individual components for better maintainability
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import AppLayout from "@/components/layout/AppLayout";
-import { Package, Plus, FileText } from "lucide-react";
+import { Package, Plus, FolderOpen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCategories } from "@/hooks/use-categories";
+import { useProducts } from "@/hooks/use-products";
 import InventoryTab from "@/components/inventory/InventoryTab";
 import AddProductTab from "@/components/inventory/AddProductTab";
-import AuditTab from "@/components/inventory/AuditTab";
+import CategoriesTab from "@/components/inventory/CategoriesTab";
 import { usePageTitle } from "@/hooks/use-page-title";
 
 type ViewType = "all" | "low-stock" | "damaged" | "expiry" | "stock-adjustment" | "categories";
+type InventoryViewType = "all" | "low-stock" | "damaged" | "expiry" | "stock-adjustment";
 
 const ProductInventory = () => {
   const { t } = useTranslation();
@@ -23,12 +25,54 @@ const ProductInventory = () => {
 
   // View state
   const [currentView, setCurrentView] = useState<ViewType>("all");
+
+  // Active tab state for dynamic header content
+  const [activeTab, setActiveTab] = useState("inventory");
+
+  // Category filtering state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
+
+  // Function to get header content based on active tab
+  const getHeaderContent = () => {
+    switch (activeTab) {
+      case "inventory":
+        return {
+          title: t("inventory.headers.productInventory"),
+          description: t("inventory.headers.manageProducts")
+        };
+      case "add":
+        return {
+          title: t("inventory.headers.addProductsStock"),
+          description: t("inventory.headers.createNewProducts")
+        };
+      case "categories":
+        return {
+          title: t("inventory.headers.productCategories"),
+          description: t("inventory.headers.organizeProducts")
+        };
+      default:
+        return {
+          title: t("inventory.headers.productInventory"),
+          description: t("inventory.headers.manageProducts")
+        };
+    }
+  };
+
+  // Convert ViewType to InventoryViewType for InventoryTab
+  const getInventoryView = (view: ViewType): InventoryViewType => {
+    return view === "categories" ? "all" : view;
+  };
+
+  // Handle view changes for InventoryTab
+  const handleInventoryViewChange = (view: InventoryViewType) => {
+    setCurrentView(view);
+  };
   
   // Dialog states
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isAddDamagedOpen, setIsAddDamagedOpen] = useState(false);
-  const [isAddExpiredOpen, setIsAddExpiredOpen] = useState(false);
+  const [isStockCorrectionOpen, setIsStockCorrectionOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
 
   // OCR-related state
@@ -125,45 +169,107 @@ const ProductInventory = () => {
     setIsProcessingOcr(false);
   };
 
-  // Mock totals data
-  const totals = {
-    totalValue: 45250,
-    totalCostPrice: 28900,
-    totalProfit: 16350,
-    profitMargin: 36,
+  // Products hook for real calculations
+  const {
+    products,
+    calculateTotalValue,
+    calculateTotalCost,
+    calculateTotalProfit,
+    fetchDamagedProducts
+  } = useProducts();
+
+  // State for damaged products data
+  const [damagedProducts, setDamagedProducts] = useState<any[]>([]);
+
+  // Memoized function to load damaged products (prevents infinite loop)
+  const loadDamagedProducts = useCallback(async () => {
+    try {
+      const damaged = await fetchDamagedProducts();
+      setDamagedProducts(damaged);
+    } catch (error) {
+      console.error('Error loading damaged products:', error);
+      setDamagedProducts([]);
+    }
+  }, [fetchDamagedProducts]);
+
+  // Fetch damaged products data only once on mount
+  useEffect(() => {
+    loadDamagedProducts();
+  }, [loadDamagedProducts]);
+
+  // Memoized damaged stats calculation
+  const damagedStats = useMemo(() => {
+    const totalDamagedValue = damagedProducts.reduce((total, damage) => total + (damage.loss_value || 0), 0);
+    const totalDamagedItems = damagedProducts.reduce((total, damage) => total + (damage.damaged_boxes || 0), 0);
+    const totalDamagedWeight = damagedProducts.reduce((total, damage) => total + (damage.damaged_kg || 0), 0);
+
+    return {
+      totalDamagedValue,
+      totalDamagedItems,
+      totalDamagedWeight,
+      damagedCount: damagedProducts.length
+    };
+  }, [damagedProducts]);
+
+  // Memoized totals calculation
+  const totals = useMemo(() => {
+    const totalValue = calculateTotalValue();
+    const totalCostPrice = calculateTotalCost();
+    const totalProfit = calculateTotalProfit();
+    const profitMargin = totalValue > 0 ? ((totalProfit / totalValue) * 100) : 0;
+
+    return {
+      totalValue,
+      totalCostPrice,
+      totalProfit,
+      profitMargin: Math.round(profitMargin * 10) / 10, // Round to 1 decimal place
+      damagedStats,
+    };
+  }, [calculateTotalValue, calculateTotalCost, calculateTotalProfit, damagedStats]);
+
+  // Category filtering functions
+  const handleCategoryClick = (categoryId: string) => {
+    // Switch to inventory tab and set category filter
+    setActiveTab("inventory");
+    setSelectedCategoryId(categoryId);
+    setCurrentView("all"); // Reset to all products view when filtering by category
+  };
+
+  const handleClearCategoryFilter = () => {
+    setSelectedCategoryId(undefined);
   };
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Dynamic Header */}
         <div>
-          <h1 className="text-3xl font-bold">Product Inventory</h1>
-          <p className="text-muted-foreground">Manage fish products, stock levels, and pricing</p>
+          <h1 className="text-3xl font-bold">{getHeaderContent().title}</h1>
+          <p className="text-muted-foreground">{getHeaderContent().description}</p>
         </div>
 
         {/* Product Management Tabs */}
-        <Tabs defaultValue="inventory" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="inventory">
               <Package className="mr-2 h-4 w-4" />
-              Inventory
+              {t("inventory.tabs.inventory")}
             </TabsTrigger>
             <TabsTrigger value="add">
               <Plus className="mr-2 h-4 w-4" />
-              Add Product
+              {t("inventory.tabs.addProduct")}
             </TabsTrigger>
-            <TabsTrigger value="audit">
-              <FileText className="mr-2 h-4 w-4" />
-              Audit
+            <TabsTrigger value="categories">
+              <FolderOpen className="mr-2 h-4 w-4" />
+              {t("inventory.tabs.categories")}
             </TabsTrigger>
           </TabsList>
 
           {/* Inventory Tab Content */}
           <TabsContent value="inventory" className="space-y-4">
             <InventoryTab
-              currentView={currentView}
-              setCurrentView={setCurrentView}
+              currentView={getInventoryView(currentView)}
+              setCurrentView={handleInventoryViewChange}
               isAddCategoryOpen={isAddCategoryOpen}
               setIsAddCategoryOpen={setIsAddCategoryOpen}
               categoryForm={categoryForm}
@@ -182,6 +288,8 @@ const ProductInventory = () => {
               categoryToDelete={categoryToDelete}
               setCategoryToDelete={setCategoryToDelete}
               totals={totals}
+              selectedCategoryId={selectedCategoryId}
+              onClearCategoryFilter={handleClearCategoryFilter}
             />
           </TabsContent>
 
@@ -194,8 +302,8 @@ const ProductInventory = () => {
               setIsAddStockOpen={setIsAddStockOpen}
               isAddDamagedOpen={isAddDamagedOpen}
               setIsAddDamagedOpen={setIsAddDamagedOpen}
-              isAddExpiredOpen={isAddExpiredOpen}
-              setIsAddExpiredOpen={setIsAddExpiredOpen}
+              isStockCorrectionOpen={isStockCorrectionOpen}
+              setIsStockCorrectionOpen={setIsStockCorrectionOpen}
               isOcrMode={isOcrMode}
               setIsOcrMode={setIsOcrMode}
               ocrImage={ocrImage}
@@ -209,10 +317,11 @@ const ProductInventory = () => {
             />
           </TabsContent>
 
-          {/* Audit Tab Content */}
-          <TabsContent value="audit" className="space-y-4">
-            <AuditTab />
+          {/* Categories Tab Content */}
+          <TabsContent value="categories" className="space-y-6">
+            <CategoriesTab onCategoryClick={handleCategoryClick} />
           </TabsContent>
+
         </Tabs>
       </div>
     </AppLayout>

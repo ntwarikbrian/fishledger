@@ -8,13 +8,13 @@ import { authAPI } from '@/services/api';
 import { toast } from 'sonner';
 
 interface UserProfile {
-  user_id: string;
-  business_name: string;
-  owner_name: string;
-  email_address: string;
-  phone_number?: string;
-  created_at: string;
-  last_login?: string;
+  id: string;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phoneNumber?: string;
+  createdAt: string;
+  lastLogin?: string;
 }
 
 interface UseUserProfileReturn {
@@ -42,18 +42,34 @@ export const useUserProfile = (): UseUserProfileReturn => {
       setIsLoading(true);
       setError(null);
 
+      // Check if we have a token
+      const token = localStorage.getItem('auth_token');
+      console.log('🔑 Auth token check:', {
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : null
+      });
+
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
       const response = await authAPI.getProfile();
-      
-      if (response.success && response.data?.user) {
-        setProfile(response.data.user);
+
+      console.log('🔍 Profile API response:', response);
+
+      if (response.success && response.data) {
+        // Backend returns user data directly in response.data, not response.data.user
+        console.log('✅ Profile data loaded:', response.data);
+        setProfile(response.data);
       } else {
+        console.error('❌ Profile fetch failed:', response);
         throw new Error(response.message || 'Failed to fetch profile');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch user profile';
       setError(errorMessage);
       console.error('Error fetching user profile:', err);
-      
+
       // Show error toast
       toast.error('Failed to load profile', {
         description: errorMessage,

@@ -6,7 +6,29 @@
 import type { ApiResponse, ApiRequestConfig, ApiError } from './types';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5004/api';
+const getApiBaseUrl = (): string => {
+  const apiMode = import.meta.env.VITE_API_MODE || 'workers';
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  if (apiUrl) {
+    // If explicit URL is provided, use it
+    return apiMode === 'workers' ? apiUrl : `${apiUrl}/api`;
+  }
+
+  // Default URLs based on mode
+  if (apiMode === 'workers') {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://aqua-manage-fish-api.your-subdomain.workers.dev'
+      : 'http://localhost:8787';
+  } else {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://your-production-api.com/api'
+      : 'http://localhost:5004/api';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
+console.log('API Client - Base URL:', API_BASE_URL); // Debug log
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const MAX_RETRIES = 3;
 
@@ -80,11 +102,13 @@ export class ApiClient {
    */
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
     let data: any;
-    
+
     try {
       const text = await response.text();
       data = text ? JSON.parse(text) : {};
+      console.log('API Client - Response status:', response.status, 'Data:', data); // Debug log
     } catch (error) {
+      console.error('API Client - JSON parse error:', error); // Debug log
       throw new ApiClientError(
         'Invalid JSON response from server',
         response.status,
@@ -93,6 +117,7 @@ export class ApiClient {
     }
 
     if (!response.ok) {
+      console.error('API Client - Response not OK:', response.status, data); // Debug log
       const errorMessage = data.message || data.error || `HTTP ${response.status}`;
       throw new ApiClientError(
         errorMessage,
@@ -102,6 +127,7 @@ export class ApiClient {
       );
     }
 
+    console.log('API Client - Returning successful response:', data); // Debug log
     return data;
   }
 
@@ -158,6 +184,7 @@ export class ApiClient {
     config: ApiRequestConfig = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log('API Client - Making request:', config.method || 'GET', url); // Debug log
     const timeout = config.timeout || this.defaultTimeout;
     const retries = config.retries ?? this.maxRetries;
 

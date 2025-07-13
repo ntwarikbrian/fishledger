@@ -20,7 +20,7 @@ export class AuthService {
    * User login
    */
   async login(credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> {
-    const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
+    const response = await apiClient.post<AuthResponse>('/api/auth/login', credentials);
     
     // Store token if login successful
     if (response.success && response.data?.token) {
@@ -37,7 +37,7 @@ export class AuthService {
    * User registration
    */
   async register(userData: RegisterData): Promise<ApiResponse<AuthResponse>> {
-    const response = await apiClient.post<AuthResponse>('/auth/register', userData);
+    const response = await apiClient.post<AuthResponse>('/api/auth/register', userData);
     
     // Store token if registration successful
     if (response.success && response.data?.token) {
@@ -56,7 +56,7 @@ export class AuthService {
   async logout(): Promise<ApiResponse<void>> {
     try {
       // Call logout endpoint if available
-      await apiClient.post('/auth/logout');
+      await apiClient.post('/api/auth/logout');
     } catch (error) {
       // Continue with local logout even if server call fails
       console.warn('Server logout failed, continuing with local logout');
@@ -73,14 +73,14 @@ export class AuthService {
    * Get current user profile
    */
   async getCurrentUser(): Promise<ApiResponse<UserData>> {
-    return apiClient.get<UserData>('/auth/me');
+    return apiClient.get<UserData>('/api/auth/profile');
   }
 
   /**
    * Update user profile
    */
   async updateProfile(userData: Partial<UserData>): Promise<ApiResponse<UserData>> {
-    return apiClient.patch<UserData>('/auth/profile', userData);
+    return apiClient.patch<UserData>('/api/auth/profile', userData);
   }
 
   /**
@@ -91,14 +91,14 @@ export class AuthService {
     newPassword: string;
     confirmPassword: string;
   }): Promise<ApiResponse<void>> {
-    return apiClient.post<void>('/auth/change-password', data);
+    return apiClient.post<void>('/api/auth/change-password', data);
   }
 
   /**
    * Request password reset
    */
   async requestPasswordReset(email: string): Promise<ApiResponse<void>> {
-    return apiClient.post<void>('/auth/forgot-password', { email });
+    return apiClient.post<void>('/api/auth/forgot-password', { email });
   }
 
   /**
@@ -109,7 +109,7 @@ export class AuthService {
     newPassword: string;
     confirmPassword: string;
   }): Promise<ApiResponse<void>> {
-    return apiClient.post<void>('/auth/reset-password', data);
+    return apiClient.post<void>('/api/auth/reset-password', data);
   }
 
   /**
@@ -122,7 +122,7 @@ export class AuthService {
     }
 
     const response = await apiClient.post<{ token: string; refreshToken?: string }>(
-      '/auth/refresh',
+      '/api/auth/refresh',
       { refreshToken }
     );
 
@@ -141,14 +141,14 @@ export class AuthService {
    * Verify email address
    */
   async verifyEmail(token: string): Promise<ApiResponse<void>> {
-    return apiClient.post<void>('/auth/verify-email', { token });
+    return apiClient.post<void>('/api/auth/verify-email', { token });
   }
 
   /**
    * Resend email verification
    */
   async resendEmailVerification(): Promise<ApiResponse<void>> {
-    return apiClient.post<void>('/auth/resend-verification');
+    return apiClient.post<void>('/api/auth/resend-verification');
   }
 
   /**

@@ -1,45 +1,72 @@
 -- =====================================================
 -- Sales Table Schema
--- Logs transaction data for sold products
+-- Redesigned for simplified sales transactions
 -- =====================================================
 
--- Sales table for transaction data of sold products
+-- Sales table for individual product sales transactions
 CREATE TABLE IF NOT EXISTS sales (
-    sales_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    product_id UUID NOT NULL REFERENCES products(product_id),
-    selling_method VARCHAR(20) NOT NULL CHECK (selling_method IN ('boxed', 'weight')),
-    quantity DECIMAL(10,2) NOT NULL, -- Can be units for boxed or kg for weight
-    total_amount DECIMAL(12,2) NOT NULL,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+
+    -- Quantities sold
+    boxes_quantity INTEGER DEFAULT 0 NOT NULL, -- Number of boxes sold
+    kg_quantity DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Kg sold (using smaller precision for cost efficiency)
+
+    -- Pricing at time of sale
+    box_price DECIMAL(8,2) NOT NULL, -- Price per box at time of sale
+    kg_price DECIMAL(8,2) NOT NULL, -- Price per kg at time of sale
+
+    -- Total amount for this sale
+    total_amount DECIMAL(10,2) NOT NULL, -- Total amount calculated
+
+    -- Partial payment tracking
+    amount_paid DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Amount already paid (for partial payments)
+    remaining_amount DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Outstanding balance (total_amount - amount_paid)
+
+    -- Sale timestamp
     date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial', 'overdue')),
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'bank_transfer', 'mobile_money')),
-    client_name VARCHAR(200),
-    client_email VARCHAR(255),
-    client_phone_number VARCHAR(20),
-    client_address TEXT
+
+    -- Payment information
+    payment_status VARCHAR(10) DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'partial')),
+    payment_method VARCHAR(15) CHECK (payment_method IN ('momo_pay', 'cash', 'bank_transfer')),
+
+    -- User who performed the sale
+    performed_by UUID NOT NULL REFERENCES users(user_id),
+
+    -- Client information (optional reference to contacts table)
+    client_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL,
+    client_name VARCHAR(100), -- Client name (required even if not in contacts)
+    email_address VARCHAR(150), -- Client email
+    phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
 );
 
 -- Comments for documentation
-COMMENT ON TABLE sales IS 'Logs transaction data for sold products';
-COMMENT ON COLUMN sales.sales_id IS 'Unique identifier for each sale';
+COMMENT ON TABLE sales IS 'Individual product sales transactions';
+COMMENT ON COLUMN sales.id IS 'Unique identifier for each sale';
 COMMENT ON COLUMN sales.product_id IS 'Reference to the product sold';
-COMMENT ON COLUMN sales.selling_method IS 'Method of sale: boxed or weight';
-COMMENT ON COLUMN sales.quantity IS 'Quantity sold (units for boxed, kg for weight)';
+COMMENT ON COLUMN sales.boxes_quantity IS 'Number of boxes sold';
+COMMENT ON COLUMN sales.kg_quantity IS 'Kg sold (loose weight)';
+COMMENT ON COLUMN sales.box_price IS 'Price per box at time of sale';
+COMMENT ON COLUMN sales.kg_price IS 'Price per kg at time of sale';
 COMMENT ON COLUMN sales.total_amount IS 'Total amount for this sale';
+COMMENT ON COLUMN sales.amount_paid IS 'Amount already paid (for partial payments)';
+COMMENT ON COLUMN sales.remaining_amount IS 'Outstanding balance (total_amount - amount_paid)';
 COMMENT ON COLUMN sales.date_time IS 'Date and time of sale';
-COMMENT ON COLUMN sales.payment_status IS 'Payment status (pending, paid, partial, overdue)';
-COMMENT ON COLUMN sales.payment_method IS 'Method of payment (cash, card, bank_transfer, mobile_money)';
+COMMENT ON COLUMN sales.payment_status IS 'Payment status (paid, pending, partial)';
+COMMENT ON COLUMN sales.payment_method IS 'Method of payment (cash, card, transfer)';
+COMMENT ON COLUMN sales.performed_by IS 'User who performed the sale';
+COMMENT ON COLUMN sales.client_id IS 'Optional reference to contacts table';
 COMMENT ON COLUMN sales.client_name IS 'Name of the client/customer';
-COMMENT ON COLUMN sales.client_email IS 'Email address of the client';
-COMMENT ON COLUMN sales.client_phone_number IS 'Phone number of the client';
-COMMENT ON COLUMN sales.client_address IS 'Address of the client';
+COMMENT ON COLUMN sales.email_address IS 'Email address of the client';
+COMMENT ON COLUMN sales.phone IS 'Phone number of the client';
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date_time);
 CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
-CREATE INDEX IF NOT EXISTS idx_sales_selling_method ON sales(selling_method);
+CREATE INDEX IF NOT EXISTS idx_sales_performed_by ON sales(performed_by);
 CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
+CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
@@ -68,15 +95,37 @@ CREATE POLICY sales_delete_owner ON sales
 CREATE OR REPLACE FUNCTION validate_sale_data()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Ensure quantity is positive
-    IF NEW.quantity <= 0 THEN
-        RAISE EXCEPTION 'Sale quantity must be positive';
+    -- Ensure at least one quantity is positive
+    IF NEW.boxes_quantity <= 0 AND NEW.kg_quantity <= 0 THEN
+        RAISE EXCEPTION 'At least one of boxes_quantity or kg_quantity must be positive';
     END IF;
 
     -- Ensure total_amount is positive
     IF NEW.total_amount <= 0 THEN
         RAISE EXCEPTION 'Sale total amount must be positive';
     END IF;
+
+    -- Ensure pricing fields are not negative
+    IF NEW.box_price < 0 OR NEW.kg_price < 0 THEN
+        RAISE EXCEPTION 'Prices cannot be negative';
+    END IF;
+
+    -- Ensure client_name is provided
+    IF NEW.client_name IS NULL OR LENGTH(TRIM(NEW.client_name)) = 0 THEN
+        RAISE EXCEPTION 'Client name is required';
+    END IF;
+
+    -- Calculate and validate total amount
+    DECLARE
+        calculated_total DECIMAL(10,2);
+    BEGIN
+        calculated_total := (NEW.boxes_quantity * NEW.box_price) + (NEW.kg_quantity * NEW.kg_price);
+
+        -- Allow small rounding differences (within 0.01)
+        IF ABS(NEW.total_amount - calculated_total) > 0.01 THEN
+            RAISE EXCEPTION 'Total amount does not match calculated total. Expected: %, Got: %', calculated_total, NEW.total_amount;
+        END IF;
+    END;
 
     RETURN NEW;
 END;
@@ -89,8 +138,8 @@ CREATE TRIGGER validate_sale_data_trigger
     EXECUTE FUNCTION validate_sale_data();
 
 -- Sample data for development
--- Note: These will need actual product_id values from the products table
--- INSERT INTO sales (product_id, selling_method, quantity, total_amount, payment_status, payment_method, client_name, client_email, client_phone_number) VALUES
--- ('product-uuid-here', 'boxed', 5, 129.95, 'paid', 'cash', 'John Smith', 'john@email.com', '+1-555-1001'),
--- ('product-uuid-here', 'weight', 2.5, 56.25, 'pending', 'card', 'Jane Doe', 'jane@email.com', '+1-555-1002'),
--- ('product-uuid-here', 'boxed', 10, 450.00, 'paid', 'bank_transfer', 'Ocean Restaurant', 'orders@oceanrestaurant.com', '+1-555-1003');
+-- Note: These will need actual product_id and user_id values from the respective tables
+-- INSERT INTO sales (product_id, boxes_quantity, kg_quantity, box_price, kg_price, total_amount, payment_status, payment_method, performed_by, client_name, email_address, phone) VALUES
+-- ('product-uuid-here', 2, 5.5, 25.99, 1.30, 59.13, 'paid', 'cash', 'user-uuid-here', 'John Smith', 'john@email.com', '+1-555-1001'),
+-- ('product-uuid-here', 0, 10.0, 0, 1.50, 15.00, 'pending', 'card', 'user-uuid-here', 'Jane Doe', 'jane@email.com', '+1-555-1002'),
+-- ('product-uuid-here', 5, 0, 22.50, 0, 112.50, 'paid', 'transfer', 'user-uuid-here', 'Ocean Restaurant', 'orders@oceanrestaurant.com', '+1-555-1003');

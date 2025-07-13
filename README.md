@@ -21,11 +21,23 @@ LocalFishing is a comprehensive fish management system designed for local fish s
 This is a full-stack TypeScript application with:
 
 - **Frontend**: React + TypeScript + Vite
-- **Backend**: Express.js + TypeScript + Node.js
+- **Backend**: Express.js + TypeScript + Node.js OR Cloudflare Workers (serverless)
 - **Database**: PostgreSQL (hosted on Supabase)
 - **File Storage**: Cloudinary for document and image management
 - **Email Service**: Gmail SMTP for messaging functionality
 - **Authentication**: JWT-based authentication system
+
+### 🆕 Cloudflare Workers Backend
+
+The system now supports **Cloudflare Workers** as a modern, serverless backend alternative:
+
+- **Serverless**: No server management required
+- **Global Edge**: Deployed on Cloudflare's global network
+- **Auto-scaling**: Handles traffic spikes automatically
+- **Cost-effective**: Pay only for what you use
+- **Better Performance**: Reduced latency with edge computing
+
+See [CLOUDFLARE_WORKERS_MIGRATION.md](./CLOUDFLARE_WORKERS_MIGRATION.md) for complete migration guide.
 
 ## Getting Started
 
@@ -55,28 +67,57 @@ cd server; npm install
 
 # Step 6: Set up the database (see Database Setup below)
 
-# Step 7: Start the development servers
-# Terminal 1 - Backend server
-cd server; npm run dev
+# Step 7: Choose your backend and start development servers
 
-# Terminal 2 - Frontend development server
+# Option A: Cloudflare Workers Backend (Recommended)
+cd workers; npm install; npm run dev  # API at http://localhost:8787
+
+# Option B: Traditional Express Backend
+cd server; npm run dev  # API at http://localhost:5004
+
+# Terminal 2 - Frontend development server (configure VITE_API_URL accordingly)
 npm run dev
 ```
 
 ### Environment Setup
 
 #### Frontend Environment
-Create a `.env.local` file in the root directory:
+Create a `.env` file in the root directory:
 ```env
-VITE_API_URL=http://localhost:3001
+# API Configuration
+VITE_API_MODE=workers  # or 'express'
+VITE_API_URL=http://localhost:8787  # Workers: 8787, Express: http://localhost:5004/api
+
+# Supabase (if using client-side features)
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Cloudinary (for file uploads)
+VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 ```
 
 #### Backend Environment
+
+**For Cloudflare Workers (Recommended):**
+1. Create a `.env` file in the `workers` directory (copy from `.env.example`)
+2. Set up Cloudflare secrets:
+```bash
+cd workers
+npx wrangler login
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_ANON_KEY
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put JWT_REFRESH_SECRET
+npx wrangler secret put CLOUDINARY_CLOUD_NAME
+npx wrangler secret put CLOUDINARY_API_KEY
+npx wrangler secret put CLOUDINARY_API_SECRET
+```
+
+**For Express Server:**
 Create a `.env` file in the `server` directory:
 ```env
-PORT=3001
+PORT=5004
 NODE_ENV=development
 DATABASE_URL=your_postgresql_connection_string
 SUPABASE_URL=your_supabase_url

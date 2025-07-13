@@ -200,37 +200,172 @@ CREATE TABLE IF NOT EXISTS product_categories (
 -- Tracks fish inventory, including pricing, damage, and expiry
 -- =====================================================
 
--- Products table for fish inventory management
+-- Products table for fish inventory management with box/kg support
 CREATE TABLE IF NOT EXISTS products (
     product_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    sku VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     category_id UUID NOT NULL REFERENCES product_categories(category_id),
-    quantity INTEGER DEFAULT 0,
-    selling_type VARCHAR(20) NOT NULL CHECK (selling_type IN ('boxed', 'weight', 'both')),
-    price DECIMAL(10,2) NOT NULL,
-    cost_price DECIMAL(10,2) NOT NULL,
-    profit DECIMAL(10,2) GENERATED ALWAYS AS (price - cost_price) STORED,
-    supplier VARCHAR(200),
-    low_stock_threshold INTEGER DEFAULT 10,
-    damaged_reason TEXT,
-    damaged_date DATE,
-    loss_value DECIMAL(10,2) DEFAULT 0,
-    approval_status VARCHAR(20) DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
-    reported_by UUID REFERENCES users(user_id),
+
+    -- Inventory fields for box/kg management
+    quantity_box INTEGER DEFAULT 0 NOT NULL, -- Number of full boxes in stock (renamed from boxed_quantity)
+    box_to_kg_ratio DECIMAL(10,2) DEFAULT 20 NOT NULL, -- How many kg per box (e.g., 20kg per box)
+    quantity_kg DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Loose kg stock (renamed from kg_quantity)
+
+    -- Cost pricing fields
+    cost_per_box DECIMAL(10,2) NOT NULL, -- Cost price per box for calculating profit margins
+    cost_per_kg DECIMAL(10,2) NOT NULL, -- Cost price per kilogram for calculating profit margins
+
+    -- Selling pricing fields
+    price_per_box DECIMAL(10,2) NOT NULL, -- Selling price per box (renamed from boxed_selling_price)
+    price_per_kg DECIMAL(10,2) NOT NULL, -- Selling price per kg (renamed from kg_selling_price)
+
+    -- Calculated profit fields
+    profit_per_box DECIMAL(10,2) GENERATED ALWAYS AS (price_per_box - cost_per_box) STORED,
+    profit_per_kg DECIMAL(10,2) GENERATED ALWAYS AS (price_per_kg - cost_per_kg) STORED,
+
+    -- Stock management
+    boxed_low_stock_threshold INTEGER DEFAULT 10 NOT NULL, -- Low stock threshold for boxed quantity alerts
+
+    -- Product lifecycle tracking
     expiry_date DATE,
-    days_left INTEGER, -- Will be calculated by application or trigger
-    stock_status VARCHAR(20) GENERATED ALWAYS AS (
-        CASE
-            WHEN quantity <= (low_stock_threshold * 0.5) THEN 'critical'
-            WHEN quantity <= low_stock_threshold THEN 'warning'
-            ELSE 'monitor'
-        END
-    ) STORED
+    days_left INTEGER, -- Days remaining until expiry (calculated by application or trigger)
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT chk_cost_per_box_positive CHECK (cost_per_box >= 0),
+    CONSTRAINT chk_cost_per_kg_positive CHECK (cost_per_kg >= 0),
+    CONSTRAINT chk_price_per_box_positive CHECK (price_per_box >= 0),
+    CONSTRAINT chk_price_per_kg_positive CHECK (price_per_kg >= 0),
+    CONSTRAINT chk_quantity_box_non_negative CHECK (quantity_box >= 0),
+    CONSTRAINT chk_quantity_kg_non_negative CHECK (quantity_kg >= 0),
+    CONSTRAINT chk_box_to_kg_ratio_positive CHECK (box_to_kg_ratio > 0),
+    CONSTRAINT chk_boxed_low_stock_threshold_positive CHECK (boxed_low_stock_threshold >= 0)
 );
 
+-- Comments for products table documentation
+COMMENT ON TABLE products IS 'Tracks fish inventory with box/kg management, pricing, and expiry';
+COMMENT ON COLUMN products.product_id IS 'Unique identifier for each product';
+COMMENT ON COLUMN products.name IS 'Product name (e.g., Atlantic Salmon)';
+COMMENT ON COLUMN products.category_id IS 'Reference to product category';
+COMMENT ON COLUMN products.quantity_box IS 'Number of full boxes in stock';
+COMMENT ON COLUMN products.quantity_kg IS 'Loose kg stock available';
+COMMENT ON COLUMN products.box_to_kg_ratio IS 'How many kg per box (e.g., 20kg per box)';
+COMMENT ON COLUMN products.cost_per_box IS 'Cost price per box for calculating profit margins';
+COMMENT ON COLUMN products.cost_per_kg IS 'Cost price per kilogram for calculating profit margins';
+COMMENT ON COLUMN products.price_per_box IS 'Selling price per box';
+COMMENT ON COLUMN products.price_per_kg IS 'Selling price per kilogram';
+COMMENT ON COLUMN products.profit_per_box IS 'Profit margin per box (selling price - cost price)';
+COMMENT ON COLUMN products.profit_per_kg IS 'Profit margin per kilogram (selling price - cost price)';
+COMMENT ON COLUMN products.boxed_low_stock_threshold IS 'Low stock threshold for boxed quantity alerts';
+COMMENT ON COLUMN products.expiry_date IS 'Product expiry date';
+COMMENT ON COLUMN products.days_left IS 'Days remaining until expiry (calculated)';
+
+
+-- Indexes for products table performance
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_products_expiry_date ON products(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_products_quantity_box ON products(quantity_box);
+CREATE INDEX IF NOT EXISTS idx_products_quantity_kg ON products(quantity_kg);
+CREATE INDEX IF NOT EXISTS idx_products_cost_per_box ON products(cost_per_box);
+CREATE INDEX IF NOT EXISTS idx_products_cost_per_kg ON products(cost_per_kg);
+CREATE INDEX IF NOT EXISTS idx_products_boxed_low_stock ON products(boxed_low_stock_threshold);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
+
+-- Row Level Security (RLS) policies for products
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only access products from their own business
+CREATE POLICY products_user_isolation ON products
+    FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM users
+            WHERE users.user_id = auth.uid()
+        )
+    );
+
+-- Note: Worker permissions policy will be added after worker_permissions table is created
+
 -- =====================================================
--- 12. AUTOMATIC MESSAGES TABLE
+-- 12. DAMAGED PRODUCTS TABLE
+-- Tracks damaged inventory separately from main products
+-- =====================================================
+
+-- Damaged products table for tracking damaged inventory
+CREATE TABLE IF NOT EXISTS damaged_products (
+    damage_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+
+    -- Damaged quantities
+    damaged_boxes INTEGER DEFAULT 0 NOT NULL CHECK (damaged_boxes >= 0),
+    damaged_kg DECIMAL(10,2) DEFAULT 0 NOT NULL CHECK (damaged_kg >= 0),
+
+    -- Damage details
+    damaged_reason TEXT NOT NULL,
+    description TEXT, -- Additional description/notes about the damage
+    damaged_date DATE NOT NULL DEFAULT CURRENT_DATE,
+
+    -- Financial impact
+    loss_value DECIMAL(12,2) DEFAULT 0 NOT NULL CHECK (loss_value >= 0),
+
+    -- Approval workflow
+    damaged_approval BOOLEAN DEFAULT false NOT NULL,
+    approved_by UUID REFERENCES users(user_id),
+    approved_date TIMESTAMP WITH TIME ZONE,
+
+    -- Audit trail
+    reported_by UUID NOT NULL REFERENCES users(user_id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT chk_damaged_quantities CHECK (damaged_boxes > 0 OR damaged_kg > 0),
+    CONSTRAINT chk_approval_consistency CHECK (
+        (damaged_approval = true AND approved_by IS NOT NULL AND approved_date IS NOT NULL) OR
+        (damaged_approval = false AND approved_by IS NULL AND approved_date IS NULL)
+    )
+);
+
+-- Comments for damaged products table
+COMMENT ON TABLE damaged_products IS 'Tracks damaged inventory items separately from main products table';
+COMMENT ON COLUMN damaged_products.damage_id IS 'Unique identifier for each damage record';
+COMMENT ON COLUMN damaged_products.product_id IS 'Reference to the product that was damaged';
+COMMENT ON COLUMN damaged_products.damaged_boxes IS 'Number of boxes that were damaged';
+COMMENT ON COLUMN damaged_products.damaged_kg IS 'Weight in kg that was damaged';
+COMMENT ON COLUMN damaged_products.damaged_reason IS 'Reason for the damage';
+COMMENT ON COLUMN damaged_products.description IS 'Additional notes about the damage';
+COMMENT ON COLUMN damaged_products.damaged_date IS 'Date when the damage was reported';
+COMMENT ON COLUMN damaged_products.loss_value IS 'Financial loss value from the damaged products';
+COMMENT ON COLUMN damaged_products.damaged_approval IS 'Whether the damage report has been approved';
+COMMENT ON COLUMN damaged_products.approved_by IS 'User who approved the damage report';
+COMMENT ON COLUMN damaged_products.approved_date IS 'Date when the damage was approved';
+COMMENT ON COLUMN damaged_products.reported_by IS 'User who reported the damage';
+
+-- Indexes for damaged products performance
+CREATE INDEX IF NOT EXISTS idx_damaged_products_product_id ON damaged_products(product_id);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_damaged_date ON damaged_products(damaged_date);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_reported_by ON damaged_products(reported_by);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_approval_status ON damaged_products(damaged_approval);
+
+-- Enable RLS for damaged products
+ALTER TABLE damaged_products ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only access damaged products from their own business
+CREATE POLICY damaged_products_user_isolation ON damaged_products
+    FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM users
+            WHERE users.user_id = auth.uid()
+        )
+    );
+
+-- =====================================================
+-- 13. AUTOMATIC MESSAGES TABLE
 -- Handles inventory-triggered automated notifications
 -- =====================================================
 
@@ -326,7 +461,113 @@ CREATE TABLE IF NOT EXISTS message_templates (
 );
 
 -- =====================================================
--- 13. STOCK MOVEMENTS TABLE
+-- 13. SALES TABLE
+-- Logs transaction data for sold products
+-- =====================================================
+
+-- Sales table for individual product sales transactions
+CREATE TABLE IF NOT EXISTS sales (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+
+    -- Quantities sold
+    boxes_quantity INTEGER DEFAULT 0 NOT NULL, -- Number of boxes sold
+    kg_quantity DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Kg sold (using smaller precision for cost efficiency)
+
+    -- Pricing at time of sale
+    box_price DECIMAL(8,2) NOT NULL, -- Price per box at time of sale
+    kg_price DECIMAL(8,2) NOT NULL, -- Price per kg at time of sale
+
+    -- Total amount for this sale
+    total_amount DECIMAL(10,2) NOT NULL, -- Total amount calculated
+
+    -- Partial payment tracking
+    amount_paid DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Amount already paid (for partial payments)
+    remaining_amount DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Outstanding balance (total_amount - amount_paid)
+
+    -- Sale timestamp
+    date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Payment information
+    payment_status VARCHAR(10) DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'partial')),
+    payment_method VARCHAR(15) CHECK (payment_method IN ('momo_pay', 'cash', 'bank_transfer')),
+
+    -- User who performed the sale
+    performed_by UUID NOT NULL REFERENCES users(user_id),
+
+    -- Client information (optional reference to contacts table)
+    client_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL,
+    client_name VARCHAR(100), -- Client name (required even if not in contacts)
+    email_address VARCHAR(150), -- Client email
+    phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
+);
+
+-- =====================================================
+-- 12. STOCK CORRECTIONS TABLE
+-- Tracks manual inventory adjustments and corrections
+-- =====================================================
+
+-- Stock corrections table for tracking manual inventory adjustments
+CREATE TABLE IF NOT EXISTS stock_corrections (
+    correction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+
+    -- Adjustment quantities (positive or negative)
+    box_adjustment INTEGER DEFAULT 0 NOT NULL, -- Positive for increase, negative for decrease
+    kg_adjustment DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Positive for increase, negative for decrease
+
+    -- Correction details
+    correction_reason TEXT NOT NULL, -- Reason for the correction (e.g., "Counting error", "Theft", "Found missing stock")
+    correction_date DATE NOT NULL DEFAULT CURRENT_DATE, -- When the correction was made
+
+    -- Status tracking
+    status VARCHAR(20) DEFAULT 'completed' NOT NULL CHECK (status IN ('pending', 'completed', 'cancelled')),
+
+    -- Audit trail
+    performed_by UUID NOT NULL REFERENCES users(user_id), -- User who performed the correction
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT chk_correction_quantities CHECK (box_adjustment != 0 OR kg_adjustment != 0),
+    CONSTRAINT chk_correction_reason_length CHECK (LENGTH(correction_reason) >= 3)
+);
+
+-- =====================================================
+-- 13. STOCK ADDITIONS TABLE
+-- Tracks new stock deliveries and additions
+-- =====================================================
+
+-- Stock additions table for tracking new stock deliveries
+CREATE TABLE IF NOT EXISTS stock_additions (
+    addition_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+
+    -- Added quantities
+    boxes_added INTEGER DEFAULT 0 NOT NULL CHECK (boxes_added >= 0), -- Number of boxes added
+    kg_added DECIMAL(10,2) DEFAULT 0 NOT NULL CHECK (kg_added >= 0), -- Kg quantity added
+
+    -- Financial details
+    total_cost DECIMAL(12,2) DEFAULT 0 NOT NULL CHECK (total_cost >= 0), -- Total cost of the addition
+
+    -- Delivery details
+    delivery_date DATE NOT NULL DEFAULT CURRENT_DATE, -- When the stock was delivered/added
+
+    -- Status tracking
+    status VARCHAR(20) DEFAULT 'completed' NOT NULL CHECK (status IN ('pending', 'completed', 'cancelled')),
+
+    -- Audit trail
+    performed_by UUID NOT NULL REFERENCES users(user_id), -- User who recorded the addition
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT chk_addition_quantities CHECK (boxes_added > 0 OR kg_added > 0),
+    CONSTRAINT chk_delivery_date_not_future CHECK (delivery_date <= CURRENT_DATE) -- Only present or past dates allowed
+);
+
+-- =====================================================
+-- 14. STOCK MOVEMENTS TABLE
 -- Tracks inventory changes from irregular events
 -- =====================================================
 
@@ -334,33 +575,32 @@ CREATE TABLE IF NOT EXISTS message_templates (
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(product_id),
-    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('counting_error', 'theft', 'return')),
-    weight_change DECIMAL(10,2) DEFAULT 0, -- Weight change in kg (positive for increase, negative for decrease)
-    quantity_change INTEGER DEFAULT 0, -- Quantity change (positive for increase, negative for decrease)
-    reason TEXT NOT NULL,
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction')),
+
+    -- Changes in box and kg quantities
+    box_change INTEGER DEFAULT 0, -- Box quantity change (positive for increase, negative for decrease)
+    kg_change DECIMAL(10,2) DEFAULT 0, -- Kg change (positive for increase, negative for decrease)
+
+    -- Reference IDs for tracking specific records based on movement type
+    damaged_id UUID REFERENCES damaged_products(damage_id), -- Reference to damaged product record
+    stock_addition_id UUID REFERENCES stock_additions(addition_id), -- Reference to stock addition record
+    correction_id UUID REFERENCES stock_corrections(correction_id), -- Reference to stock correction record
+
+    -- Movement details
+    reason TEXT, -- Reason from the referenced record or manual entry
+    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled')),
+
+    -- Audit trail
     performed_by UUID NOT NULL REFERENCES users(user_id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
--- =====================================================
--- 14. SALES TABLE
--- Logs transaction data for sold products
--- =====================================================
-
--- Sales table for transaction data of sold products
-CREATE TABLE IF NOT EXISTS sales (
-    sales_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    product_id UUID NOT NULL REFERENCES products(product_id),
-    selling_method VARCHAR(20) NOT NULL CHECK (selling_method IN ('boxed', 'weight')),
-    quantity DECIMAL(10,2) NOT NULL, -- Can be units for boxed or kg for weight
-    total_amount DECIMAL(12,2) NOT NULL,
-    date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial', 'overdue')),
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'bank_transfer', 'mobile_money')),
-    client_name VARCHAR(200),
-    client_email VARCHAR(255),
-    client_phone_number VARCHAR(20),
-    client_address TEXT
+    -- Constraints
+    CONSTRAINT chk_stock_movement_quantities CHECK (box_change != 0 OR kg_change != 0),
+    CONSTRAINT chk_movement_references CHECK (
+        (movement_type = 'damaged' AND damaged_id IS NOT NULL) OR
+        (movement_type = 'new_stock' AND stock_addition_id IS NOT NULL) OR
+        (movement_type = 'stock_correction' AND correction_id IS NOT NULL)
+    )
 );
 
 -- =====================================================
@@ -380,6 +620,18 @@ CREATE TABLE IF NOT EXISTS worker_permissions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(worker_id, permission_name)
 );
+
+-- Add worker permissions policy for products now that worker_permissions table exists
+CREATE POLICY products_worker_access ON products
+    FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM workers w
+            JOIN worker_permissions wp ON w.worker_id = wp.worker_id
+            WHERE w.worker_id = auth.uid()
+            AND wp.permission_name IN ('view_inventory', 'manage_inventory')
+        )
+    );
 
 -- =====================================================
 -- TRIGGERS AND FUNCTIONS
@@ -511,6 +763,21 @@ CREATE INDEX IF NOT EXISTS idx_files_file_type ON files(file_type);
 CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(folder_name);
 CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by);
 
+-- Sales table indexes
+CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
+CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date_time);
+CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
+CREATE INDEX IF NOT EXISTS idx_sales_performed_by ON sales(performed_by);
+CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
+CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
+
+-- Stock movements table indexes
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product_id ON stock_movements(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_performed_by ON stock_movements(performed_by);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);
+-- Index for related_sale_id removed as column no longer exists
+
 -- =====================================================
 -- TRIGGERS FOR FILES AND FOLDERS
 -- =====================================================
@@ -528,6 +795,273 @@ CREATE TRIGGER validate_file_data_trigger
     EXECUTE FUNCTION validate_file_data();
 
 -- =====================================================
+-- 18. SALES AUDIT TABLE
+-- Tracks all changes made to sales records for auditing
+-- =====================================================
+
+-- Sales Audit Trail Table
+CREATE TABLE IF NOT EXISTS sales_audit (
+    audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+    audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_update', 'deletion')),
+    boxes_change INTEGER DEFAULT 0,
+    kg_change DECIMAL(10,2) DEFAULT 0.00,
+    reason TEXT NOT NULL,
+    performed_by UUID NOT NULL REFERENCES users(user_id),
+
+    -- Approval workflow fields
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+    approved_by UUID REFERENCES users(user_id),
+    approval_timestamp TIMESTAMPTZ,
+    approval_reason TEXT,
+
+    -- Additional metadata for audit trail
+    old_values JSONB,
+    new_values JSONB,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_sales_audit_sale_id ON sales_audit(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sales_audit_timestamp ON sales_audit(timestamp);
+CREATE INDEX IF NOT EXISTS idx_sales_audit_audit_type ON sales_audit(audit_type);
+CREATE INDEX IF NOT EXISTS idx_sales_audit_performed_by ON sales_audit(performed_by);
+CREATE INDEX IF NOT EXISTS idx_sales_audit_approval_status ON sales_audit(approval_status);
+CREATE INDEX IF NOT EXISTS idx_sales_audit_approved_by ON sales_audit(approved_by);
+
+-- Create a trigger to automatically update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_sales_audit_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_sales_audit_updated_at
+    BEFORE UPDATE ON sales_audit
+    FOR EACH ROW
+    EXECUTE FUNCTION update_sales_audit_updated_at();
+
+-- Add comments for sales_audit table documentation
+COMMENT ON TABLE sales_audit IS 'Audit trail for all sales-related changes with approval workflow';
+COMMENT ON COLUMN sales_audit.audit_id IS 'Unique identifier for each audit record';
+COMMENT ON COLUMN sales_audit.timestamp IS 'When the audit event occurred';
+COMMENT ON COLUMN sales_audit.sale_id IS 'Reference to the sales record that was modified';
+COMMENT ON COLUMN sales_audit.audit_type IS 'Type of change: quantity_change, payment_update, or deletion';
+COMMENT ON COLUMN sales_audit.boxes_change IS 'Change in box quantity (can be negative)';
+COMMENT ON COLUMN sales_audit.kg_change IS 'Change in kg quantity (can be negative)';
+COMMENT ON COLUMN sales_audit.reason IS 'Description of why the change was made';
+COMMENT ON COLUMN sales_audit.performed_by IS 'User who performed the action';
+COMMENT ON COLUMN sales_audit.approval_status IS 'Approval status: pending, approved, or rejected';
+COMMENT ON COLUMN sales_audit.approved_by IS 'User who approved or rejected the audit record';
+COMMENT ON COLUMN sales_audit.approval_timestamp IS 'When the audit record was approved or rejected';
+COMMENT ON COLUMN sales_audit.approval_reason IS 'Reason for approval or rejection';
+COMMENT ON COLUMN sales_audit.old_values IS 'JSON object containing the old values before change';
+COMMENT ON COLUMN sales_audit.new_values IS 'JSON object containing the new values after change';
+
+-- =====================================================
+-- 19. TRANSACTIONS TABLE
+-- Comprehensive transaction management system for tracking all financial transactions
+-- =====================================================
+
+-- Transactions table for comprehensive transaction management
+CREATE TABLE IF NOT EXISTS transactions (
+    -- Primary key
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Reference to sales table
+    sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+
+    -- Transaction timestamp (copied from sales for quick access)
+    date_time TIMESTAMP WITH TIME ZONE NOT NULL,
+
+    -- Product information (denormalized for performance)
+    product_name VARCHAR(255) NOT NULL,
+
+    -- Client information (denormalized for performance)
+    client_name VARCHAR(255) NOT NULL,
+
+    -- Quantity information
+    boxes_quantity INTEGER DEFAULT 0 NOT NULL,
+    kg_quantity DECIMAL(10,3) DEFAULT 0 NOT NULL,
+
+    -- Financial information
+    total_amount DECIMAL(10,2) NOT NULL,
+
+    -- Payment status and method
+    payment_status VARCHAR(10) DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'partial')),
+    payment_method VARCHAR(15) CHECK (payment_method IN ('momo_pay', 'cash', 'bank_transfer')),
+
+    -- Deposit and reference information
+    deposit_id VARCHAR(100), -- External deposit/transaction ID
+    deposit_type VARCHAR(10) CHECK (deposit_type IN ('momo', 'bank', 'boss')),
+    account_number VARCHAR(50), -- Account number for bank transfers
+    reference VARCHAR(255), -- Additional reference information
+
+    -- Receipt/proof image
+    image_url TEXT, -- URL to receipt or proof image
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- User who created/updated the transaction
+    created_by UUID NOT NULL REFERENCES users(user_id),
+    updated_by UUID REFERENCES users(user_id)
+);
+
+-- Create indexes for performance optimization
+CREATE INDEX IF NOT EXISTS idx_transactions_sale_id ON transactions(sale_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_date_time ON transactions(date_time);
+CREATE INDEX IF NOT EXISTS idx_transactions_payment_status ON transactions(payment_status);
+CREATE INDEX IF NOT EXISTS idx_transactions_payment_method ON transactions(payment_method);
+CREATE INDEX IF NOT EXISTS idx_transactions_client_name ON transactions(client_name);
+CREATE INDEX IF NOT EXISTS idx_transactions_product_name ON transactions(product_name);
+CREATE INDEX IF NOT EXISTS idx_transactions_deposit_type ON transactions(deposit_type);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_by ON transactions(created_by);
+
+-- Create composite indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_transactions_status_method ON transactions(payment_status, payment_method);
+CREATE INDEX IF NOT EXISTS idx_transactions_date_status ON transactions(date_time, payment_status);
+
+-- Row Level Security (RLS) policies
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Business owners can view all transactions
+CREATE POLICY transactions_select_all ON transactions
+    FOR SELECT
+    USING (auth.uid() IS NOT NULL);
+
+-- Policy: Business owners can insert transactions
+CREATE POLICY transactions_insert_own ON transactions
+    FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Policy: Business owners can update their own transactions
+CREATE POLICY transactions_update_own ON transactions
+    FOR UPDATE
+    USING (auth.uid() IS NOT NULL)
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Policy: Business owners can delete their own transactions
+CREATE POLICY transactions_delete_own ON transactions
+    FOR DELETE
+    USING (auth.uid() IS NOT NULL);
+
+-- Create trigger to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_transactions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_transactions_updated_at
+    BEFORE UPDATE ON transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_transactions_updated_at();
+
+-- Create function to automatically create transaction from sale
+CREATE OR REPLACE FUNCTION create_transaction_from_sale()
+RETURNS TRIGGER AS $$
+DECLARE
+    product_name_val VARCHAR(255);
+BEGIN
+    -- Get product name from products table
+    SELECT name INTO product_name_val
+    FROM products
+    WHERE product_id = NEW.product_id;
+
+    -- Insert transaction record
+    INSERT INTO transactions (
+        sale_id,
+        date_time,
+        product_name,
+        client_name,
+        boxes_quantity,
+        kg_quantity,
+        total_amount,
+        payment_status,
+        payment_method,
+        created_by
+    ) VALUES (
+        NEW.id,
+        NEW.date_time,
+        COALESCE(product_name_val, 'Unknown Product'),
+        NEW.client_name,
+        NEW.boxes_quantity,
+        NEW.kg_quantity,
+        NEW.total_amount,
+        NEW.payment_status,
+        NEW.payment_method,
+        NEW.performed_by
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically create transaction when sale is created
+CREATE TRIGGER trigger_create_transaction_from_sale
+    AFTER INSERT ON sales
+    FOR EACH ROW
+    EXECUTE FUNCTION create_transaction_from_sale();
+
+-- Create function to update transaction when sale is updated
+CREATE OR REPLACE FUNCTION update_transaction_from_sale()
+RETURNS TRIGGER AS $$
+DECLARE
+    product_name_val VARCHAR(255);
+BEGIN
+    -- Get product name from products table
+    SELECT name INTO product_name_val
+    FROM products
+    WHERE product_id = NEW.product_id;
+
+    -- Update corresponding transaction record
+    UPDATE transactions SET
+        date_time = NEW.date_time,
+        product_name = COALESCE(product_name_val, 'Unknown Product'),
+        client_name = NEW.client_name,
+        boxes_quantity = NEW.boxes_quantity,
+        kg_quantity = NEW.kg_quantity,
+        total_amount = NEW.total_amount,
+        payment_status = NEW.payment_status,
+        payment_method = NEW.payment_method,
+        updated_by = NEW.performed_by,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE sale_id = NEW.id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically update transaction when sale is updated
+CREATE TRIGGER trigger_update_transaction_from_sale
+    AFTER UPDATE ON sales
+    FOR EACH ROW
+    EXECUTE FUNCTION update_transaction_from_sale();
+
+-- Add comments for documentation
+COMMENT ON TABLE transactions IS 'Comprehensive transaction management system for tracking all financial transactions';
+COMMENT ON COLUMN transactions.transaction_id IS 'Unique identifier for each transaction';
+COMMENT ON COLUMN transactions.sale_id IS 'Reference to the originating sale record';
+COMMENT ON COLUMN transactions.date_time IS 'Transaction timestamp copied from sales for performance';
+COMMENT ON COLUMN transactions.product_name IS 'Product name denormalized for quick access';
+COMMENT ON COLUMN transactions.client_name IS 'Client name denormalized for quick access';
+COMMENT ON COLUMN transactions.deposit_id IS 'External deposit or transaction reference ID';
+COMMENT ON COLUMN transactions.deposit_type IS 'Type of deposit: momo, bank, or boss';
+COMMENT ON COLUMN transactions.account_number IS 'Account number for bank transfers';
+COMMENT ON COLUMN transactions.reference IS 'Additional reference information';
+COMMENT ON COLUMN transactions.image_url IS 'URL to receipt or proof image';
+
+-- =====================================================
 -- END OF SCHEMA DEFINITION
--- Fish Selling Management System - 15 Tables Complete
+-- Fish Selling Management System - 19 Tables Complete
 -- =====================================================

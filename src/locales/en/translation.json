@@ -107,7 +107,186 @@
     "lowStock": "Low Stock",
     "critical": "Critical",
     "warning": "Warning",
-    "monitor": "Monitor"
+    "monitor": "Monitor",
+
+    "tabs": {
+      "inventory": "Inventory",
+      "addProduct": "Add Product",
+      "categories": "Categories"
+    },
+
+    "headers": {
+      "productInventory": "Product Inventory",
+      "manageProducts": "Manage fish products, stock levels, and pricing",
+      "addProductsStock": "Add Products & Stock",
+      "createNewProducts": "Create new products and manage stock additions",
+      "productCategories": "Product Categories",
+      "organizeProducts": "Organize your fish products into categories for better management"
+    },
+
+    "addProduct": {
+      "title": "Add New Fish Product",
+      "description": "Create a new fish product with pricing and inventory details",
+      "cardTitle": "Add New Fish Product",
+      "cardDescription": "Create and add a brand new fish product to your comprehensive inventory system with complete product details, pricing, and specifications",
+      "productNameLabel": "Product Name *",
+      "productNamePlaceholder": "e.g., Salmon, Tilapia, Tuna...",
+      "categoryLabel": "Category *",
+      "categoryPlaceholder": "Select category",
+      "boxQuantityLabel": "Boxed Quantity",
+      "kgQuantityLabel": "Weight Quantity (kg)",
+      "boxRatioLabel": "Box to Kg Ratio *",
+      "boxRatioPlaceholder": "e.g., 20 kg per box",
+      "costPriceBoxLabel": "Cost Price per Box",
+      "costPriceKgLabel": "Cost Price per Kg",
+      "sellingPriceBoxLabel": "Selling Price per Box",
+      "sellingPriceKgLabel": "Selling Price per Kg",
+      "lowStockLabel": "Low Stock Threshold",
+      "expiryDateLabel": "Expiry Date",
+      "deliveryDateLabel": "Delivery Date",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "addProduct": "Add Product",
+      "success": "Product created successfully!",
+      "error": "Failed to create product: ",
+      "validation": {
+        "nameRequired": "Product name is required",
+        "categoryRequired": "Category is required",
+        "boxRatioRequired": "Box to kg ratio is required",
+        "boxRatioMin": "Box to kg ratio must be greater than 0",
+        "lowStockRequired": "Low stock threshold is required",
+        "lowStockMin": "Low stock threshold must be greater than 0",
+        "sellingPriceBox": "Selling price per box must be higher than cost price per box",
+        "sellingPriceKg": "Selling price per kg must be higher than cost price per kg"
+      }
+    },
+
+    "addStock": {
+      "title": "Add Stock to Existing Product",
+      "description": "Increase inventory levels for existing fish products when new shipments arrive or stock is replenished from suppliers",
+      "cardTitle": "Add Stock to Existing Product",
+      "cardDescription": "Increase inventory levels for existing fish products when new shipments arrive or stock is replenished from suppliers",
+      "dialogTitle": "Add Stock to Product",
+      "dialogDescription": "Add new stock to an existing product. Use OCR to scan delivery documents for faster data entry",
+      "ocrMode": "OCR Mode",
+      "enable": "Enable",
+      "selectProduct": "Select Product *",
+      "boxes": "Boxes",
+      "weight": "Weight (kg)",
+      "deliveryDate": "Delivery Date *",
+      "expiryDate": "Expiry Date *",
+      "totalCost": "Total Cost",
+      "cancel": "Cancel",
+      "adding": "Adding...",
+      "addStock": "Add Stock",
+      "comingSoon": "Feature Coming Soon!"
+    },
+
+    "addDamaged": {
+      "title": "Record Damaged Products",
+      "description": "Document and record damaged, spoiled, or compromised fish products and automatically remove them from available sellable inventory",
+      "cardTitle": "Record Damaged Products",
+      "cardDescription": "Document and record damaged, spoiled, or compromised fish products and automatically remove them from available sellable inventory",
+      "dialogTitle": "Record Damaged Products",
+      "dialogDescription": "Document damaged products and remove them from available inventory",
+      "selectProduct": "Select Product *",
+      "damagedBoxes": "Damaged Boxes",
+      "damagedWeight": "Damaged Weight (kg)",
+      "damageReason": "Damage Reason *",
+      "damageReasonPlaceholder": "e.g., Spoiled, Damaged, Expired...",
+      "cancel": "Cancel",
+      "recording": "Recording...",
+      "addDamaged": "Add Damaged"
+    },
+
+    "stockCorrection": {
+      "title": "Stock Correction",
+      "description": "Adjust inventory quantities to correct discrepancies between system records and actual physical stock counts",
+      "cardTitle": "Stock Correction",
+      "cardDescription": "Adjust inventory quantities to correct discrepancies between system records and actual physical stock counts",
+      "dialogTitle": "Stock Correction",
+      "dialogDescription": "Adjust inventory quantities to match actual physical stock counts",
+      "selectProduct": "Select Product *",
+      "currentStock": "Current Stock:",
+      "actualBoxes": "Actual Boxes",
+      "actualWeight": "Actual Weight (kg)",
+      "correctionReason": "Reason for Correction *",
+      "correctionReasonPlaceholder": "e.g., Theft, Physical count discrepancy, System error...",
+      "cancel": "Cancel",
+      "applying": "Applying...",
+      "applyCorrection": "Apply Correction"
+    },
+
+    "addCategory": {
+      "title": "Add Product Category",
+      "description": "Create new product categories to organize your fish inventory for better management and classification",
+      "cardTitle": "Add Product Category",
+      "cardDescription": "Create new product categories to organize your fish inventory for better management and classification",
+      "dialogTitle": "Add New Category",
+      "dialogDescription": "Create a new product category to organize your fish inventory",
+      "categoryName": "Category Name *",
+      "categoryNamePlaceholder": "e.g., Premium Fish, Fresh Water Fish",
+      "description": "Description",
+      "descriptionPlaceholder": "Brief description of this category...",
+      "cancel": "Cancel",
+      "createCategory": "Create Category",
+      "success": "Category created successfully!",
+      "error": "Failed to create category",
+      "validation": {
+        "nameRequired": "Category name is required"
+      }
+    },
+
+    "categories": {
+      "title": "Categories",
+      "searchPlaceholder": "Search categories...",
+      "loading": "Loading categories...",
+      "errorLoading": "Error Loading Categories",
+      "noCategories": "No categories found",
+      "noCategoriesDescription": "No categories have been created yet. Start by adding your first category!",
+      "editCategory": "Edit Category",
+      "editDescription": "Update the category information",
+      "deleteCategory": "Delete Category",
+      "deleteConfirmation": "Are you sure you want to delete this category?",
+      "deleteWarning": "This action cannot be undone. This category will be permanently deleted.",
+      "editSuccess": "Category updated successfully!",
+      "editError": "Failed to update category",
+      "deleteSuccess": "Category deleted successfully!",
+      "deleteError": "Failed to delete category"
+    },
+
+    "views": {
+      "all": "All",
+      "lowStock": "Low Stock",
+      "damaged": "Damaged",
+      "expiry": "Expiry",
+      "stockAdjustment": "Stock Adjustment"
+    },
+
+    "table": {
+      "productName": "Product Name",
+      "category": "Category",
+      "boxes": "Boxes",
+      "kgStock": "KG Stock",
+      "boxRatio": "Box Ratio",
+      "pricing": "Pricing",
+      "cost": "Cost",
+      "profit": "Profit",
+      "actions": "Actions",
+      "edit": "Edit",
+      "delete": "Delete",
+      "uncategorized": "Uncategorized",
+      "perBox": "per box",
+      "perKg": "per kg"
+    },
+
+    "summary": {
+      "totalValue": "Total Value",
+      "totalCost": "Total Cost",
+      "totalProfit": "Total Profit",
+      "profitMargin": "Profit Margin",
+      "damagedValue": "Damaged Value"
+    }
   },
   "sales": {
     "title": "Sales",

@@ -28,7 +28,7 @@ export class FoldersService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    const endpoint = `/folders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/folders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return apiClient.get<FolderData[]>(endpoint);
   }
 
@@ -43,7 +43,7 @@ export class FoldersService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    const endpoint = `/folders/paginated${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/folders/paginated${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return apiClient.get<PaginatedResponse<FolderData>>(endpoint);
   }
 
@@ -51,14 +51,14 @@ export class FoldersService {
    * Get folder by ID
    */
   async getById(id: string): Promise<ApiResponse<FolderData>> {
-    return apiClient.get<FolderData>(`/folders/${id}`);
+    return apiClient.get<FolderData>(`/api/folders/${id}`);
   }
 
   /**
    * Create new folder
    */
   async create(folderData: CreateFolderData): Promise<ApiResponse<FolderData>> {
-    return apiClient.post<FolderData>('/folders', folderData);
+    return apiClient.post<FolderData>('/api/folders', folderData);
   }
 
   /**
@@ -72,7 +72,7 @@ export class FoldersService {
    * Delete folder
    */
   async delete(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/folders/${id}`);
+    return apiClient.delete<void>(`/api/folders/${id}`);
   }
 
   /**
@@ -87,7 +87,7 @@ export class FoldersService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    return apiClient.get<FolderData[]>(`/folders/search?${queryParams.toString()}`);
+    return apiClient.get<FolderData[]>(`/api/folders/search?${queryParams.toString()}`);
   }
 
   /**
@@ -98,14 +98,14 @@ export class FoldersService {
     total_size: number;
     last_modified: string;
   }>> {
-    return apiClient.get(`/folders/${id}/stats`);
+    return apiClient.get(`/api/folders/${id}/stats`);
   }
 
   /**
    * Duplicate folder
    */
   async duplicate(id: string, newName?: string): Promise<ApiResponse<FolderData>> {
-    return apiClient.post<FolderData>(`/folders/${id}/duplicate`, {
+    return apiClient.post<FolderData>(`/api/folders/${id}/duplicate`, {
       new_name: newName
     });
   }
@@ -123,14 +123,14 @@ export class FoldersService {
    * Get folders by color
    */
   async getByColor(color: string): Promise<ApiResponse<FolderData[]>> {
-    return apiClient.get<FolderData[]>(`/folders/by-color/${color}`);
+    return apiClient.get<FolderData[]>(`/api/folders/by-color/${color}`);
   }
 
   /**
    * Get recently created folders
    */
   async getRecent(limit: number = 10): Promise<ApiResponse<FolderData[]>> {
-    return apiClient.get<FolderData[]>(`/folders/recent?limit=${limit}`);
+    return apiClient.get<FolderData[]>(`/api/folders/recent?limit=${limit}`);
   }
 
   /**
@@ -140,14 +140,14 @@ export class FoldersService {
     deleted: string[];
     failed: Array<{ id: string; error: string }>;
   }>> {
-    return apiClient.post('/folders/bulk-delete', { ids });
+    return apiClient.post('/api/folders/bulk-delete', { ids });
   }
 
   /**
    * Export folder data
    */
   async export(id: string, format: 'json' | 'csv' = 'json'): Promise<ApiResponse<any>> {
-    return apiClient.get(`/folders/${id}/export?format=${format}`);
+    return apiClient.get(`/api/folders/${id}/export?format=${format}`);
   }
 
   /**
@@ -160,7 +160,7 @@ export class FoldersService {
       permission: 'read' | 'write' | 'admin';
     }>;
   }>> {
-    return apiClient.get(`/folders/${id}/permissions`);
+    return apiClient.get(`/api/folders/${id}/permissions`);
   }
 
   /**

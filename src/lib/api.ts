@@ -8,9 +8,21 @@
 export * from './api';
 
 // Legacy API configuration - kept for compatibility
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://your-production-api.com/api'
-  : 'http://localhost:5004/api';
+const getApiBaseUrl = (): string => {
+  const apiMode = import.meta.env.VITE_API_MODE || 'workers';
+
+  if (apiMode === 'workers') {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://aqua-manage-fish-api.your-subdomain.workers.dev'
+      : 'http://localhost:8787';
+  } else {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://your-production-api.com/api'
+      : 'http://localhost:5004/api';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Generic API request function with error handling
@@ -54,10 +66,27 @@ async function apiRequest<T>(
       headers,
     });
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (jsonError) {
+      // If response is not JSON, create a basic error response
+      result = {
+        success: false,
+        error: `Server returned non-JSON response: ${response.statusText}`,
+      };
+    }
 
     if (!response.ok) {
-      throw new Error(result.message || `HTTP error! status: ${response.status}`);
+      // For 409 Conflict errors, return the structured error response
+      if (response.status === 409) {
+        return {
+          success: false,
+          error: result.error || result.message || `HTTP error! status: ${response.status}`,
+          status: response.status,
+        };
+      }
+      throw new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
     }
 
     return result;
@@ -77,13 +106,13 @@ export const categoriesApi = {
   /**
    * Get all product categories
    */
-  getAll: () => apiRequest<any[]>('/categories'),
+  getAll: () => apiRequest<any[]>('/api/categories'),
 
   /**
    * Create a new category
    */
   create: (data: { name: string; description?: string }) =>
-    apiRequest('/categories', {
+    apiRequest('/api/categories', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -92,7 +121,7 @@ export const categoriesApi = {
    * Update an existing category
    */
   update: (id: string, data: { name: string; description?: string }) =>
-    apiRequest(`/categories/${id}`, {
+    apiRequest(`/api/categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -101,7 +130,7 @@ export const categoriesApi = {
    * Delete a category
    */
   delete: (id: string) =>
-    apiRequest(`/categories/${id}`, {
+    apiRequest(`/api/categories/${id}`, {
       method: 'DELETE',
     }),
 };
@@ -113,13 +142,13 @@ export const productsApi = {
   /**
    * Get all products
    */
-  getAll: () => apiRequest<any[]>('/products'),
+  getAll: () => apiRequest<any[]>('/api/products'),
 
   /**
    * Create a new product
    */
   create: (data: any) =>
-    apiRequest('/products', {
+    apiRequest('/api/products', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -128,17 +157,204 @@ export const productsApi = {
    * Update an existing product
    */
   update: (id: string, data: any) =>
-    apiRequest(`/products/${id}`, {
+    apiRequest(`/api/products/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   /**
-   * Delete a product
+   * Delete a product (with cascading delete of all related records)
    */
   delete: (id: string) =>
-    apiRequest(`/products/${id}`, {
+    apiRequest(`/api/products/${id}`, {
       method: 'DELETE',
+    }),
+
+  /**
+   * Record damaged product
+   */
+  recordDamage: (id: string, data: {
+    damaged_boxes: number;
+    damaged_kg: number;
+    damaged_reason: string;
+    description?: string;
+  }) =>
+    apiRequest(`/api/products/${id}/damage`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Get all damaged products
+   */
+  getDamagedProducts: () => apiRequest<any[]>('/api/products/damaged'),
+};
+
+/**
+ * Stock Movement API endpoints
+ */
+export const stockMovementsApi = {
+  /**
+   * Get all stock movements with filtering
+   */
+  getAll: (params?: {
+    movement_type?: string;
+    product_id?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.movement_type) searchParams.append('movement_type', params.movement_type);
+    if (params?.product_id) searchParams.append('product_id', params.product_id);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.offset) searchParams.append('offset', params.offset.toString());
+
+    return apiRequest<any[]>(`/api/stock-movements?${searchParams.toString()}`);
+  },
+
+  /**
+   * Get stock movement by ID
+   */
+  getById: (id: string) => apiRequest<any>(`/api/stock-movements/${id}`),
+
+  /**
+   * Get stock movements for a specific product
+   */
+  getByProduct: (productId: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiRequest<any[]>(`/api/stock-movements/product/${productId}${params}`);
+  },
+
+  /**
+   * Create a new stock movement
+   */
+  create: (data: {
+    product_id: string;
+    movement_type: 'damaged' | 'new_stock' | 'stock_correction';
+    box_change: number;
+    kg_change: number;
+    reason?: string;
+    damaged_id?: string;
+    stock_addition_id?: string;
+    correction_id?: string;
+  }) =>
+    apiRequest(`/api/stock-movements`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// =====================================================
+// STOCK CORRECTIONS API
+// =====================================================
+
+export const stockCorrections = {
+  /**
+   * Get all stock corrections with filtering
+   */
+  getAll: (params?: {
+    product_id?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.product_id) searchParams.append('product_id', params.product_id);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.offset) searchParams.append('offset', params.offset.toString());
+    if (params?.start_date) searchParams.append('start_date', params.start_date);
+    if (params?.end_date) searchParams.append('end_date', params.end_date);
+
+    return apiRequest<any[]>(`/api/stock-corrections?${searchParams.toString()}`);
+  },
+
+  /**
+   * Get stock correction by ID
+   */
+  getById: (id: string) => apiRequest<any>(`/api/stock-corrections/${id}`),
+
+  /**
+   * Get stock corrections for a specific product
+   */
+  getByProduct: (productId: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiRequest<any[]>(`/api/stock-corrections/product/${productId}${params}`);
+  },
+
+  /**
+   * Create a new stock correction
+   */
+  create: (data: {
+    product_id: string;
+    box_adjustment: number;
+    kg_adjustment: number;
+    correction_reason: string;
+    correction_date?: string;
+  }) =>
+    apiRequest(`/api/stock-corrections`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// =====================================================
+// STOCK ADDITIONS API
+// =====================================================
+
+export const stockAdditions = {
+  /**
+   * Get all stock additions with filtering
+   */
+  getAll: (params?: {
+    product_id?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.product_id) searchParams.append('product_id', params.product_id);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.offset) searchParams.append('offset', params.offset.toString());
+    if (params?.start_date) searchParams.append('start_date', params.start_date);
+    if (params?.end_date) searchParams.append('end_date', params.end_date);
+
+    return apiRequest<any[]>(`/api/stock-additions?${searchParams.toString()}`);
+  },
+
+  /**
+   * Get stock addition by ID
+   */
+  getById: (id: string) => apiRequest<any>(`/api/stock-additions/${id}`),
+
+  /**
+   * Get stock additions for a specific product
+   */
+  getByProduct: (productId: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiRequest<any[]>(`/api/stock-additions/product/${productId}${params}`);
+  },
+
+  /**
+   * Create a new stock addition
+   */
+  create: (data: {
+    product_id: string;
+    boxes_added: number;
+    kg_added: number;
+    total_cost: number;
+    delivery_date?: string;
+  }) =>
+    apiRequest(`/api/products/${data.product_id}/stock`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };
 
@@ -218,13 +434,13 @@ export const contactsApi = {
   /**
    * Get contact by ID
    */
-  getById: (id: string) => apiRequest<{ data: Contact }>(`/contacts/${id}`),
+  getById: (id: string) => apiRequest<{ data: Contact }>(`/api/contacts/${id}`),
 
   /**
    * Create a new contact
    */
   create: (data: CreateContactInput) =>
-    apiRequest<{ data: Contact }>('/contacts', {
+    apiRequest<{ data: Contact }>('/api/contacts', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -233,7 +449,7 @@ export const contactsApi = {
    * Update an existing contact
    */
   update: (id: string, data: UpdateContactInput) =>
-    apiRequest<{ data: Contact }>(`/contacts/${id}`, {
+    apiRequest<{ data: Contact }>(`/api/contacts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -242,7 +458,7 @@ export const contactsApi = {
    * Delete a contact
    */
   delete: (id: string) =>
-    apiRequest<{ data: Contact }>(`/contacts/${id}`, {
+    apiRequest<{ data: Contact }>(`/api/contacts/${id}`, {
       method: 'DELETE',
     }),
 
@@ -300,13 +516,13 @@ export const expenseCategoriesApi = {
   /**
    * Get all expense categories
    */
-  getAll: () => apiRequest<any[]>('/expenses/categories'),
+  getAll: () => apiRequest<any[]>('/api/expenses/categories'),
 
   /**
    * Create a new expense category
    */
   create: (data: { category_name: string; description?: string; budget?: number }) =>
-    apiRequest('/expenses/categories', {
+    apiRequest('/api/expenses/categories', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -315,7 +531,7 @@ export const expenseCategoriesApi = {
    * Update an existing expense category
    */
   update: (id: string, data: { category_name: string; description?: string; budget?: number }) =>
-    apiRequest(`/expenses/categories/${id}`, {
+    apiRequest(`/api/expenses/categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -324,7 +540,7 @@ export const expenseCategoriesApi = {
    * Delete an expense category
    */
   delete: (id: string) =>
-    apiRequest(`/expenses/categories/${id}`, {
+    apiRequest(`/api/expenses/categories/${id}`, {
       method: 'DELETE',
     }),
 };
@@ -336,7 +552,7 @@ export const expensesApi = {
   /**
    * Get all expenses
    */
-  getAll: () => apiRequest<any[]>('/expenses'),
+  getAll: () => apiRequest<any[]>('/api/expenses'),
 
   /**
    * Create a new expense
@@ -349,7 +565,7 @@ export const expensesApi = {
     status?: string;
     receipt_url?: string | null;
   }) =>
-    apiRequest('/expenses', {
+    apiRequest('/api/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -383,7 +599,7 @@ export const expensesApi = {
       formData.append('file', file);
     }
 
-    return apiRequest('/expenses', {
+    return apiRequest('/api/expenses', {
       method: 'POST',
       body: formData,
     });
@@ -400,7 +616,7 @@ export const expensesApi = {
     status?: string;
     receipt_url?: string | null;
   }) =>
-    apiRequest(`/expenses/${id}`, {
+    apiRequest(`/api/expenses/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -409,7 +625,7 @@ export const expensesApi = {
    * Delete an expense
    */
   delete: (id: string) =>
-    apiRequest(`/expenses/${id}`, {
+    apiRequest(`/api/expenses/${id}`, {
       method: 'DELETE',
     }),
 };
@@ -421,18 +637,18 @@ export const foldersApi = {
   /**
    * Get all folders for the authenticated user
    */
-  getAll: () => apiRequest<FolderData[]>('/folders'),
+  getAll: () => apiRequest<FolderData[]>('/api/folders'),
 
   /**
    * Get a specific folder by ID
    */
-  getById: (id: string) => apiRequest<FolderData>(`/folders/${id}`),
+  getById: (id: string) => apiRequest<FolderData>(`/api/folders/${id}`),
 
   /**
    * Create a new folder
    */
   create: (data: CreateFolderData) =>
-    apiRequest<FolderData>('/folders', {
+    apiRequest<FolderData>('/api/folders', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -441,7 +657,7 @@ export const foldersApi = {
    * Update an existing folder
    */
   update: (id: string, data: UpdateFolderData) =>
-    apiRequest<FolderData>(`/folders/${id}`, {
+    apiRequest<FolderData>(`/api/folders/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -450,7 +666,7 @@ export const foldersApi = {
    * Delete a folder (only if it's empty)
    */
   delete: (id: string) =>
-    apiRequest<{ folder_id: string }>(`/folders/${id}`, {
+    apiRequest<{ folder_id: string }>(`/api/folders/${id}`, {
       method: 'DELETE',
     }),
 };
@@ -523,13 +739,13 @@ export const filesApi = {
    * Get files by folder ID
    */
   getByFolder: (folderId: string) =>
-    apiRequest<FileData[]>(`/files?folder_id=${folderId}`),
+    apiRequest<FileData[]>(`/api/files?folder_id=${folderId}`),
 
   /**
    * Get a specific file by ID
    */
   getById: (id: string) =>
-    apiRequest<FileData>(`/files/${id}`),
+    apiRequest<FileData>(`/api/files/${id}`),
 
   /**
    * Upload a single file
@@ -542,7 +758,7 @@ export const filesApi = {
       formData.append('description', description);
     }
 
-    return apiRequest<FileUploadResponse>('/files/upload', {
+    return apiRequest<FileUploadResponse>('/api/files/upload', {
       method: 'POST',
       body: formData,
     });
@@ -561,7 +777,7 @@ export const filesApi = {
       formData.append('description', description);
     }
 
-    return apiRequest<MultipleFileUploadResponse>('/files/upload-multiple', {
+    return apiRequest<MultipleFileUploadResponse>('/api/files/upload-multiple', {
       method: 'POST',
       body: formData,
     });
@@ -571,7 +787,7 @@ export const filesApi = {
    * Delete a file
    */
   delete: (id: string) =>
-    apiRequest<{ message: string }>(`/files/${id}`, {
+    apiRequest<{ message: string }>(`/api/files/${id}`, {
       method: 'DELETE',
     }),
 };

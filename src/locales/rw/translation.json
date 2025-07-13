@@ -131,7 +131,186 @@
     "lowStock": "Bike",
     "critical": "Bikenewe cyane",
     "warning": "Iburira",
-    "monitor": "Genzura"
+    "monitor": "Genzura",
+
+    "tabs": {
+      "inventory": "Ibicuruzwa",
+      "addProduct": "Ongeraho Ibicuruzwa",
+      "categories": "Ibyiciro"
+    },
+
+    "headers": {
+      "productInventory": "Ibicuruzwa by'Ubucuruzi",
+      "manageProducts": "Gucunga amafi, ibicuruzwa, n'ibiciro",
+      "addProductsStock": "Ongeraho Ibicuruzwa n'Ububiko",
+      "createNewProducts": "Kurema ibicuruzwa bishya no gucunga ububiko",
+      "productCategories": "Ibyiciro by'Ibicuruzwa",
+      "organizeProducts": "Gutegura amafi yawe mu byiciro kugira ngo uyacunge neza"
+    },
+
+    "addProduct": {
+      "title": "Ongeraho Igicuruzwa Gishya cy'Ifi",
+      "description": "Kurema igicuruzwa gishya cy'ifi hamwe n'ibiciro n'amakuru y'ububiko",
+      "cardTitle": "Ongeraho Igicuruzwa Gishya cy'Ifi",
+      "cardDescription": "Kurema no kongeraho igicuruzwa gishya cy'ifi muri sisitemu yawe y'ububiko hamwe n'amakuru yuzuye, ibiciro, n'ibiranga",
+      "productNameLabel": "Izina ry'Igicuruzwa *",
+      "productNamePlaceholder": "urugero: Salmon, Tilapia, Tuna...",
+      "categoryLabel": "Icyiciro *",
+      "categoryPlaceholder": "Hitamo icyiciro",
+      "boxQuantityLabel": "Umubare w'Amasanduku",
+      "kgQuantityLabel": "Uburemere (kg)",
+      "boxRatioLabel": "Igipimo cy'Isanduku ku Kilo *",
+      "boxRatioPlaceholder": "urugero: 20 kg mu isanduku rimwe",
+      "costPriceBoxLabel": "Igiciro cy'Isanduku (Ikiguzi)",
+      "costPriceKgLabel": "Igiciro cya Kilo (Ikiguzi)",
+      "sellingPriceBoxLabel": "Igiciro cy'Isanduku (Igurisha)",
+      "sellingPriceKgLabel": "Igiciro cya Kilo (Igurisha)",
+      "lowStockLabel": "Urugero rw'Ububiko Buke",
+      "expiryDateLabel": "Itariki Irangira",
+      "deliveryDateLabel": "Itariki y'Igihe Cyatanzwe",
+      "cancel": "Hagarika",
+      "creating": "Birakurema...",
+      "addProduct": "Ongeraho Igicuruzwa",
+      "success": "Igicuruzwa cyaremwe neza!",
+      "error": "Kurema igicuruzwa ntibyakunze: ",
+      "validation": {
+        "nameRequired": "Izina ry'igicuruzwa rirakenewe",
+        "categoryRequired": "Icyiciro kirakenewe",
+        "boxRatioRequired": "Igipimo cy'isanduku ku kilo kirakenewe",
+        "boxRatioMin": "Igipimo cy'isanduku ku kilo kigomba kuba kirenze 0",
+        "lowStockRequired": "Urugero rw'ububiko buke rurakenewe",
+        "lowStockMin": "Urugero rw'ububiko buke rugomba kuba rurenze 0",
+        "sellingPriceBox": "Igiciro cy'igurisha cy'isanduku kigomba kuba kirenze igiciro cy'ikiguzi",
+        "sellingPriceKg": "Igiciro cy'igurisha cya kilo kigomba kuba kirenze igiciro cy'ikiguzi"
+      }
+    },
+
+    "addStock": {
+      "title": "Ongeraho Ububiko ku Gicuruzwa Gisanzwe",
+      "description": "Kongera ububiko ku bicuruzwa by'amafi igihe ibicuruzwa bishya bigeze cyangwa ububiko bwongerewe n'abatanga",
+      "cardTitle": "Ongeraho Ububiko ku Gicuruzwa Gisanzwe",
+      "cardDescription": "Kongera ububiko ku bicuruzwa by'amafi igihe ibicuruzwa bishya bigeze cyangwa ububiko bwongerewe n'abatanga",
+      "dialogTitle": "Ongeraho Ububiko ku Gicuruzwa",
+      "dialogDescription": "Ongeraho ububiko bushya ku gicuruzwa gisanzwe. Koresha OCR kugira ngo usikane inyandiko z'igihe bitanzwe kugira ngo wandike amakuru vuba",
+      "ocrMode": "Uburyo bwa OCR",
+      "enable": "Koresha",
+      "selectProduct": "Hitamo Igicuruzwa *",
+      "boxes": "Amasanduku",
+      "weight": "Uburemere (kg)",
+      "deliveryDate": "Itariki y'Igihe Cyatanzwe *",
+      "expiryDate": "Itariki Irangira *",
+      "totalCost": "Ikiguzi Cyose",
+      "cancel": "Hagarika",
+      "adding": "Birakongera...",
+      "addStock": "Ongeraho Ububiko",
+      "comingSoon": "Igihe Giza!"
+    },
+
+    "addDamaged": {
+      "title": "Andika Ibicuruzwa Byangiritse",
+      "description": "Kwandika no gufata ibicuruzwa byangiritse, byaribwe, cyangwa byangiritse kandi bikuraho mu bubiko bw'ibicuruzwa bishobora kugurisha",
+      "cardTitle": "Andika Ibicuruzwa Byangiritse",
+      "cardDescription": "Kwandika no gufata ibicuruzwa byangiritse, byaribwe, cyangwa byangiritse kandi bikuraho mu bubiko bw'ibicuruzwa bishobora kugurisha",
+      "dialogTitle": "Andika Ibicuruzwa Byangiritse",
+      "dialogDescription": "Andika ibicuruzwa byangiritse kandi ubikuraho mu bubiko bw'ibicuruzwa bishobora kugurisha",
+      "selectProduct": "Hitamo Igicuruzwa *",
+      "damagedBoxes": "Amasanduku Yangiritse",
+      "damagedWeight": "Uburemere Bwangiritse (kg)",
+      "damageReason": "Impamvu y'Ibyangiritse *",
+      "damageReasonPlaceholder": "urugero: Byaribwe, Byangiritse, Byapfuye...",
+      "cancel": "Hagarika",
+      "recording": "Birandikwa...",
+      "addDamaged": "Ongeraho Byangiritse"
+    },
+
+    "stockCorrection": {
+      "title": "Kosora Ububiko",
+      "description": "Guhindura umubare w'ububiko kugira ngo uhuze n'amakuru y'ububiko bw'ukuri bw'ibintu",
+      "cardTitle": "Kosora Ububiko",
+      "cardDescription": "Guhindura umubare w'ububiko kugira ngo uhuze n'amakuru y'ububiko bw'ukuri bw'ibintu",
+      "dialogTitle": "Kosora Ububiko",
+      "dialogDescription": "Guhindura umubare w'ububiko kugira ngo uhuze n'amakuru y'ububiko bw'ukuri bw'ibintu",
+      "selectProduct": "Hitamo Igicuruzwa *",
+      "currentStock": "Ububiko bw'Ubu:",
+      "actualBoxes": "Amasanduku y'Ukuri",
+      "actualWeight": "Uburemere bw'Ukuri (kg)",
+      "correctionReason": "Impamvu yo Kosora *",
+      "correctionReasonPlaceholder": "urugero: Ubujura, Itandukaniro ry'umubare w'ibintu, Ikosa rya sisitemu...",
+      "cancel": "Hagarika",
+      "applying": "Birakoresha...",
+      "applyCorrection": "Koresha Ikosora"
+    },
+
+    "addCategory": {
+      "title": "Ongeraho Icyiciro cy'Igicuruzwa",
+      "description": "Kurema ibyiciro bishya by'ibicuruzwa kugira ngo utegure ububiko bwawe bw'amafi kugira ngo uyacunge neza no kuyashyira mu byiciro",
+      "cardTitle": "Ongeraho Icyiciro cy'Igicuruzwa",
+      "cardDescription": "Kurema ibyiciro bishya by'ibicuruzwa kugira ngo utegure ububiko bwawe bw'amafi kugira ngo uyacunge neza no kuyashyira mu byiciro",
+      "dialogTitle": "Ongeraho Icyiciro Gishya",
+      "dialogDescription": "Kurema icyiciro gishya cy'igicuruzwa kugira ngo utegure ububiko bwawe bw'amafi",
+      "categoryName": "Izina ry'Icyiciro *",
+      "categoryNamePlaceholder": "urugero: Amafi y'Ubwiza, Amafi y'Amazi Meza",
+      "description": "Ibisobanuro",
+      "descriptionPlaceholder": "Ibisobanuro bigufi by'iki cyiciro...",
+      "cancel": "Hagarika",
+      "createCategory": "Kurema Icyiciro",
+      "success": "Icyiciro cyaremwe neza!",
+      "error": "Kurema icyiciro ntibyakunze",
+      "validation": {
+        "nameRequired": "Izina ry'icyiciro rirakenewe"
+      }
+    },
+
+    "categories": {
+      "title": "Ibyiciro",
+      "searchPlaceholder": "Shakisha ibyiciro...",
+      "loading": "Ibyiciro biratangura...",
+      "errorLoading": "Ikosa mu gutangura Ibyiciro",
+      "noCategories": "Nta byiciro bihari",
+      "noCategoriesDescription": "Ntabwo hari byiciro byaremwe. Tangira wongere icyiciro cya mbere!",
+      "editCategory": "Hindura Icyiciro",
+      "editDescription": "Kuvugurura amakuru y'icyiciro",
+      "deleteCategory": "Siba Icyiciro",
+      "deleteConfirmation": "Uremeza ko ushaka gusiba iki cyiciro?",
+      "deleteWarning": "Iki gikorwa ntikishobora gusubizwa inyuma. Iki cyiciro kizasibwa burundu.",
+      "editSuccess": "Icyiciro cyavuguruwe neza!",
+      "editError": "Kuvugurura icyiciro ntibyakunze",
+      "deleteSuccess": "Icyiciro cyasibwe neza!",
+      "deleteError": "Gusiba icyiciro ntibyakunze"
+    },
+
+    "views": {
+      "all": "Byose",
+      "lowStock": "Ububiko Buke",
+      "damaged": "Byangiritse",
+      "expiry": "Birangira",
+      "stockAdjustment": "Guhindura Ububiko"
+    },
+
+    "table": {
+      "productName": "Izina ry'Igicuruzwa",
+      "category": "Icyiciro",
+      "boxes": "Amasanduku",
+      "kgStock": "Ububiko bwa KG",
+      "boxRatio": "Igipimo cy'Isanduku",
+      "pricing": "Ibiciro",
+      "cost": "Ikiguzi",
+      "profit": "Inyungu",
+      "actions": "Ibikorwa",
+      "edit": "Hindura",
+      "delete": "Siba",
+      "uncategorized": "Nta cyiciro",
+      "perBox": "ku isanduku",
+      "perKg": "kuri kilo"
+    },
+
+    "summary": {
+      "totalValue": "Agaciro kose",
+      "totalCost": "Ikiguzi cyose",
+      "totalProfit": "Inyungu zose",
+      "profitMargin": "Igipimo cy'Inyungu",
+      "damagedValue": "Agaciro k'Ibyangiritse"
+    }
   },
   "sales": {
     "title": "Igurisha",

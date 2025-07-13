@@ -184,10 +184,32 @@ export interface ProductData {
   product_id: string;
   name: string;
   category_id: string;
-  price: number;
-  stock_quantity: number;
-  description?: string;
-  image_url?: string;
+
+  // Inventory fields for box/kg management
+  quantity_box: number; // Number of full boxes in stock
+  box_to_kg_ratio: number; // How many kg per box (e.g., 20kg per box)
+  quantity_kg: number; // Loose kg stock
+
+  // Cost pricing fields
+  cost_per_box: number; // Cost price per box for calculating profit margins
+  cost_per_kg: number; // Cost price per kilogram for calculating profit margins
+
+  // Selling pricing fields
+  price_per_box: number; // Selling price per box
+  price_per_kg: number; // Selling price per kg
+
+  // Calculated profit fields
+  profit_per_box: number; // Profit margin per box (selling price - cost price)
+  profit_per_kg: number; // Profit margin per kilogram (selling price - cost price)
+
+  // Stock management
+  boxed_low_stock_threshold: number; // Low stock threshold for boxed quantity alerts
+
+  // Product lifecycle tracking
+  expiry_date?: string;
+  days_left?: number; // Days remaining until expiry (calculated)
+
+  // Timestamps
   created_at: string;
   updated_at: string;
 }
@@ -195,10 +217,25 @@ export interface ProductData {
 export interface CreateProductData {
   name: string;
   category_id: string;
-  price: number;
-  stock_quantity: number;
-  description?: string;
-  image_url?: string;
+
+  // Inventory fields for box/kg management
+  quantity_box?: number; // Number of full boxes in stock
+  box_to_kg_ratio: number; // How many kg per box (e.g., 20kg per box)
+  quantity_kg?: number; // Loose kg stock
+
+  // Cost pricing fields
+  cost_per_box: number; // Cost price per box for calculating profit margins
+  cost_per_kg: number; // Cost price per kilogram for calculating profit margins
+
+  // Selling pricing fields
+  price_per_box: number; // Selling price per box
+  price_per_kg: number; // Selling price per kg
+
+  // Stock management
+  boxed_low_stock_threshold?: number; // Low stock threshold for boxed quantity alerts
+
+  // Product lifecycle tracking
+  expiry_date?: string;
 }
 
 // =====================================================

@@ -58,10 +58,10 @@ const Settings: React.FC = () => {
   useEffect(() => {
     if (profile) {
       setUserDetails({
-        businessName: profile.business_name || "",
-        ownerName: profile.owner_name || "",
-        email: profile.email_address || "",
-        phone: profile.phone_number || ""
+        businessName: profile.businessName || "",
+        ownerName: profile.ownerName || "",
+        email: profile.email || "",
+        phone: profile.phoneNumber || ""
       });
     }
   }, [profile]);

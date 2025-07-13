@@ -29,14 +29,14 @@ export class FilesService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    return apiClient.get<FileData[]>(`/files?${queryParams.toString()}`);
+    return apiClient.get<FileData[]>(`/api/files?${queryParams.toString()}`);
   }
 
   /**
    * Get file by ID
    */
   async getById(id: string): Promise<ApiResponse<FileData>> {
-    return apiClient.get<FileData>(`/files/${id}`);
+    return apiClient.get<FileData>(`/api/files/${id}`);
   }
 
   /**
@@ -78,14 +78,14 @@ export class FilesService {
       formData.append('description', description);
     }
 
-    return apiClient.post<MultipleFileUploadResponse>('/files/upload-multiple', formData);
+    return apiClient.post<MultipleFileUploadResponse>('/api/files/upload-multiple', formData);
   }
 
   /**
    * Delete file
    */
   async delete(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/files/${id}`);
+    return apiClient.delete<void>(`/api/files/${id}`);
   }
 
   /**
@@ -123,7 +123,7 @@ export class FilesService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    return apiClient.get<FileData[]>(`/files/search?${queryParams.toString()}`);
+    return apiClient.get<FileData[]>(`/api/files/search?${queryParams.toString()}`);
   }
 
   /**
@@ -141,14 +141,14 @@ export class FilesService {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
     
-    return apiClient.get<FileData[]>(`/files/by-type?${queryParams.toString()}`);
+    return apiClient.get<FileData[]>(`/api/files/by-type?${queryParams.toString()}`);
   }
 
   /**
    * Get recent files
    */
   async getRecent(limit: number = 10): Promise<ApiResponse<FileData[]>> {
-    return apiClient.get<FileData[]>(`/files/recent?limit=${limit}`);
+    return apiClient.get<FileData[]>(`/api/files/recent?limit=${limit}`);
   }
 
   /**
@@ -164,7 +164,7 @@ export class FilesService {
    * Copy file to another folder
    */
   async copy(id: string, targetFolderId: string, newName?: string): Promise<ApiResponse<FileData>> {
-    return apiClient.post<FileData>(`/files/${id}/copy`, {
+    return apiClient.post<FileData>(`/api/files/${id}/copy`, {
       folder_id: targetFolderId,
       new_name: newName
     });
@@ -177,14 +177,14 @@ export class FilesService {
     deleted: string[];
     failed: Array<{ id: string; error: string }>;
   }>> {
-    return apiClient.post('/files/bulk-delete', { ids });
+    return apiClient.post('/api/files/bulk-delete', { ids });
   }
 
   /**
    * Get file download URL
    */
   async getDownloadUrl(id: string): Promise<ApiResponse<{ download_url: string; expires_at: string }>> {
-    return apiClient.get(`/files/${id}/download-url`);
+    return apiClient.get(`/api/files/${id}/download-url`);
   }
 
   /**
@@ -193,7 +193,7 @@ export class FilesService {
   async generateThumbnail(id: string, size: 'small' | 'medium' | 'large' = 'medium'): Promise<ApiResponse<{
     thumbnail_url: string;
   }>> {
-    return apiClient.post(`/files/${id}/thumbnail`, { size });
+    return apiClient.post(`/api/files/${id}/thumbnail`, { size });
   }
 
   /**
@@ -205,7 +205,7 @@ export class FilesService {
     by_type: Record<string, number>;
     recent_uploads: number;
   }>> {
-    return apiClient.get('/files/stats');
+    return apiClient.get('/api/files/stats');
   }
 
   /**
@@ -226,14 +226,14 @@ export class FilesService {
     share_url: string;
     expires_at?: string;
   }>> {
-    return apiClient.post(`/files/${id}/share`, options);
+    return apiClient.post(`/api/files/${id}/share`, options);
   }
 
   /**
    * Revoke file sharing link
    */
   async revokeShareLink(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete(`/files/${id}/share`);
+    return apiClient.delete(`/api/files/${id}/share`);
   }
 }
 

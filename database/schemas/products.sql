@@ -3,71 +3,81 @@
 -- Tracks fish inventory, including pricing, damage, and expiry
 -- =====================================================
 
--- Products table for fish inventory management
+-- Products table for fish inventory management with box/kg support
 CREATE TABLE IF NOT EXISTS products (
     product_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    sku VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     category_id UUID NOT NULL REFERENCES product_categories(category_id),
-    quantity INTEGER DEFAULT 0,
-    selling_type VARCHAR(20) NOT NULL CHECK (selling_type IN ('boxed', 'weight', 'both')),
-    price DECIMAL(10,2) NOT NULL,
-    cost_price DECIMAL(10,2) NOT NULL,
-    profit DECIMAL(10,2) GENERATED ALWAYS AS (price - cost_price) STORED,
-    supplier VARCHAR(200),
-    low_stock_threshold INTEGER DEFAULT 10,
-    damaged_reason TEXT,
-    damaged_date DATE,
-    loss_value DECIMAL(10,2) DEFAULT 0,
-    approval_status VARCHAR(20) DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
-    reported_by UUID REFERENCES users(user_id),
+
+    -- Inventory fields for box/kg management
+    quantity_box INTEGER DEFAULT 0 NOT NULL, -- Number of full boxes in stock (renamed from boxed_quantity)
+    box_to_kg_ratio DECIMAL(10,2) DEFAULT 20 NOT NULL, -- How many kg per box (e.g., 20kg per box)
+    quantity_kg DECIMAL(10,2) DEFAULT 0 NOT NULL, -- Loose kg stock (renamed from kg_quantity)
+
+    -- Cost pricing fields
+    cost_per_box DECIMAL(10,2) NOT NULL, -- Cost price per box for calculating profit margins
+    cost_per_kg DECIMAL(10,2) NOT NULL, -- Cost price per kilogram for calculating profit margins
+
+    -- Selling pricing fields
+    price_per_box DECIMAL(10,2) NOT NULL, -- Selling price per box (renamed from boxed_selling_price)
+    price_per_kg DECIMAL(10,2) NOT NULL, -- Selling price per kg (renamed from kg_selling_price)
+
+    -- Calculated profit fields
+    profit_per_box DECIMAL(10,2) GENERATED ALWAYS AS (price_per_box - cost_per_box) STORED,
+    profit_per_kg DECIMAL(10,2) GENERATED ALWAYS AS (price_per_kg - cost_per_kg) STORED,
+
+    -- Stock management
+    boxed_low_stock_threshold INTEGER DEFAULT 10 NOT NULL, -- Low stock threshold for boxed quantity alerts
+
+    -- Product lifecycle tracking
     expiry_date DATE,
-    days_left INTEGER GENERATED ALWAYS AS (
-        CASE 
-            WHEN expiry_date IS NULL THEN NULL
-            ELSE EXTRACT(DAY FROM (expiry_date - CURRENT_DATE))
-        END
-    ) STORED,
-    stock_status VARCHAR(20) GENERATED ALWAYS AS (
-        CASE 
-            WHEN quantity <= (low_stock_threshold * 0.5) THEN 'critical'
-            WHEN quantity <= low_stock_threshold THEN 'warning'
-            ELSE 'monitor'
-        END
-    ) STORED
+    days_left INTEGER, -- Days remaining until expiry (calculated by application or trigger)
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Constraints
+    CONSTRAINT chk_cost_per_box_positive CHECK (cost_per_box >= 0),
+    CONSTRAINT chk_cost_per_kg_positive CHECK (cost_per_kg >= 0),
+    CONSTRAINT chk_price_per_box_positive CHECK (price_per_box >= 0),
+    CONSTRAINT chk_price_per_kg_positive CHECK (price_per_kg >= 0),
+    CONSTRAINT chk_quantity_box_non_negative CHECK (quantity_box >= 0),
+    CONSTRAINT chk_quantity_kg_non_negative CHECK (quantity_kg >= 0),
+    CONSTRAINT chk_box_to_kg_ratio_positive CHECK (box_to_kg_ratio > 0),
+    CONSTRAINT chk_boxed_low_stock_threshold_positive CHECK (boxed_low_stock_threshold >= 0)
 );
 
 -- Comments for documentation
-COMMENT ON TABLE products IS 'Tracks fish inventory, including pricing, damage, and expiry';
+COMMENT ON TABLE products IS 'Tracks fish inventory with box/kg management, pricing, damage, and expiry';
 COMMENT ON COLUMN products.product_id IS 'Unique identifier for each product';
-COMMENT ON COLUMN products.sku IS 'Stock Keeping Unit - unique product code';
 COMMENT ON COLUMN products.name IS 'Product name (e.g., Atlantic Salmon)';
 COMMENT ON COLUMN products.category_id IS 'Reference to product category';
-COMMENT ON COLUMN products.quantity IS 'Current stock quantity';
-COMMENT ON COLUMN products.selling_type IS 'How product is sold: boxed, weight, or both';
-COMMENT ON COLUMN products.price IS 'Selling price per unit';
-COMMENT ON COLUMN products.cost_price IS 'Cost price per unit';
-COMMENT ON COLUMN products.profit IS 'Calculated profit per unit (price - cost_price)';
-COMMENT ON COLUMN products.supplier IS 'Supplier name or company';
-COMMENT ON COLUMN products.low_stock_threshold IS 'Threshold for low stock alerts';
-COMMENT ON COLUMN products.damaged_reason IS 'Reason for product damage';
-COMMENT ON COLUMN products.damaged_date IS 'Date when product was damaged';
-COMMENT ON COLUMN products.loss_value IS 'Financial loss due to damage';
-COMMENT ON COLUMN products.approval_status IS 'Approval status for damage reports';
-COMMENT ON COLUMN products.reported_by IS 'User who reported the damage';
+COMMENT ON COLUMN products.quantity_box IS 'Number of full boxes in stock';
+COMMENT ON COLUMN products.quantity_kg IS 'Loose kg stock available';
+COMMENT ON COLUMN products.box_to_kg_ratio IS 'How many kg per box (e.g., 20kg per box)';
+COMMENT ON COLUMN products.cost_per_box IS 'Cost price per box for calculating profit margins';
+COMMENT ON COLUMN products.cost_per_kg IS 'Cost price per kilogram for calculating profit margins';
+COMMENT ON COLUMN products.price_per_box IS 'Selling price per box';
+COMMENT ON COLUMN products.price_per_kg IS 'Selling price per kilogram';
+COMMENT ON COLUMN products.profit_per_box IS 'Profit margin per box (selling price - cost price)';
+COMMENT ON COLUMN products.profit_per_kg IS 'Profit margin per kilogram (selling price - cost price)';
+COMMENT ON COLUMN products.boxed_low_stock_threshold IS 'Low stock threshold for boxed quantity alerts';
 COMMENT ON COLUMN products.expiry_date IS 'Product expiry date';
-COMMENT ON COLUMN products.days_left IS 'Calculated days until expiry';
-COMMENT ON COLUMN products.stock_status IS 'Calculated stock status (critical, warning, monitor)';
+COMMENT ON COLUMN products.days_left IS 'Days remaining until expiry (calculated)';
+COMMENT ON COLUMN products.created_at IS 'Timestamp when product was created';
+COMMENT ON COLUMN products.updated_at IS 'Timestamp when product was last updated';
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
-CREATE INDEX IF NOT EXISTS idx_products_selling_type ON products(selling_type);
-CREATE INDEX IF NOT EXISTS idx_products_stock_status ON products(stock_status);
-CREATE INDEX IF NOT EXISTS idx_products_expiry ON products(expiry_date);
-CREATE INDEX IF NOT EXISTS idx_products_supplier ON products(supplier);
-CREATE INDEX IF NOT EXISTS idx_products_approval_status ON products(approval_status);
+CREATE INDEX IF NOT EXISTS idx_products_expiry_date ON products(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_products_quantity_box ON products(quantity_box);
+CREATE INDEX IF NOT EXISTS idx_products_quantity_kg ON products(quantity_kg);
+CREATE INDEX IF NOT EXISTS idx_products_cost_per_box ON products(cost_per_box);
+CREATE INDEX IF NOT EXISTS idx_products_cost_per_kg ON products(cost_per_kg);
+CREATE INDEX IF NOT EXISTS idx_products_boxed_low_stock ON products(boxed_low_stock_threshold);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -92,30 +102,48 @@ CREATE POLICY products_delete_owner ON products
     FOR DELETE
     USING (auth.uid() IS NOT NULL);
 
--- Function to validate product data
+-- Function to validate product data with new structure
 CREATE OR REPLACE FUNCTION validate_product_data()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Ensure price is positive
-    IF NEW.price <= 0 THEN
-        RAISE EXCEPTION 'Product price must be positive';
+    -- Ensure cost prices are positive
+    IF NEW.cost_per_box <= 0 THEN
+        RAISE EXCEPTION 'Cost per box must be positive';
     END IF;
-    
-    -- Ensure cost_price is positive
-    IF NEW.cost_price <= 0 THEN
-        RAISE EXCEPTION 'Product cost price must be positive';
+
+    IF NEW.cost_per_kg <= 0 THEN
+        RAISE EXCEPTION 'Cost per kg must be positive';
     END IF;
-    
-    -- Ensure quantity is not negative
-    IF NEW.quantity < 0 THEN
-        RAISE EXCEPTION 'Product quantity cannot be negative';
+
+    -- Ensure selling prices are positive
+    IF NEW.price_per_box <= 0 THEN
+        RAISE EXCEPTION 'Price per box must be positive';
     END IF;
-    
-    -- Ensure low_stock_threshold is positive
-    IF NEW.low_stock_threshold <= 0 THEN
-        RAISE EXCEPTION 'Low stock threshold must be positive';
+
+    IF NEW.price_per_kg <= 0 THEN
+        RAISE EXCEPTION 'Price per kg must be positive';
     END IF;
-    
+
+    -- Ensure box quantities are not negative
+    IF NEW.quantity_box < 0 THEN
+        RAISE EXCEPTION 'Box quantity cannot be negative';
+    END IF;
+
+    -- Ensure kg quantities are not negative
+    IF NEW.quantity_kg < 0 THEN
+        RAISE EXCEPTION 'Kg quantity cannot be negative';
+    END IF;
+
+    -- Ensure box_to_kg_ratio is positive
+    IF NEW.box_to_kg_ratio <= 0 THEN
+        RAISE EXCEPTION 'Box to kg ratio must be positive';
+    END IF;
+
+    -- Ensure boxed_low_stock_threshold is positive
+    IF NEW.boxed_low_stock_threshold <= 0 THEN
+        RAISE EXCEPTION 'Boxed low stock threshold must be positive';
+    END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -126,9 +154,30 @@ CREATE TRIGGER validate_product_data_trigger
     FOR EACH ROW
     EXECUTE FUNCTION validate_product_data();
 
+-- Function to calculate days left until expiry
+CREATE OR REPLACE FUNCTION calculate_days_left()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Calculate days left until expiry
+    IF NEW.expiry_date IS NOT NULL THEN
+        NEW.days_left = NEW.expiry_date - CURRENT_DATE;
+    ELSE
+        NEW.days_left = NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to calculate days left
+CREATE TRIGGER calculate_days_left_trigger
+    BEFORE INSERT OR UPDATE OF expiry_date ON products
+    FOR EACH ROW
+    EXECUTE FUNCTION calculate_days_left();
+
 -- Sample data for development
 -- Note: These will need actual category_id values from the product_categories table
--- INSERT INTO products (sku, name, category_id, quantity, selling_type, price, cost_price, supplier, low_stock_threshold, expiry_date) VALUES
--- ('SALM-001', 'Atlantic Salmon', 'category-uuid-here', 50, 'both', 25.99, 18.50, 'Ocean Fresh Suppliers', 10, CURRENT_DATE + INTERVAL '7 days'),
--- ('COD-001', 'Fresh Cod', 'category-uuid-here', 30, 'weight', 22.50, 16.00, 'Atlantic Fish Co.', 8, CURRENT_DATE + INTERVAL '5 days'),
--- ('TUNA-001', 'Yellowfin Tuna', 'category-uuid-here', 15, 'boxed', 45.00, 32.00, 'Pacific Seafood Ltd.', 5, CURRENT_DATE + INTERVAL '10 days');
+-- INSERT INTO products (name, category_id, quantity_box, box_to_kg_ratio, quantity_kg, cost_per_box, cost_per_kg, price_per_box, price_per_kg, boxed_low_stock_threshold, expiry_date) VALUES
+-- ('Atlantic Salmon', 'category-uuid-here', 50, 20.0, 15.5, 18.50, 0.93, 25.99, 1.30, 10, CURRENT_DATE + INTERVAL '7 days'),
+-- ('Fresh Cod', 'category-uuid-here', 30, 15.0, 8.2, 16.00, 1.07, 22.50, 1.50, 8, CURRENT_DATE + INTERVAL '5 days'),
+-- ('Yellowfin Tuna', 'category-uuid-here', 15, 25.0, 12.0, 32.00, 1.28, 45.00, 1.80, 5, CURRENT_DATE + INTERVAL '10 days');

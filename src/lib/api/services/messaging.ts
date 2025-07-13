@@ -119,7 +119,7 @@ class MessagingService {
    * Send message to multiple recipients
    */
   async sendMessage(data: SendMessageRequest): Promise<ApiResponse<MessageSendResult>> {
-    return apiClient.post<MessageSendResult>('/messages/send', data);
+    return apiClient.post<MessageSendResult>('/api/messages/send', data);
   }
 
   /**
@@ -140,35 +140,35 @@ class MessagingService {
         offset: number;
         total: number;
       };
-    }>(`/messages/history?limit=${limit}&offset=${offset}`);
+    }>(`/api/messages/history?limit=${limit}&offset=${offset}`);
   }
 
   /**
    * Get message statistics
    */
   async getMessageStats(): Promise<ApiResponse<MessageStats>> {
-    return apiClient.get<MessageStats>('/messages/stats');
+    return apiClient.get<MessageStats>('/api/messages/stats');
   }
 
   /**
    * Test email configuration
    */
   async testEmailConfiguration(): Promise<ApiResponse<EmailTestResult>> {
-    return apiClient.post<EmailTestResult>('/messages/test-email');
+    return apiClient.post<EmailTestResult>('/api/messages/test-email');
   }
 
   /**
    * Send test email
    */
   async sendTestEmail(data: TestEmailRequest): Promise<ApiResponse<EmailTestResult>> {
-    return apiClient.post<EmailTestResult>('/messages/send-test-email', data);
+    return apiClient.post<EmailTestResult>('/api/messages/send-test-email', data);
   }
 
   /**
    * Get available delivery methods
    */
   async getDeliveryMethods(): Promise<ApiResponse<DeliveryMethodInfo[]>> {
-    return apiClient.get<DeliveryMethodInfo[]>('/messages/delivery-methods');
+    return apiClient.get<DeliveryMethodInfo[]>('/api/messages/delivery-methods');
   }
 
   /**

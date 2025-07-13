@@ -63,9 +63,9 @@ const Login = () => {
         if (response.success && response.data) {
           // Store user type and navigate to dashboard
           localStorage.setItem("userType", "admin");
-          localStorage.setItem("userEmail", response.data.user.email_address);
-          localStorage.setItem("businessName", response.data.user.business_name);
-          localStorage.setItem("ownerName", response.data.user.owner_name);
+          localStorage.setItem("userEmail", response.data.user.email);
+          localStorage.setItem("businessName", response.data.user.businessName);
+          localStorage.setItem("ownerName", response.data.user.ownerName);
 
           navigate("/");
         } else {
@@ -82,7 +82,7 @@ const Login = () => {
         if (response.success && response.data) {
           localStorage.setItem("userType", "worker");
           localStorage.setItem("workerId", workerId);
-          localStorage.setItem("userEmail", response.data.user.email_address);
+          localStorage.setItem("userEmail", response.data.user.email);
           localStorage.setItem("businessName", businessName);
 
           navigate("/");

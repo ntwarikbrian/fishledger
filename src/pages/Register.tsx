@@ -33,6 +33,57 @@ import { CompactLanguageSwitcher } from "@/components/ui/language-switcher";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { authAPI } from "@/services/api";
 
+// Password strength validation utility
+const validatePasswordStrength = (password: string) => {
+  const checks = {
+    length: password.length >= 8,
+    lowercase: /[a-z]/.test(password),
+    uppercase: /[A-Z]/.test(password),
+    number: /\d/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+  };
+
+  const score = Object.values(checks).filter(Boolean).length;
+
+  return {
+    checks,
+    score,
+    strength: score < 2 ? 'weak' : score < 4 ? 'medium' : 'strong',
+    isValid: checks.length && checks.lowercase && checks.number
+  };
+};
+
+// Email validation utility
+const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return {
+    isValid: emailRegex.test(email),
+    message: !email ? 'Email is required' :
+             !emailRegex.test(email) ? 'Please enter a valid email address' : ''
+  };
+};
+
+// Business name validation utility
+const validateBusinessName = (name: string) => {
+  const trimmed = name.trim();
+  return {
+    isValid: trimmed.length >= 2 && trimmed.length <= 100,
+    message: !trimmed ? 'Business name is required' :
+             trimmed.length < 2 ? 'Business name must be at least 2 characters' :
+             trimmed.length > 100 ? 'Business name must be less than 100 characters' : ''
+  };
+};
+
+// Phone validation utility
+const validatePhone = (phone: string) => {
+  const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+  return {
+    isValid: phoneRegex.test(phone),
+    message: !phone ? 'Phone number is required' :
+             !phoneRegex.test(phone) ? 'Please enter a valid phone number' : ''
+  };
+};
+
 const Register = () => {
   const { t } = useTranslation();
   usePageTitle('auth.registerTitle', 'Register');
@@ -55,6 +106,17 @@ const Register = () => {
   const [success, setSuccess] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // Validation states
+  const [passwordStrength, setPasswordStrength] = useState(validatePasswordStrength(""));
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isCheckingBusinessName, setIsCheckingBusinessName] = useState(false);
+  const [validationStates, setValidationStates] = useState({
+    email: { isValid: false, message: "" },
+    businessName: { isValid: false, message: "" },
+    phone: { isValid: false, message: "" },
+    ownerName: { isValid: false, message: "" }
+  });
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -73,6 +135,46 @@ const Register = () => {
     if (error) {
       setError("");
     }
+
+    // Real-time validation
+    switch (field) {
+      case 'password':
+        setPasswordStrength(validatePasswordStrength(value));
+        break;
+      case 'email':
+        const emailValidation = validateEmail(value);
+        setValidationStates(prev => ({
+          ...prev,
+          email: emailValidation
+        }));
+        break;
+      case 'businessName':
+        const businessValidation = validateBusinessName(value);
+        setValidationStates(prev => ({
+          ...prev,
+          businessName: businessValidation
+        }));
+        break;
+      case 'phone':
+        const phoneValidation = validatePhone(value);
+        setValidationStates(prev => ({
+          ...prev,
+          phone: phoneValidation
+        }));
+        break;
+      case 'ownerName':
+        const ownerValidation = {
+          isValid: value.trim().length >= 2 && value.trim().length <= 100,
+          message: !value.trim() ? 'Owner name is required' :
+                   value.trim().length < 2 ? 'Owner name must be at least 2 characters' :
+                   value.trim().length > 100 ? 'Owner name must be less than 100 characters' : ''
+        };
+        setValidationStates(prev => ({
+          ...prev,
+          ownerName: ownerValidation
+        }));
+        break;
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -81,34 +183,46 @@ const Register = () => {
     setError("");
     setFieldErrors({});
 
-    // Client-side validation
+    // Enhanced client-side validation
     const errors: Record<string, string> = {};
 
-    if (!formData.businessName.trim()) {
-      errors.businessName = "Business name is required";
+    // Validate business name
+    const businessValidation = validateBusinessName(formData.businessName);
+    if (!businessValidation.isValid) {
+      errors.businessName = businessValidation.message;
     }
 
+    // Validate owner name
     if (!formData.ownerName.trim()) {
       errors.ownerName = "Owner name is required";
+    } else if (formData.ownerName.trim().length < 2) {
+      errors.ownerName = "Owner name must be at least 2 characters";
     }
 
-    if (!formData.email.trim()) {
-      errors.email = "Email address is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = "Please enter a valid email address";
+    // Validate email
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.isValid) {
+      errors.email = emailValidation.message;
     }
 
-    if (!formData.phone.trim()) {
-      errors.phone = "Phone number is required";
+    // Validate phone
+    const phoneValidation = validatePhone(formData.phone);
+    if (!phoneValidation.isValid) {
+      errors.phone = phoneValidation.message;
     }
 
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(formData.password);
     if (!formData.password) {
       errors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      errors.password = "Password must be at least 8 characters long";
+    } else if (!passwordValidation.isValid) {
+      errors.password = "Password must be at least 8 characters and contain letters and numbers";
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    // Validate password confirmation
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = "Please confirm your password";
+    } else if (formData.password !== formData.confirmPassword) {
       errors.confirmPassword = "Passwords do not match";
     }
 
@@ -142,7 +256,28 @@ const Register = () => {
 
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        const errorMessage = err.message;
+
+        // Handle specific backend errors with user-friendly messages
+        if (errorMessage.includes('Email already registered') || errorMessage.includes('email already exists')) {
+          setFieldErrors({ email: 'This email is already registered. Please use a different email or try logging in.' });
+        } else if (errorMessage.includes('Business name already taken') || errorMessage.includes('business name already exists')) {
+          setFieldErrors({ businessName: 'This business name is already taken. Please choose a different name.' });
+        } else if (errorMessage.includes('Password validation failed') || errorMessage.includes('password too weak')) {
+          setFieldErrors({ password: 'Password is too weak. Please use a stronger password with letters and numbers.' });
+        } else if (errorMessage.includes('Too many authentication attempts') || errorMessage.includes('Too many requests')) {
+          setError('Too many registration attempts. Please wait a few minutes and try again.');
+        } else if (errorMessage.includes('Rate limit') || errorMessage.includes('rate limit')) {
+          setError('Please wait a moment before trying again.');
+        } else if (errorMessage.includes('Validation failed')) {
+          setError('Please check your information and try again.');
+        } else if (errorMessage.includes('Network error') || errorMessage.includes('fetch')) {
+          setError('Network error. Please check your internet connection and try again.');
+        } else if (errorMessage.includes('Server error')) {
+          setError('Server is temporarily unavailable. Please try again later.');
+        } else {
+          setError(errorMessage);
+        }
       } else {
         setError("Registration failed. Please try again.");
       }
@@ -332,15 +467,27 @@ const Register = () => {
                     value={formData.businessName}
                     onChange={(e) => handleInputChange("businessName", e.target.value)}
                     className={`pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
-                      fieldErrors.businessName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                      fieldErrors.businessName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                      formData.businessName && validationStates.businessName.isValid ? 'border-green-500' : ''
                     }`}
                     required
                   />
+                  {formData.businessName && validationStates.businessName.isValid && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                      ✓
+                    </div>
+                  )}
                 </div>
                 {fieldErrors.businessName && (
                   <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {fieldErrors.businessName}
+                  </p>
+                )}
+                {!fieldErrors.businessName && validationStates.businessName.message && (
+                  <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationStates.businessName.message}
                   </p>
                 )}
               </div>
@@ -359,15 +506,27 @@ const Register = () => {
                     value={formData.ownerName}
                     onChange={(e) => handleInputChange("ownerName", e.target.value)}
                     className={`pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
-                      fieldErrors.ownerName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                      fieldErrors.ownerName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                      formData.ownerName && validationStates.ownerName.isValid ? 'border-green-500' : ''
                     }`}
                     required
                   />
+                  {formData.ownerName && validationStates.ownerName.isValid && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                      ✓
+                    </div>
+                  )}
                 </div>
                 {fieldErrors.ownerName && (
                   <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {fieldErrors.ownerName}
+                  </p>
+                )}
+                {!fieldErrors.ownerName && validationStates.ownerName.message && (
+                  <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationStates.ownerName.message}
                   </p>
                 )}
               </div>
@@ -387,15 +546,27 @@ const Register = () => {
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
                       className={`pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
-                        fieldErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                        fieldErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                        formData.email && validationStates.email.isValid ? 'border-green-500' : ''
                       }`}
                       required
                     />
+                    {formData.email && validationStates.email.isValid && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        ✓
+                      </div>
+                    )}
                   </div>
                   {fieldErrors.email && (
                     <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
                       {fieldErrors.email}
+                    </p>
+                  )}
+                  {!fieldErrors.email && validationStates.email.message && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {validationStates.email.message}
                     </p>
                   )}
                 </div>
@@ -414,15 +585,27 @@ const Register = () => {
                       value={formData.phone}
                       onChange={(e) => handleInputChange("phone", e.target.value)}
                       className={`pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
-                        fieldErrors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                        fieldErrors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                        formData.phone && validationStates.phone.isValid ? 'border-green-500' : ''
                       }`}
                       required
                     />
+                    {formData.phone && validationStates.phone.isValid && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        ✓
+                      </div>
+                    )}
                   </div>
                   {fieldErrors.phone && (
                     <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
                       {fieldErrors.phone}
+                    </p>
+                  )}
+                  {!fieldErrors.phone && validationStates.phone.message && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {validationStates.phone.message}
                     </p>
                   )}
                 </div>
@@ -442,7 +625,10 @@ const Register = () => {
                       placeholder="••••••••"
                       value={formData.password}
                       onChange={(e) => handleInputChange("password", e.target.value)}
-                      className="pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                      className={`pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
+                        fieldErrors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                        formData.password && passwordStrength.isValid ? 'border-green-500' : ''
+                      }`}
                       required
                     />
                     <button
@@ -453,6 +639,54 @@ const Register = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+
+                  {/* Password Strength Indicator */}
+                  {formData.password && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              passwordStrength.strength === 'weak' ? 'bg-red-500 w-1/3' :
+                              passwordStrength.strength === 'medium' ? 'bg-yellow-500 w-2/3' :
+                              'bg-green-500 w-full'
+                            }`}
+                          />
+                        </div>
+                        <span className={`text-xs font-medium ${
+                          passwordStrength.strength === 'weak' ? 'text-red-600 dark:text-red-400' :
+                          passwordStrength.strength === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-green-600 dark:text-green-400'
+                        }`}>
+                          {passwordStrength.strength === 'weak' ? 'Weak' :
+                           passwordStrength.strength === 'medium' ? 'Medium' : 'Strong'}
+                        </span>
+                      </div>
+
+                      {/* Password Requirements */}
+                      <div className="grid grid-cols-2 gap-1 text-xs">
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                          {passwordStrength.checks.length ? '✓' : '○'} 8+ characters
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.lowercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                          {passwordStrength.checks.lowercase ? '✓' : '○'} Lowercase
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.number ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                          {passwordStrength.checks.number ? '✓' : '○'} Number
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.uppercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                          {passwordStrength.checks.uppercase ? '✓' : '○'} Uppercase
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {fieldErrors.password && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
 
                 {/* Confirm Password */}
@@ -468,7 +702,10 @@ const Register = () => {
                       placeholder="••••••••"
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                      className="pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                      className={`pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 ${
+                        fieldErrors.confirmPassword ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                        formData.confirmPassword && formData.password === formData.confirmPassword ? 'border-green-500' : ''
+                      }`}
                       required
                     />
                     <button
@@ -479,6 +716,28 @@ const Register = () => {
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+
+                  {/* Password Match Indicator */}
+                  {formData.confirmPassword && (
+                    <div className="flex items-center gap-1 text-xs">
+                      {formData.password === formData.confirmPassword ? (
+                        <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                          ✓ Passwords match
+                        </span>
+                      ) : (
+                        <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                          ✗ Passwords don't match
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {fieldErrors.confirmPassword && (
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.confirmPassword}
+                    </p>
+                  )}
                 </div>
               </div>
 

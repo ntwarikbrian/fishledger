@@ -4,7 +4,28 @@
  */
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:5004/api';
+const getApiBaseUrl = (): string => {
+  const apiMode = import.meta.env.VITE_API_MODE || 'workers';
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  if (apiUrl) {
+    // If explicit URL is provided, use it
+    return apiMode === 'workers' ? apiUrl : `${apiUrl}/api`;
+  }
+
+  // Default URLs based on mode
+  if (apiMode === 'workers') {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://aqua-manage-fish-api.your-subdomain.workers.dev'
+      : 'http://localhost:8787';
+  } else {
+    return import.meta.env.NODE_ENV === 'production'
+      ? 'https://your-production-api.com/api'
+      : 'http://localhost:5004/api';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Types for API requests and responses
 export interface LoginRequest {
@@ -27,24 +48,21 @@ export interface AuthResponse {
   message: string;
   data?: {
     user: {
-      user_id: string;
-      business_name: string;
-      owner_name: string;
-      email_address: string;
-      phone_number?: string;
-      created_at: string;
-      last_login?: string;
+      id: string;
+      email: string;
+      businessName: string;
+      ownerName: string;
+      phoneNumber?: string;
     };
-    token: string;
-    refresh_token: string;
-    expires_in: string;
+    tokens: {
+      accessToken: string;
+      refreshToken: string;
+      expiresIn: string;
+    };
   };
-  error?: {
-    code: string;
-    message: string;
-    details?: any;
-  };
+  error?: string;
   timestamp: string;
+  requestId?: string;
 }
 
 export interface ApiError {
@@ -66,6 +84,12 @@ class ApiClient {
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     this.token = localStorage.getItem('auth_token');
+
+    console.log('🔧 API Client initialized:', {
+      baseURL: this.baseURL,
+      hasToken: !!this.token,
+      tokenPreview: this.token ? `${this.token.substring(0, 20)}...` : null
+    });
   }
 
   // Set authentication token
@@ -79,6 +103,28 @@ class ApiClient {
     this.token = null;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+  }
+
+  // Clear all authentication data (enhanced for debugging)
+  clearAllAuthData() {
+    this.token = null;
+    // Clear all possible auth-related localStorage items
+    const authKeys = [
+      'auth_token',
+      'refresh_token',
+      'user_data',
+      'userType',
+      'userEmail',
+      'businessName',
+      'ownerName',
+      'workerId'
+    ];
+
+    authKeys.forEach(key => {
+      localStorage.removeItem(key);
+    });
+
+    console.log('🧹 Cleared all authentication data from localStorage');
   }
 
   // Make HTTP request with error handling
@@ -102,12 +148,47 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error?.message || data.message || 'Request failed');
+        // Enhanced error handling for different status codes
+        let errorMessage = data.error || data.message || 'Request failed';
+
+        // Handle specific status codes with better error messages
+        if (response.status === 409) {
+          // Conflict - email/business name already exists
+          errorMessage = data.error || 'Email or business name already exists';
+        } else if (response.status === 429) {
+          // Rate limiting
+          errorMessage = data.error || 'Too many requests. Please try again later.';
+        } else if (response.status === 400) {
+          // Bad request - validation errors
+          errorMessage = data.error || 'Invalid data provided';
+        } else if (response.status === 401) {
+          // Unauthorized
+          errorMessage = data.error || 'Authentication required';
+        } else if (response.status === 403) {
+          // Forbidden
+          errorMessage = data.error || 'Access denied';
+        } else if (response.status >= 500) {
+          // Server errors
+          errorMessage = 'Server error. Please try again later.';
+        }
+
+        throw new Error(errorMessage);
       }
 
       return data;
     } catch (error) {
       if (error instanceof Error) {
+        // Check for authentication errors and clear auth data
+        if (error.message.includes('User not found') ||
+            error.message.includes('Invalid or expired token') ||
+            error.message.includes('Authentication required')) {
+          console.warn('🔄 Authentication error detected, clearing auth data...');
+          this.clearAllAuthData();
+          // Optionally redirect to login if not already there
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
         throw error;
       }
       throw new Error('Network error occurred');
@@ -149,15 +230,30 @@ export const authAPI = {
   // Register new user
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/register', data);
-      
+      const response = await apiClient.post<AuthResponse>('/api/auth/register', data);
+
       // Store user data and token on successful registration
       if (response.success && response.data) {
-        apiClient.setToken(response.data.token);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
-        localStorage.setItem('refresh_token', response.data.refresh_token);
+        // Backend returns tokens in a nested tokens object
+        const accessToken = response.data.tokens?.accessToken;
+        const refreshToken = response.data.tokens?.refreshToken;
+
+        console.log('🔐 Registration successful, storing tokens:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          user: response.data.user
+        });
+
+        if (accessToken) {
+          apiClient.setToken(accessToken);
+          localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        }
+
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
       }
-      
+
       return response;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Registration failed');
@@ -167,15 +263,30 @@ export const authAPI = {
   // Login user
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login', data);
-      
+      const response = await apiClient.post<AuthResponse>('/api/auth/login', data);
+
       // Store user data and token on successful login
       if (response.success && response.data) {
-        apiClient.setToken(response.data.token);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
-        localStorage.setItem('refresh_token', response.data.refresh_token);
+        // Backend returns tokens in a nested tokens object
+        const accessToken = response.data.tokens?.accessToken;
+        const refreshToken = response.data.tokens?.refreshToken;
+
+        console.log('🔐 Login successful, storing tokens:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          user: response.data.user
+        });
+
+        if (accessToken) {
+          apiClient.setToken(accessToken);
+          localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        }
+
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
       }
-      
+
       return response;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Login failed');
@@ -185,14 +296,14 @@ export const authAPI = {
   // Worker login
   workerLogin: async (data: { email: string; password: string; business_name: string }): Promise<AuthResponse> => {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/worker-login', data);
-      
+      const response = await apiClient.post<AuthResponse>('/api/auth/worker-login', data);
+
       if (response.success && response.data) {
         apiClient.setToken(response.data.token);
         localStorage.setItem('user_data', JSON.stringify(response.data.user));
         localStorage.setItem('refresh_token', response.data.refresh_token);
       }
-      
+
       return response;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Worker login failed');
@@ -202,7 +313,7 @@ export const authAPI = {
   // Logout user
   logout: async (): Promise<void> => {
     try {
-      await apiClient.post('/auth/logout');
+      await apiClient.post('/api/auth/logout');
     } catch (error) {
       console.warn('Logout request failed:', error);
     } finally {
@@ -212,18 +323,33 @@ export const authAPI = {
   },
 
   // Get user profile
-  getProfile: async (): Promise<AuthResponse> => {
-    return apiClient.get<AuthResponse>('/auth/profile');
+  getProfile: async (): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      id: string;
+      email: string;
+      businessName: string;
+      ownerName: string;
+      phoneNumber?: string;
+      createdAt: string;
+      lastLogin?: string;
+    };
+    error?: string;
+    timestamp: string;
+    requestId?: string;
+  }> => {
+    return apiClient.get('/api/auth/profile');
   },
 
   // Update user profile
   updateProfile: async (data: any): Promise<AuthResponse> => {
-    return apiClient.put<AuthResponse>('/auth/profile', data);
+    return apiClient.put<AuthResponse>('/api/auth/profile', data);
   },
 
   // Get existing users
   getExistingUsers: async (): Promise<any> => {
-    return apiClient.get('/auth/existing-users');
+    return apiClient.get('/api/auth/existing-users');
   },
 
   // Refresh token
@@ -233,13 +359,22 @@ export const authAPI = {
       throw new Error('No refresh token available');
     }
 
-    const response = await apiClient.post<AuthResponse>('/auth/refresh', {
-      refresh_token: refreshToken,
+    const response = await apiClient.post<AuthResponse>('/api/auth/refresh', {
+      refreshToken: refreshToken, // Backend expects 'refreshToken', not 'refresh_token'
     });
 
     if (response.success && response.data) {
-      apiClient.setToken(response.data.token);
-      localStorage.setItem('refresh_token', response.data.refresh_token);
+      // Backend returns tokens in a nested tokens object
+      const accessToken = response.data.tokens?.accessToken;
+      const newRefreshToken = response.data.tokens?.refreshToken;
+
+      if (accessToken) {
+        apiClient.setToken(accessToken);
+      }
+
+      if (newRefreshToken) {
+        localStorage.setItem('refresh_token', newRefreshToken);
+      }
     }
 
     return response;
