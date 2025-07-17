@@ -1,108 +1,187 @@
-# LocalFishing - Fish Management System
+# Scalable SaaS Platform - LocalFishing
 
 ## Project Overview
 
-LocalFishing is a comprehensive fish management system designed for local fish selling operations. The system provides tools for inventory management, sales tracking, customer management, staff management, document handling, and comprehensive reporting.
+A modern, scalable SaaS platform built for fish management and local business operations. This full-stack TypeScript application leverages serverless architecture with Cloudflare Workers and Hono framework for optimal performance, cost-efficiency, and global scalability. The platform provides comprehensive tools for inventory management, sales tracking, financial analytics, document management, and business intelligence.
 
-## Features
+## ✨ Key Features
 
-- **Fish Inventory Management**: Track fish stock by weight (kg) and boxed quantities with real-time updates
-- **Sales Management**: Process sales transactions, track revenue, and manage customer orders
-- **Customer Management**: Maintain customer records, contact information, and purchase history
-- **Staff Management**: Handle worker accounts, permissions, and task assignments
-- **Document Management**: Upload, organize, and manage business documents with folder structure
-- **Expense Tracking**: Monitor business expenses with categorization and reporting
-- **Reports & Analytics**: Generate comprehensive sales, profit, expense, and stock reports
-- **Message System**: Email messaging system for customer and staff communication
-- **Authentication**: Secure user authentication with role-based access control
+### 📊 **Dashboard & Analytics**
+- **Real-time Dashboard**: Interactive dashboard with revenue charts, financial overview, and key metrics
+- **Skeleton Loading**: Professional loading states with skeleton placeholders for better UX
+- **Selective Refresh**: Smart filtering that only refreshes relevant components (e.g., revenue chart filters)
+- **Multi-language Support**: Full internationalization with English and Kinyarwanda support
 
-## Architecture
+### 🐟 **Inventory Management**
+- **Fish Stock Tracking**: Monitor fish inventory by weight (kg) and boxed quantities
+- **Low Stock Alerts**: Automated notifications for items running low
+- **Damage Tracking**: Record and track damaged inventory with financial impact
+- **Stock Movements**: Comprehensive audit trail of all inventory changes
 
-This is a full-stack TypeScript application with:
+### 💰 **Financial Management**
+- **Transaction Processing**: Handle sales, deposits, and expense transactions
+- **Revenue Analytics**: Period-based revenue charts (week, month, 6 months)
+- **Expense Tracking**: Categorized expense management with audit trails
+- **Financial Overview**: Donut charts showing profit, expenses, and damages
 
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: Express.js + TypeScript + Node.js OR Cloudflare Workers (serverless)
-- **Database**: PostgreSQL (hosted on Supabase)
-- **File Storage**: Cloudinary for document and image management
-- **Email Service**: Gmail SMTP for messaging functionality
-- **Authentication**: JWT-based authentication system
+### 📁 **Document Management**
+- **Cloudinary Integration**: Professional file storage and management
+- **Permanent Folders**: Organized document structure for different business needs
+- **File Upload**: Secure file upload with validation and processing
+- **Document Organization**: Hierarchical folder structure with permissions
 
-### 🆕 Cloudflare Workers Backend
+### 👥 **User Management**
+- **Role-based Access**: Admin and worker roles with appropriate permissions
+- **Secure Authentication**: JWT-based authentication with refresh tokens
+- **User Profiles**: Comprehensive user management and profile handling
 
-The system now supports **Cloudflare Workers** as a modern, serverless backend alternative:
+### 🔧 **Technical Excellence**
+- **Serverless Architecture**: Built on Cloudflare Workers for global edge deployment
+- **TypeScript**: Full type safety across frontend and backend
+- **Modern UI**: shadcn/ui components with Tailwind CSS for professional design
+- **Error Handling**: Comprehensive error handling and user feedback
+- **Performance Optimized**: Efficient data fetching with caching and selective updates
 
-- **Serverless**: No server management required
-- **Global Edge**: Deployed on Cloudflare's global network
-- **Auto-scaling**: Handles traffic spikes automatically
-- **Cost-effective**: Pay only for what you use
-- **Better Performance**: Reduced latency with edge computing
+## 🏗️ Modern Architecture
 
-See [CLOUDFLARE_WORKERS_MIGRATION.md](./CLOUDFLARE_WORKERS_MIGRATION.md) for complete migration guide.
+This scalable SaaS platform is built with cutting-edge technologies:
 
-## Getting Started
+### **Frontend Stack**
+- **React 18** with TypeScript for type-safe, modern UI development
+- **Vite** for lightning-fast development and optimized builds
+- **Tailwind CSS + shadcn/ui** for professional, accessible design system
+- **React Router** for client-side routing and navigation
+- **React Hook Form + Zod** for robust form handling and validation
+- **Recharts** for interactive data visualizations and charts
+
+### **Backend Stack (Serverless-First)**
+- **Cloudflare Workers** with Hono framework for edge computing
+- **TypeScript** for full-stack type safety
+- **Serverless Architecture** for automatic scaling and cost optimization
+- **Global Edge Deployment** for minimal latency worldwide
+- **JWT Authentication** with secure token management
+
+### **Database & Storage**
+- **PostgreSQL** hosted on Supabase for reliable, scalable data storage
+- **Optimized Schema** with small data types for cost efficiency
+- **Row Level Security (RLS)** for data protection
+- **Cloudinary** for professional file and image management
+
+### **DevOps & Performance**
+- **npm** package management across all services
+- **TypeScript** compilation and type checking
+- **Environment-based Configuration** for different deployment stages
+- **Comprehensive Error Handling** with user-friendly feedback
+- **Performance Monitoring** with detailed logging and analytics
+
+### 🚀 **Serverless Benefits**
+- **Zero Server Management**: Focus on code, not infrastructure
+- **Global Edge Network**: Sub-100ms response times worldwide
+- **Automatic Scaling**: Handle traffic spikes without configuration
+- **Cost Optimization**: Pay only for actual usage
+- **High Availability**: Built-in redundancy and failover
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm package manager
-- PostgreSQL database (Supabase account recommended)
-- Cloudinary account for file storage
+- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
+- **npm** package manager (comes with Node.js)
+- **Supabase Account** - [Sign up here](https://supabase.com)
+- **Cloudinary Account** - [Sign up here](https://cloudinary.com)
+- **Cloudflare Account** (for deployment) - [Sign up here](https://cloudflare.com)
 
-### Installation
+### 📦 Installation
 
-```sh
-# Step 1: Clone the repository
-git clone https://github.com/bilyv/localfishing.git
+```bash
+# 1. Clone the repository
+git clone <your-repo-url>
+cd scalable-saas
 
-# Step 2: Navigate to the project directory
-cd localfishing
-
-# Step 3: Install frontend dependencies
+# 2. Install client dependencies
+cd client
 npm install
 
-# Step 4: Install backend dependencies
-cd server; npm install
+# 3. Install backend dependencies
+cd ../backend
+npm install
 
-# Step 5: Set up environment variables (see Environment Setup below)
+# 4. Set up environment variables (see Environment Setup below)
 
-# Step 6: Set up the database (see Database Setup below)
+# 5. Set up the database (see Database Setup below)
 
-# Step 7: Choose your backend and start development servers
+# 6. Start development servers
 
-# Option A: Cloudflare Workers Backend (Recommended)
-cd workers; npm install; npm run dev  # API at http://localhost:8787
+# Terminal 1 - Backend (Hono + Cloudflare Workers)
+cd backend
+npm run dev  # API at http://localhost:8787
 
-# Option B: Traditional Express Backend
-cd server; npm run dev  # API at http://localhost:5004
-
-# Terminal 2 - Frontend development server (configure VITE_API_URL accordingly)
-npm run dev
+# Terminal 2 - Frontend (React + Vite)
+cd client
+npm run dev  # App at http://localhost:5173
 ```
 
-### Environment Setup
+### 🔧 Development Commands
 
-#### Frontend Environment
-Create a `.env` file in the root directory:
+```bash
+# Backend development
+cd backend; npm run dev
+
+# Frontend development
+cd client; npm run dev
+
+# Type checking
+cd client; npm run type-check
+cd backend; npm run type-check
+
+# Build for production
+cd client; npm run build
+cd backend; npm run build
+```
+
+### ⚙️ Environment Setup
+
+#### Frontend Environment (`client/.env`)
 ```env
 # API Configuration
-VITE_API_MODE=workers  # or 'express'
-VITE_API_URL=http://localhost:8787  # Workers: 8787, Express: http://localhost:5004/api
+VITE_API_URL=http://localhost:8787
 
-# Supabase (if using client-side features)
-VITE_SUPABASE_URL=your_supabase_url
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Cloudinary (for file uploads)
+# Cloudinary Configuration
 VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 ```
 
-#### Backend Environment
+#### Backend Environment (`backend/.env`)
+```env
+# Development Configuration
+NODE_ENV=development
+PORT=8787
 
-**For Cloudflare Workers (Recommended):**
-1. Create a `.env` file in the `workers` directory (copy from `.env.example`)
-2. Set up Cloudflare secrets:
+# Supabase Configuration
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# JWT Configuration
+JWT_SECRET=your_super_secret_jwt_key_here
+JWT_REFRESH_SECRET=your_super_secret_refresh_key_here
+
+# Cloudinary Configuration
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# CORS Configuration
+CORS_ORIGIN=http://localhost:5173
+```
+
+#### 🔐 Cloudflare Secrets (Production)
+For production deployment, set up Cloudflare Workers secrets:
 ```bash
-cd workers
+cd backend
 npx wrangler login
 npx wrangler secret put SUPABASE_URL
 npx wrangler secret put SUPABASE_ANON_KEY
@@ -114,207 +193,308 @@ npx wrangler secret put CLOUDINARY_API_KEY
 npx wrangler secret put CLOUDINARY_API_SECRET
 ```
 
-**For Express Server:**
-Create a `.env` file in the `server` directory:
-```env
-PORT=5004
-NODE_ENV=development
-DATABASE_URL=your_postgresql_connection_string
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-JWT_SECRET=your_jwt_secret_key
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASSWORD=your_app_password
-EMAIL_FROM=your_email@gmail.com
+### 🗄️ Database Setup
+
+#### 1. Create Supabase Project
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Note your project URL and API keys from the project settings
+
+#### 2. Run Database Schema
+```bash
+# Navigate to database directory
+cd database
+
+# Option 1: Run the complete schema
+# Copy and paste contents of main.sql into Supabase SQL Editor
+
+# Option 2: Run individual schemas
+# Copy contents of schemas/*.sql files one by one
 ```
 
-### Database Setup
+#### 3. Database Schema Structure
+```
+database/
+├── main.sql                    # Complete database schema
+├── schemas/                    # Individual table schemas
+│   ├── users.sql              # User management tables
+│   ├── sales.sql              # Sales and transactions
+│   ├── expenses.sql           # Expense tracking
+│   ├── folders.sql            # Document management
+│   ├── deposits.sql           # Deposit transactions
+│   └── transactions.sql       # Transaction history
+└── migrations/                 # Database migrations
+    ├── 001_create_deposits_table.sql
+    ├── 002_add_to_recipient_column.sql
+    └── 003_add_expense_categories_audit_fields.sql
+```
 
-1. **Create a Supabase project** at [supabase.com](https://supabase.com)
-2. **Run the database migrations**:
-   ```sh
-   # Navigate to the database directory
-   cd database
+#### 4. Key Database Features
+- **Optimized Data Types**: Small data types for cost efficiency
+- **Audit Trails**: Comprehensive tracking of all changes
+- **Foreign Key Constraints**: Data integrity and relationships
+- **Indexes**: Optimized for common query patterns
+- **Row Level Security**: Ready for multi-tenant architecture
 
-   # Run the main schema file in your Supabase SQL editor
-   # Copy and paste the contents of main.sql
-   ```
-3. **Set up Row Level Security (RLS)** policies as needed for your security requirements
+### 🌐 Development URLs
 
-### Email Configuration
+- **Frontend**: http://localhost:5173 (Vite dev server)
+- **Backend**: http://localhost:8787 (Hono + Cloudflare Workers)
+- **Database**: Supabase Dashboard (your project URL)
+- **File Storage**: Cloudinary Dashboard
 
-For the messaging system to work, you need to configure email settings:
+## 🛠️ Technology Stack
 
-1. **Set email environment variables** in your `.env` file:
-   ```sh
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=587
-   EMAIL_USER=your_email@gmail.com
-   EMAIL_PASSWORD=your_app_password
-   EMAIL_FROM=your_email@gmail.com
-   ```
+### **Frontend Technologies**
+| Technology | Purpose | Version |
+|------------|---------|---------|
+| **React 18** | UI Framework with concurrent features | ^18.0.0 |
+| **TypeScript** | Type-safe JavaScript development | ^5.0.0 |
+| **Vite** | Fast build tool and dev server | ^5.0.0 |
+| **Tailwind CSS** | Utility-first CSS framework | ^3.4.0 |
+| **shadcn/ui** | Professional component library | Latest |
+| **React Router** | Client-side routing | ^6.0.0 |
+| **React Hook Form** | Performant form handling | ^7.0.0 |
+| **Zod** | Schema validation | ^3.0.0 |
+| **Recharts** | Data visualization | ^2.8.0 |
+| **Lucide React** | Icon library | ^0.400.0 |
+| **React i18next** | Internationalization | ^13.0.0 |
 
-2. **For Gmail users**: Generate an App Password:
-   - Enable 2-Factor Authentication on your Google account
-   - Go to Google Account → Security → App passwords
-   - Generate a password for "Mail" and use it as `EMAIL_PASSWORD`
+### **Backend Technologies**
+| Technology | Purpose | Version |
+|------------|---------|---------|
+| **Cloudflare Workers** | Serverless edge computing | Latest |
+| **Hono** | Fast web framework for Workers | ^4.0.0 |
+| **TypeScript** | Type-safe server development | ^5.0.0 |
+| **PostgreSQL** | Relational database | ^15.0 |
+| **Supabase** | Database hosting and APIs | Latest |
+| **JWT** | Authentication tokens | ^9.0.0 |
+| **Cloudinary** | File storage and processing | ^1.40.0 |
+| **Zod** | Runtime type validation | ^3.0.0 |
 
-3. **Test email configuration**:
-   ```sh
-   cd server; npm run test:email
-   ```
+### **DevOps & Tools**
+| Tool | Purpose |
+|------|---------|
+| **npm** | Package management |
+| **Wrangler** | Cloudflare Workers CLI |
+| **ESLint** | Code linting |
+| **Prettier** | Code formatting |
+| **Git** | Version control |
 
-📖 **Detailed setup guide**: See [server/EMAIL_SETUP.md](server/EMAIL_SETUP.md) for complete instructions.
-
-### Development
-
-- **Frontend**: Runs on `http://localhost:5173` by default
-- **Backend**: Runs on `http://localhost:3001` by default
-
-## Technologies Used
-
-### Frontend
-- **React 18** - Modern React with hooks and concurrent features
-- **TypeScript** - Type-safe JavaScript for better development experience
-- **Vite** - Fast build tool and development server
-- **Tailwind CSS** - Utility-first CSS framework for rapid UI development
-- **shadcn/ui** - High-quality, accessible UI component library
-- **React Router DOM** - Client-side routing for single-page application
-- **React Query (TanStack Query)** - Powerful data fetching and caching
-- **React Hook Form** - Performant forms with easy validation
-- **Zod** - TypeScript-first schema validation
-- **Lucide React** - Beautiful and consistent icon library
-- **Recharts** - Composable charting library for data visualization
-
-### Backend
-- **Express.js** - Fast, unopinionated web framework for Node.js
-- **TypeScript** - Type safety for server-side development
-- **PostgreSQL** - Robust relational database
-- **Supabase** - Backend-as-a-Service for database and authentication
-- **JWT** - JSON Web Tokens for secure authentication
-- **Cloudinary** - Cloud-based image and video management
-- **Multer** - Middleware for handling multipart/form-data
-- **bcryptjs** - Password hashing library
-- **Express Validator** - Middleware for input validation
-- **Helmet** - Security middleware for Express apps
-- **CORS** - Cross-Origin Resource Sharing middleware
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-localfishing/
-├── src/                          # Frontend source code
-│   ├── components/               # Reusable UI components
-│   │   ├── ui/                  # Base UI components (shadcn/ui)
-│   │   └── inventory/           # Inventory-specific components
-│   ├── pages/                   # Application pages/routes
-│   ├── hooks/                   # Custom React hooks
-│   ├── lib/                     # Utility functions and configurations
-│   │   └── api/                 # API client and services
-│   ├── services/                # Business logic services
-│   └── utils/                   # Helper utilities
-├── server/                      # Backend source code
-│   ├── src/                     # Server entry point
-│   ├── config/                  # Configuration files
-│   ├── controllers/             # Route controllers
-│   ├── middleware/              # Express middleware
-│   ├── routes/                  # API route definitions
-│   ├── services/                # Business logic services
-│   ├── types/                   # TypeScript type definitions
-│   └── utils/                   # Server utilities
+scalable-saas/
+├── client/                      # Frontend React application
+│   ├── src/
+│   │   ├── components/          # Reusable UI components
+│   │   │   ├── ui/             # shadcn/ui base components
+│   │   │   ├── layout/         # Layout components (Navbar, Sidebar)
+│   │   │   └── inventory/      # Business-specific components
+│   │   ├── pages/              # Application pages/routes
+│   │   │   ├── Index.tsx       # Dashboard with analytics
+│   │   │   ├── Transactions.tsx # Transaction management
+│   │   │   ├── Expenses.tsx    # Expense tracking
+│   │   │   └── Documents.tsx   # Document management
+│   │   ├── hooks/              # Custom React hooks
+│   │   │   ├── use-dashboard-data.ts
+│   │   │   ├── use-transactions.ts
+│   │   │   └── use-deposits.ts
+│   │   ├── lib/                # Utilities and configurations
+│   │   │   ├── api/           # API client and services
+│   │   │   └── utils.ts       # Helper functions
+│   │   ├── services/          # Business logic services
+│   │   ├── locales/           # Internationalization files
+│   │   │   ├── en/            # English translations
+│   │   │   └── rw/            # Kinyarwanda translations
+│   │   └── types/             # TypeScript type definitions
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/                     # Serverless backend (Hono + Workers)
+│   ├── src/
+│   │   ├── handlers/           # Request handlers
+│   │   │   ├── dashboard.ts    # Dashboard analytics
+│   │   │   ├── transactions.ts # Transaction processing
+│   │   │   ├── expenses.ts     # Expense management
+│   │   │   └── deposits.ts     # Deposit handling
+│   │   ├── routes/             # API route definitions
+│   │   ├── middleware/         # Authentication & validation
+│   │   ├── config/             # Configuration files
+│   │   └── utils/              # Server utilities
+│   ├── package.json
+│   └── wrangler.toml           # Cloudflare Workers config
 ├── database/                    # Database schema and migrations
-│   ├── schemas/                 # Individual table schemas
-│   └── main.sql                 # Complete database schema
-├── scripts/                     # Utility scripts
-└── public/                      # Static assets
+│   ├── main.sql                # Complete database schema
+│   ├── schemas/                # Individual table schemas
+│   │   ├── users.sql
+│   │   ├── sales.sql
+│   │   ├── expenses.sql
+│   │   ├── transactions.sql
+│   │   └── deposits.sql
+│   └── migrations/             # Database migrations
+└── README.md                   # This file
 ```
 
-## Available Scripts
+## 📜 Available Scripts
 
-### Frontend Scripts
-- `npm run dev` - Start frontend development server
-- `npm run build` - Build frontend for production
-- `npm run build:dev` - Build frontend for development
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint for frontend
+### **Client Scripts** (`cd client`)
+```bash
+npm run dev          # Start development server (http://localhost:5173)
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+npm run type-check   # TypeScript type checking
+```
 
-### Backend Scripts
-- `cd server; npm run dev` - Start backend development server with hot reload
-- `cd server; npm run build` - Build backend for production
-- `cd server; npm run start` - Start production server
-- `cd server; npm run lint` - Run ESLint for backend
-- `cd server; npm run test` - Run backend tests
+### **Backend Scripts** (`cd backend`)
+```bash
+npm run dev          # Start development server (http://localhost:8787)
+npm run build        # Build for production
+npm run deploy       # Deploy to Cloudflare Workers
+npm run lint         # Run ESLint
+npm run type-check   # TypeScript type checking
+```
 
-### Database Scripts
-- `cd server; npm run migrate:schema` - Apply database schema
-- `cd server; npm run test:supabase` - Test Supabase connection
+### **Development Workflow**
+```bash
+# Start both servers simultaneously
+# Terminal 1
+cd backend && npm run dev
 
-## Deployment
+# Terminal 2
+cd client && npm run dev
 
-### Production Deployment
+# Production build
+cd client && npm run build
+cd backend && npm run build
+```
 
-1. **Build the applications**:
-   ```sh
-   # Build frontend
-   npm run build
+## 🚀 Deployment
 
-   # Build backend
-   cd server; npm run build
+### **Frontend Deployment (Vercel/Netlify)**
+
+```bash
+# Build the client
+cd client
+npm run build
+
+# Deploy to Vercel
+npx vercel --prod
+
+# Or deploy to Netlify
+npm install -g netlify-cli
+netlify deploy --prod --dir=dist
+```
+
+### **Backend Deployment (Cloudflare Workers)**
+
+```bash
+# Deploy to Cloudflare Workers
+cd backend
+npm run deploy
+
+# Or using Wrangler directly
+npx wrangler deploy
+```
+
+### **Environment Variables for Production**
+
+#### Frontend (Vercel/Netlify)
+```env
+VITE_API_URL=https://your-worker.your-subdomain.workers.dev
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+```
+
+#### Backend (Cloudflare Workers Secrets)
+Set up using Wrangler CLI:
+```bash
+cd backend
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put CLOUDINARY_API_SECRET
+# ... etc
+```
+
+## 📚 API Documentation
+
+### **API Endpoints**
+
+| Endpoint | Purpose | Methods |
+|----------|---------|---------|
+| `/api/auth/*` | Authentication & user management | POST, GET |
+| `/api/dashboard/*` | Dashboard analytics & stats | GET |
+| `/api/transactions/*` | Transaction processing | GET, POST, PUT, DELETE |
+| `/api/expenses/*` | Expense management | GET, POST, PUT, DELETE |
+| `/api/deposits/*` | Deposit handling | GET, POST, PUT, DELETE |
+| `/api/files/*` | File upload & management | GET, POST, DELETE |
+| `/api/folders/*` | Folder organization | GET, POST, PUT, DELETE |
+
+### **Key API Features**
+- **RESTful Design**: Standard HTTP methods and status codes
+- **JWT Authentication**: Secure token-based authentication
+- **Input Validation**: Comprehensive request validation with Zod
+- **Error Handling**: Consistent error responses with helpful messages
+- **CORS Support**: Configurable cross-origin resource sharing
+- **Type Safety**: Full TypeScript support for request/response types
+
+## 🔒 Security Features
+
+- **JWT Authentication**: Secure token-based authentication with refresh tokens
+- **Input Validation**: Comprehensive validation using Zod schemas
+- **CORS Protection**: Configurable cross-origin resource sharing
+- **Environment Security**: Secure environment variable handling
+- **Type Safety**: Full TypeScript coverage prevents runtime errors
+- **Database Security**: Row Level Security (RLS) ready for multi-tenancy
+- **File Upload Security**: Secure file handling with Cloudinary
+- **Error Handling**: Secure error messages without sensitive data exposure
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. **Fork the repository**
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Make your changes**
+   - Follow TypeScript best practices
+   - Add proper type definitions
+   - Include comments for complex logic
+   - Follow the existing code style
+4. **Test your changes**
+   ```bash
+   cd client && npm run type-check
+   cd backend && npm run type-check
+   ```
+5. **Commit your changes**
+   ```bash
+   git commit -m 'feat: Add amazing feature'
+   ```
+6. **Push and create a Pull Request**
+   ```bash
+   git push origin feature/amazing-feature
    ```
 
-2. **Set up production environment variables**
+### **Development Guidelines**
+- Use TypeScript for all new code
+- Follow the existing project structure
+- Add comments for complex business logic
+- Use semantic commit messages
+- Test your changes thoroughly
 
-3. **Deploy to your hosting platform** (Vercel, Netlify, Railway, etc.)
-
-### Environment Variables for Production
-
-Ensure all environment variables are properly set in your production environment:
-- Database connection strings
-- API keys for external services
-- JWT secrets
-- CORS origins
-
-## API Documentation
-
-The backend provides RESTful APIs for:
-- Authentication (`/api/auth`)
-- User management (`/api/users`)
-- Product management (`/api/products`)
-- Sales management (`/api/sales`)
-- Customer management (`/api/contacts`)
-- Document management (`/api/files`, `/api/folders`)
-- Expense tracking (`/api/expenses`)
-- Reports (`/api/reports`)
-- Staff management (`/api/workers`)
-
-## Security Features
-
-- JWT-based authentication
-- Password hashing with bcrypt
-- Input validation and sanitization
-- CORS protection
-- Rate limiting
-- Helmet security headers
-- Environment variable protection
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with proper TypeScript types
-4. Add tests for new functionality
-5. Ensure all tests pass (`npm test`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+## 🆘 Support
 
-For support and questions, please open an issue in the GitHub repository.
+- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
+- **Documentation**: Check the `/docs` folder for detailed guides
+
+---
+
+**Built with ❤️ using modern web technologies for scalable SaaS applications**
