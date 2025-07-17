@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Test - LocalFishing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .language-selector {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .language-selector button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .language-selector button:hover {
+            background: #1d4ed8;
+        }
+        .language-selector button.active {
+            background: #059669;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .section h2 {
+            color: #374151;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+        .translation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .translation-item {
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 5px;
+            border-left: 4px solid #2563eb;
+        }
+        .translation-key {
+            font-weight: bold;
+            color: #6b7280;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .translation-value {
+            color: #111827;
+            font-size: 16px;
+        }
+        .current-language {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 20px;
+        }
+        .test-status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .test-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .test-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐟 LocalFishing Translation Test</h1>
+        
+        <div class="language-selector">
+            <button id="btn-en" class="active" onclick="switchLanguage('en')">English</button>
+            <button id="btn-rw" onclick="switchLanguage('rw')">Ikinyarwanda</button>
+        </div>
+
+        <div id="test-status" class="test-status test-success">
+            ✅ Translations loaded successfully!
+        </div>
+
+        <div class="current-language" id="current-language">
+            Current Language: English
+        </div>
+
+        <!-- Products Section -->
+        <div class="section">
+            <h2 id="products-title">🐟 Products & Inventory</h2>
+            <div class="translation-grid" id="products-translations">
+                <!-- Products translations will be populated here -->
+            </div>
+        </div>
+
+        <!-- Sales Section -->
+        <div class="section">
+            <h2 id="sales-title">💰 Sales Management</h2>
+            <div class="translation-grid" id="sales-translations">
+                <!-- Sales translations will be populated here -->
+            </div>
+        </div>
+
+        <!-- Common Terms -->
+        <div class="section">
+            <h2 id="common-title">🔧 Common Terms</h2>
+            <div class="translation-grid" id="common-translations">
+                <!-- Common translations will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock translation data (in a real app, this would come from your i18n files)
+        const translations = {
+            en: {
+                // Products
+                'inventory.title': 'Product Inventory',
+                'inventory.addProduct': 'Add Product',
+                'inventory.productName': 'Product Name',
+                'inventory.category': 'Category',
+                'inventory.quantity': 'Quantity',
+                'inventory.price': 'Price',
+                'inventory.inStock': 'In Stock',
+                'inventory.outOfStock': 'Out of Stock',
+                'inventory.lowStock': 'Low Stock',
+                'inventory.addProduct.title': 'Add New Fish Product',
+                'inventory.addProduct.productNameLabel': 'Product Name *',
+                'inventory.addProduct.categoryLabel': 'Category *',
+                'inventory.addProduct.boxQuantityLabel': 'Boxed Quantity',
+                'inventory.addProduct.kgQuantityLabel': 'Weight Quantity (kg)',
+                'inventory.addProduct.success': 'Product created successfully!',
+                
+                // Sales
+                'sales.title': 'Sales',
+                'sales.newSale': 'New Sale',
+                'sales.customer': 'Customer',
+                'sales.product': 'Product',
+                'sales.quantity': 'Quantity',
+                'sales.totalAmount': 'Total Amount',
+                'sales.paymentMethod': 'Payment Method',
+                'sales.cash': 'Cash',
+                'sales.mobile': 'Mobile Money',
+                'sales.newSale.title': 'Create New Sale',
+                'sales.newSale.selectProduct': 'Select Product *',
+                'sales.newSale.boxesQuantity': 'Boxes Quantity',
+                'sales.newSale.kgQuantity': 'Kg Quantity',
+                'sales.newSale.paymentStatus': 'Payment Status',
+                'sales.newSale.paid': 'Paid',
+                'sales.newSale.pending': 'Pending',
+                'sales.newSale.createSale': 'Create Sale',
+                
+                // Common
+                'common.save': 'Save',
+                'common.cancel': 'Cancel',
+                'common.delete': 'Delete',
+                'common.edit': 'Edit',
+                'common.add': 'Add',
+                'common.search': 'Search',
+                'common.loading': 'Loading...',
+                'common.success': 'Success',
+                'common.error': 'Error',
+                'common.confirm': 'Confirm'
+            },
+            rw: {
+                // Products
+                'inventory.title': 'Ibicuruzwa',
+                'inventory.addProduct': 'Ongeraho igicuruzwa',
+                'inventory.productName': 'Izina ry\'igicuruzwa',
+                'inventory.category': 'Icyiciro',
+                'inventory.quantity': 'Umubare',
+                'inventory.price': 'Igiciro',
+                'inventory.inStock': 'Birahari',
+                'inventory.outOfStock': 'Ntibihari',
+                'inventory.lowStock': 'Bike',
+                'inventory.addProduct.title': 'Ongeraho Igicuruzwa Gishya cy\'Ifi',
+                'inventory.addProduct.productNameLabel': 'Izina ry\'Igicuruzwa *',
+                'inventory.addProduct.categoryLabel': 'Icyiciro *',
+                'inventory.addProduct.boxQuantityLabel': 'Umubare w\'Amasanduku',
+                'inventory.addProduct.kgQuantityLabel': 'Uburemere (kg)',
+                'inventory.addProduct.success': 'Igicuruzwa cyaremwe neza!',
+                
+                // Sales
+                'sales.title': 'Igurisha',
+                'sales.newSale': 'Igurisha rishya',
+                'sales.customer': 'Umukiriya',
+                'sales.product': 'Igicuruzwa',
+                'sales.quantity': 'Umubare',
+                'sales.totalAmount': 'Igiteranyo',
+                'sales.paymentMethod': 'Uburyo bwo kwishyura',
+                'sales.cash': 'Amafaranga',
+                'sales.mobile': 'Telefoni',
+                'sales.newSale.title': 'Kurema Igurisha Rishya',
+                'sales.newSale.selectProduct': 'Hitamo Igicuruzwa *',
+                'sales.newSale.boxesQuantity': 'Umubare w\'Amasanduku',
+                'sales.newSale.kgQuantity': 'Umubare wa Kilo',
+                'sales.newSale.paymentStatus': 'Uko Ubwishyu Bumeze',
+                'sales.newSale.paid': 'Byishyuwe',
+                'sales.newSale.pending': 'Birategereza',
+                'sales.newSale.createSale': 'Kurema Igurisha',
+                
+                // Common
+                'common.save': 'Bika',
+                'common.cancel': 'Hagarika',
+                'common.delete': 'Siba',
+                'common.edit': 'Hindura',
+                'common.add': 'Ongeraho',
+                'common.search': 'Shakisha',
+                'common.loading': 'Biratangura...',
+                'common.success': 'Byagenze neza',
+                'common.error': 'Ikosa',
+                'common.confirm': 'Emeza'
+            }
+        };
+
+        let currentLanguage = 'en';
+
+        function switchLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update button states
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-rw').classList.toggle('active', lang === 'rw');
+            
+            // Update current language display
+            const langName = lang === 'en' ? 'English' : 'Ikinyarwanda';
+            document.getElementById('current-language').textContent = `Current Language: ${langName}`;
+            
+            // Update all translations
+            updateTranslations();
+        }
+
+        function updateTranslations() {
+            const currentTranslations = translations[currentLanguage];
+            
+            // Update section titles
+            document.getElementById('products-title').textContent = 
+                currentLanguage === 'en' ? '🐟 Products & Inventory' : '🐟 Ibicuruzwa n\'Ububiko';
+            document.getElementById('sales-title').textContent = 
+                currentLanguage === 'en' ? '💰 Sales Management' : '💰 Gucunga Igurisha';
+            document.getElementById('common-title').textContent = 
+                currentLanguage === 'en' ? '🔧 Common Terms' : '🔧 Amagambo Asanzwe';
+
+            // Products translations
+            const productsKeys = [
+                'inventory.title', 'inventory.addProduct', 'inventory.productName', 
+                'inventory.category', 'inventory.quantity', 'inventory.price',
+                'inventory.inStock', 'inventory.outOfStock', 'inventory.lowStock',
+                'inventory.addProduct.title', 'inventory.addProduct.productNameLabel',
+                'inventory.addProduct.categoryLabel', 'inventory.addProduct.boxQuantityLabel',
+                'inventory.addProduct.kgQuantityLabel', 'inventory.addProduct.success'
+            ];
+            
+            // Sales translations
+            const salesKeys = [
+                'sales.title', 'sales.newSale', 'sales.customer', 'sales.product',
+                'sales.quantity', 'sales.totalAmount', 'sales.paymentMethod',
+                'sales.cash', 'sales.mobile', 'sales.newSale.title',
+                'sales.newSale.selectProduct', 'sales.newSale.boxesQuantity',
+                'sales.newSale.kgQuantity', 'sales.newSale.paymentStatus',
+                'sales.newSale.paid', 'sales.newSale.pending', 'sales.newSale.createSale'
+            ];
+            
+            // Common translations
+            const commonKeys = [
+                'common.save', 'common.cancel', 'common.delete', 'common.edit',
+                'common.add', 'common.search', 'common.loading', 'common.success',
+                'common.error', 'common.confirm'
+            ];
+
+            // Populate sections
+            populateSection('products-translations', productsKeys, currentTranslations);
+            populateSection('sales-translations', salesKeys, currentTranslations);
+            populateSection('common-translations', commonKeys, currentTranslations);
+        }
+
+        function populateSection(containerId, keys, translations) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            keys.forEach(key => {
+                const value = translations[key] || `[Missing: ${key}]`;
+                const item = document.createElement('div');
+                item.className = 'translation-item';
+                item.innerHTML = `
+                    <div class="translation-key">${key}</div>
+                    <div class="translation-value">${value}</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Initialize with English
+        updateTranslations();
+
+        // Test status
+        const testStatus = document.getElementById('test-status');
+        const missingTranslations = [];
+        
+        // Check for missing translations
+        Object.keys(translations.en).forEach(key => {
+            if (!translations.rw[key]) {
+                missingTranslations.push(key);
+            }
+        });
+
+        if (missingTranslations.length > 0) {
+            testStatus.className = 'test-status test-error';
+            testStatus.innerHTML = `❌ Missing ${missingTranslations.length} Kinyarwanda translations`;
+        }
+    </script>
+</body>
+</html>

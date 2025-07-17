@@ -27,6 +27,7 @@ const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Generic API request function with error handling
+ * Handles both old and new backend response formats
  */
 async function apiRequest<T>(
   endpoint: string,
@@ -78,19 +79,62 @@ async function apiRequest<T>(
       };
     }
 
+    console.log('API Response:', {
+      status: response.status,
+      ok: response.ok,
+      result
+    });
+
     if (!response.ok) {
-      // For 409 Conflict errors, return the structured error response
-      if (response.status === 409) {
+      // Handle new backend error format
+      if (result && typeof result === 'object') {
+        // New format: { success: false, error: "message", ... }
+        if ('success' in result && result.success === false) {
+          return {
+            success: false,
+            error: result.error || result.message || `HTTP error! status: ${response.status}`,
+            status: response.status,
+          };
+        }
+        // Old format or other error structures
         return {
           success: false,
           error: result.error || result.message || `HTTP error! status: ${response.status}`,
           status: response.status,
         };
       }
-      throw new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
+
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return result;
+    // Handle successful responses - normalize format
+    if (result && typeof result === 'object') {
+      // New backend format: { success: true, data: {...}, message?: "...", ... }
+      if ('success' in result && result.success === true) {
+        return {
+          success: true,
+          data: result.data,
+          message: result.message,
+        };
+      }
+
+      // Old format or direct data response
+      if ('success' in result) {
+        return result;
+      }
+
+      // Direct data response (wrap in success format)
+      return {
+        success: true,
+        data: result as T,
+      };
+    }
+
+    // Fallback for non-object responses
+    return {
+      success: true,
+      data: result as T,
+    };
   } catch (error) {
     console.error(`API request failed for ${endpoint}:`, error);
     return {
@@ -487,6 +531,7 @@ export interface FolderData {
   icon: string;
   file_count: number;
   total_size: number;
+  is_permanent?: boolean; // Whether this is a permanent system folder
   created_by: string;
 }
 
@@ -597,10 +642,10 @@ export const expensesApi = {
 
     // Append file if provided
     if (file) {
-      formData.append('file', file);
+      formData.append('receipt', file);
     }
 
-    return apiRequest('/api/expenses', {
+    return apiRequest('/api/expenses/upload', {
       method: 'POST',
       body: formData,
     });
@@ -759,7 +804,7 @@ export const filesApi = {
       formData.append('description', description);
     }
 
-    return apiRequest<FileUploadResponse>('/api/files/upload', {
+    return apiRequest<FileUploadResponse>('/api/files', {
       method: 'POST',
       body: formData,
     });
@@ -778,19 +823,37 @@ export const filesApi = {
       formData.append('description', description);
     }
 
-    return apiRequest<MultipleFileUploadResponse>('/api/files/upload-multiple', {
+    return apiRequest<MultipleFileUploadResponse>('/api/files', {
       method: 'POST',
       body: formData,
     });
   },
 
   /**
+   * Update file metadata
+   */
+  updateMetadata: (id: string, data: { file_name?: string; description?: string }) =>
+    apiRequest<FileData>(`/api/files/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
    * Delete a file
    */
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/api/files/${id}`, {
-      method: 'DELETE',
-    }),
+  delete: async (id: string) => {
+    console.log("🔗 API: Calling delete for file ID:", id);
+    try {
+      const result = await apiRequest<{ message: string }>(`/api/files/${id}`, {
+        method: 'DELETE',
+      });
+      console.log("🔗 API: Delete response:", result);
+      return result;
+    } catch (error) {
+      console.error("🔗 API: Delete error:", error);
+      throw error;
+    }
+  },
 };
 
 export default apiRequest;

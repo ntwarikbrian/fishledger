@@ -4,160 +4,231 @@
  */
 
 import { z } from 'zod';
-import type { RouteHandler } from '../types/index';
+import type { HonoContext, PaginationParams } from '../types/index';
 import {
   createSuccessResponse,
   createErrorResponse,
   createValidationErrorResponse,
   createNotFoundResponse,
+  createPaginatedResponse,
+  calculatePagination,
 } from '../utils/response';
+import {
+  applyPagination,
+  applySearch,
+  getTotalCount,
+} from '../utils/db';
 
-// Note: This is a placeholder implementation since folders table doesn't exist in the current schema
-// In a real implementation, you would need to create a folders table in your database
-
-// Validation schemas
+// Validation schemas - Updated to match database schema
 const createFolderSchema = z.object({
-  name: z.string().min(1, 'Folder name is required').max(100, 'Folder name too long'),
+  folder_name: z.string().min(1, 'Folder name is required').max(100, 'Folder name too long'),
   description: z.string().max(500, 'Description too long').optional(),
-  parent_id: z.string().optional(),
-  color: z.string().max(7, 'Invalid color format').optional(),
-  icon: z.string().max(50, 'Icon name too long').optional(),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format').default('#3B82F6'),
+  icon: z.string().max(50, 'Icon name too long').default('folder'),
 });
 
 const updateFolderSchema = createFolderSchema.partial();
 
-/**
- * Get all folders for the authenticated user
- */
-export const getFoldersHandler: RouteHandler = async (request, context) => {
-  try {
-    // TODO: Implement actual folder retrieval from database
-    // For now, return a placeholder response
-    const folders = [
-      {
-        folder_id: '1',
-        name: 'Documents',
-        description: 'General documents',
-        parent_id: null,
-        color: '#3B82F6',
-        icon: 'folder',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        folder_id: '2',
-        name: 'Receipts',
-        description: 'Expense receipts',
-        parent_id: null,
-        color: '#10B981',
-        icon: 'receipt',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
+const getFoldersQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10),
+  sortBy: z.enum(['folder_name', 'file_count']).default('folder_name'), // Updated to match existing columns
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  search: z.string().optional(),
+});
 
-    return createSuccessResponse(folders, 'Folders retrieved successfully', context.requestId);
+/**
+ * Get all folders for the authenticated user with pagination and filtering
+ */
+export const getFoldersHandler = async (c: HonoContext) => {
+  try {
+    const queryParams = c.req.query();
+
+    const validation = getFoldersQuerySchema.safeParse(queryParams);
+    if (!validation.success) {
+      const errors = validation.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
+    }
+
+    const { page, limit, sortBy, sortOrder, search } = validation.data;
+    const user = c.get('user');
+
+    if (!user) {
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
+
+    // Build query for folders created by the authenticated user
+    let query = c.get('supabase')
+      .from('folders')
+      .select('*')
+      .eq('created_by', user.id);
+
+    // Apply search if provided
+    if (search) {
+      query = applySearch(query, search, ['folder_name', 'description']);
+    }
+
+    // Get total count for pagination - Use direct query since folders table is not in getTotalCount
+    const { count: totalCount, error: countError } = await c.get('supabase')
+      .from('folders')
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', user.id);
+
+    if (countError) {
+      throw new Error(`Failed to get folder count: ${countError.message}`);
+    }
+
+    // Apply pagination
+    query = applyPagination(query, { page, limit, sortBy, sortOrder });
+
+    const { data: folders, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch folders: ${error.message}`);
+    }
+
+    const pagination = calculatePagination(page, limit, totalCount || 0);
+
+    return createPaginatedResponse(
+      folders || [],
+      pagination,
+      c.get('requestId')
+    );
 
   } catch (error) {
     console.error('Get folders error:', error);
-    return createErrorResponse('Failed to retrieve folders', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, context.requestId);
+    return c.json(createErrorResponse('Failed to retrieve folders', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
 
 /**
  * Get a single folder by ID
  */
-export const getFolderHandler: RouteHandler = async (request, context) => {
+export const getFolderHandler = async (c: HonoContext) => {
   try {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const id = pathParts[pathParts.length - 1];
+    const id = c.req.param('id');
 
     if (!id) {
-      return createErrorResponse('Folder ID is required', 400, undefined, context.requestId);
+      return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    // TODO: Implement actual folder retrieval from database
-    // For now, return a placeholder response
-    const folder = {
-      folder_id: id,
-      name: 'Sample Folder',
-      description: 'Sample folder description',
-      parent_id: null,
-      color: '#3B82F6',
-      icon: 'folder',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const user = c.get('user');
+    if (!user) {
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
 
-    return createSuccessResponse(folder, 'Folder retrieved successfully', context.requestId);
+    // Get folder from database - only folders created by the authenticated user
+    const { data: folder, error } = await c.get('supabase')
+      .from('folders')
+      .select('*')
+      .eq('folder_id', id)
+      .eq('created_by', user.id)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      return c.json(createNotFoundResponse('Folder', c.get('requestId')), 404);
+    }
+
+    if (error) {
+      throw new Error(`Failed to fetch folder: ${error.message}`);
+    }
+
+    return c.json(createSuccessResponse(folder, 'Folder retrieved successfully', c.get('requestId')));
 
   } catch (error) {
     console.error('Get folder error:', error);
-    return createErrorResponse('Failed to retrieve folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, context.requestId);
+    return c.json(createErrorResponse('Failed to retrieve folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
 
 /**
  * Create a new folder
  */
-export const createFolderHandler: RouteHandler = async (request, context) => {
+export const createFolderHandler = async (c: HonoContext) => {
   try {
-    const body = await request.json();
+    console.log('🚀 createFolderHandler called');
+
+    const body = await c.req.json();
+    console.log('📝 Request body:', JSON.stringify(body, null, 2));
 
     const validation = createFolderSchema.safeParse(body);
+    console.log('✅ Validation result:', {
+      success: validation.success,
+      errors: validation.success ? null : validation.error.errors
+    });
+
     if (!validation.success) {
       const errors = validation.error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
       }));
-      return createValidationErrorResponse(errors, context.requestId);
+      console.log('❌ Validation failed:', errors);
+      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
     }
 
     const folderData = validation.data;
+    console.log('📁 Folder data after validation:', folderData);
 
-    // TODO: Implement actual folder creation in database
-    // For now, return a placeholder response
-    const newFolder = {
-      folder_id: `folder_${Date.now()}`,
+    const user = c.get('user');
+    console.log('👤 User from context:', user ? { id: user.id, email: user.email } : 'NO USER');
+
+    if (!user) {
+      console.log('❌ User not authenticated');
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
+
+    // Create folder in database
+    const insertData = {
       ...folderData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_by: user.id,
+      file_count: 0,
+      total_size: 0,
+      // Mark Workers ID Image folder as permanent
+      is_permanent: folderData.folder_name === 'Workers ID Image',
     };
+    console.log('💾 Data to insert:', insertData);
 
-    return new Response(JSON.stringify({
+    const { data: newFolder, error } = await c.get('supabase')
+      .from('folders')
+      .insert(insertData)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('💥 Database error:', error);
+      throw new Error(`Failed to create folder: ${error.message}`);
+    }
+
+    console.log('✅ Folder created successfully:', newFolder);
+    return c.json({
       success: true,
       message: 'Folder created successfully',
       data: newFolder,
-      requestId: context.requestId,
-    }), {
-      status: 201,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': context.requestId,
-      },
-    });
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 201);
 
   } catch (error) {
-    console.error('Create folder error:', error);
-    return createErrorResponse('Failed to create folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, context.requestId);
+    console.error('💥 Create folder error:', error);
+    return c.json(createErrorResponse('Failed to create folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
 
 /**
  * Update an existing folder
  */
-export const updateFolderHandler: RouteHandler = async (request, context) => {
+export const updateFolderHandler = async (c: HonoContext) => {
   try {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const id = pathParts[pathParts.length - 1];
+    const id = c.req.param('id');
 
     if (!id) {
-      return createErrorResponse('Folder ID is required', 400, undefined, context.requestId);
+      return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const body = await request.json();
+    const body = await c.req.json();
 
     const validation = updateFolderSchema.safeParse(body);
     if (!validation.success) {
@@ -165,57 +236,114 @@ export const updateFolderHandler: RouteHandler = async (request, context) => {
         field: err.path.join('.'),
         message: err.message,
       }));
-      return createValidationErrorResponse(errors, context.requestId);
+      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
     }
 
     const updateData = validation.data;
+    const user = c.get('user');
 
-    // TODO: Implement actual folder update in database
-    // For now, return a placeholder response
-    const updatedFolder = {
-      folder_id: id,
-      name: updateData.name || 'Updated Folder',
-      description: updateData.description || 'Updated description',
-      parent_id: updateData.parent_id || null,
-      color: updateData.color || '#3B82F6',
-      icon: updateData.icon || 'folder',
-      created_at: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-      updated_at: new Date().toISOString(),
-    };
+    if (!user) {
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
 
-    return createSuccessResponse(updatedFolder, 'Folder updated successfully', context.requestId);
+    // Check if folder exists and belongs to user
+    const { error: checkError } = await c.get('supabase')
+      .from('folders')
+      .select('folder_id')
+      .eq('folder_id', id)
+      .eq('created_by', user.id)
+      .single();
+
+    if (checkError && checkError.code === 'PGRST116') {
+      return c.json(createNotFoundResponse('Folder', c.get('requestId')), 404);
+    }
+
+    if (checkError) {
+      throw new Error(`Failed to check folder existence: ${checkError.message}`);
+    }
+
+    // Update folder in database
+    const { data: updatedFolder, error } = await c.get('supabase')
+      .from('folders')
+      .update(updateData)
+      .eq('folder_id', id)
+      .eq('created_by', user.id) // Ensure user can only update their own folders
+      .select('*')
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update folder: ${error.message}`);
+    }
+
+    return c.json(createSuccessResponse(updatedFolder, 'Folder updated successfully', c.get('requestId')));
 
   } catch (error) {
     console.error('Update folder error:', error);
-    return createErrorResponse('Failed to update folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, context.requestId);
+    return c.json(createErrorResponse('Failed to update folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
 
 /**
  * Delete a folder (only if it's empty)
  */
-export const deleteFolderHandler: RouteHandler = async (request, context) => {
+export const deleteFolderHandler = async (c: HonoContext) => {
   try {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const id = pathParts[pathParts.length - 1];
+    const id = c.req.param('id');
 
     if (!id) {
-      return createErrorResponse('Folder ID is required', 400, undefined, context.requestId);
+      return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    // TODO: Implement actual folder deletion from database
-    // Check if folder has files or subfolders before deletion
-    // For now, return a placeholder response
+    const user = c.get('user');
+    if (!user) {
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
 
-    return createSuccessResponse(
+    // Check if folder exists and belongs to user
+    const { data: folder, error: checkError } = await c.get('supabase')
+      .from('folders')
+      .select('folder_id, file_count')
+      .eq('folder_id', id)
+      .eq('created_by', user.id)
+      .single();
+
+    if (checkError && checkError.code === 'PGRST116') {
+      return c.json(createNotFoundResponse('Folder', c.get('requestId')), 404);
+    }
+
+    if (checkError) {
+      throw new Error(`Failed to check folder existence: ${checkError.message}`);
+    }
+
+    // Check if folder is permanent (cannot be deleted)
+    if (folder.is_permanent) {
+      return c.json(createErrorResponse('Cannot delete permanent system folder', 400, { error: 'This is a permanent system folder and cannot be deleted' }, c.get('requestId')), 400);
+    }
+
+    // Check if folder is empty (has no files)
+    if (folder.file_count > 0) {
+      return c.json(createErrorResponse('Cannot delete folder with files', 400, { error: 'Folder must be empty before deletion' }, c.get('requestId')), 400);
+    }
+
+    // Delete folder from database
+    const { error: deleteError } = await c.get('supabase')
+      .from('folders')
+      .delete()
+      .eq('folder_id', id)
+      .eq('created_by', user.id);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete folder: ${deleteError.message}`);
+    }
+
+    return c.json(createSuccessResponse(
       { deleted: true, folder_id: id },
       'Folder deleted successfully',
-      context.requestId,
-    );
+      c.get('requestId')
+    ));
 
   } catch (error) {
     console.error('Delete folder error:', error);
-    return createErrorResponse('Failed to delete folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, context.requestId);
+    return c.json(createErrorResponse('Failed to delete folder', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };

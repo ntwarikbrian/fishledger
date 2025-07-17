@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import {
   Upload,
   Search,
   Filter,
-  Download,
   Eye,
+  Edit,
   Trash2,
   Image as ImageIcon,
   File,
@@ -24,7 +24,6 @@ import {
   Grid3X3,
   List,
   MoreVertical,
-  Edit,
   Share,
   Archive,
   BarChart,
@@ -62,6 +61,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { foldersApi, filesApi, type FolderData, type CreateFolderData, type FileData } from "@/lib/api";
+
+// Helper function to convert hex colors to color names for UI styling
+const getColorName = (hexColor: string): string => {
+  const colorMap: Record<string, string> = {
+    "#3B82F6": "blue",
+    "#10B981": "green",
+    "#8B5CF6": "purple",
+    "#F59E0B": "orange",
+    "#EF4444": "red",
+  };
+  return colorMap[hexColor] || "blue";
+};
 
 // Circular Progress Component for Statistics
 interface CircularProgressProps {
@@ -182,7 +193,7 @@ interface AddFolderFormProps {
 const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit, isLoading = false }) => {
   const [name, setName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [color, setColor] = useState<string>("blue");
+  const [color, setColor] = useState<string>("#3B82F6"); // Default blue hex color
   const [icon, setIcon] = useState<string>("FileText");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -195,16 +206,16 @@ const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit, isLoading = fal
     // Reset form
     setName("");
     setDescription("");
-    setColor("blue");
+    setColor("#3B82F6"); // Reset to default blue hex color
     setIcon("FileText");
   };
 
   const colorOptions = [
-    { value: "blue", label: "Blue", class: "bg-blue-500" },
-    { value: "green", label: "Green", class: "bg-green-500" },
-    { value: "purple", label: "Purple", class: "bg-purple-500" },
-    { value: "orange", label: "Orange", class: "bg-orange-500" },
-    { value: "red", label: "Red", class: "bg-red-500" },
+    { value: "#3B82F6", label: "Blue", class: "bg-blue-500" },
+    { value: "#10B981", label: "Green", class: "bg-green-500" },
+    { value: "#8B5CF6", label: "Purple", class: "bg-purple-500" },
+    { value: "#F59E0B", label: "Orange", class: "bg-orange-500" },
+    { value: "#EF4444", label: "Red", class: "bg-red-500" },
     { value: "yellow", label: "Yellow", class: "bg-yellow-500" },
   ];
 
@@ -313,6 +324,8 @@ const AddFolderForm: React.FC<AddFolderFormProps> = ({ onSubmit, isLoading = fal
 };
 
 const Documents: React.FC = () => {
+  console.log("🚀 Documents component rendering...");
+
   // State management for documents and UI
   const [documents, setDocuments] = useState<DocumentFile[]>([]);
 
@@ -362,7 +375,36 @@ const Documents: React.FC = () => {
         console.log("Folders API response:", response);
 
         if (response.success && response.data) {
-          setFolders(response.data);
+          let foldersData = response.data;
+
+          // Check if Workers ID Image folder exists
+          const workersIdFolder = foldersData.find(folder =>
+            folder.folder_name === 'Workers ID Image' && folder.is_permanent
+          );
+
+          // If it doesn't exist, create it
+          if (!workersIdFolder) {
+            try {
+              console.log("Creating permanent Workers ID Image folder...");
+              const createResponse = await foldersApi.create({
+                folder_name: 'Workers ID Image',
+                description: 'Store worker identification images and documents for employee verification',
+                color: '#8B5CF6', // Purple color
+                icon: 'id-card'
+              });
+
+              if (createResponse.success && createResponse.data) {
+                // Add the new permanent folder to the list
+                foldersData = [createResponse.data, ...foldersData];
+                console.log("Workers ID Image folder created successfully");
+              }
+            } catch (createError) {
+              console.error("Failed to create Workers ID Image folder:", createError);
+              // Don't show error to user as this is automatic
+            }
+          }
+
+          setFolders(foldersData);
         } else {
           console.error('Failed to fetch folders:', response.message);
           if (response.error?.includes('401') || response.error?.includes('Authentication')) {
@@ -500,28 +542,49 @@ const Documents: React.FC = () => {
             uploadDescription || `Uploaded ${selectedImages[0].name}`
           );
 
-          if (response.success && response.data) {
-            // Convert API response to DocumentFile format
-            const newDocument: DocumentFile = {
-              id: response.data.file.file_id,
-              name: response.data.file.file_name,
-              type: response.data.file.file_type?.startsWith('image/') ? 'image' : 'document',
-              size: response.data.metadata.size,
-              uploadDate: new Date(response.data.file.upload_date).toISOString().split('T')[0],
-              uploadedBy: "You", // TODO: Get from auth context
-              category: selectedFolder?.folder_name || "Uncategorized",
-              folderId: response.data.file.folder_id,
-              folderName: selectedFolder?.folder_name || "Uncategorized",
-              folderColor: selectedFolder?.color || "purple",
-              url: response.data.file.file_url,
-              thumbnail: response.data.file.file_url, // Use same URL for thumbnail
-              description: response.data.file.description || "",
-              tags: []
-            };
+          if (response.success && response.data && response.data.file) {
+            console.log("✅ Single file upload successful:", response.data);
 
-            // Add to documents list
-            setDocuments(prev => [newDocument, ...prev]);
-            successCount = 1;
+            try {
+              // Validate required fields
+              if (!response.data.file.file_id || !response.data.file.file_name) {
+                throw new Error("Missing required file data in response");
+              }
+
+              // Convert API response to DocumentFile format
+              const newDocument: DocumentFile = {
+                id: response.data.file.file_id,
+                name: response.data.file.file_name,
+                type: response.data.file.file_type?.startsWith('image/') ? 'image' : 'document',
+                size: `${((Number(response.data.metadata?.size) || 0) / (1024 * 1024)).toFixed(1)} MB`,
+                uploadDate: response.data.file.upload_date ?
+                  new Date(response.data.file.upload_date).toISOString().split('T')[0] :
+                  new Date().toISOString().split('T')[0],
+                uploadedBy: "You", // TODO: Get from auth context
+                category: selectedFolder?.folder_name || "Uncategorized",
+                folderId: response.data.file.folder_id,
+                folderName: selectedFolder?.folder_name || "Uncategorized",
+                folderColor: selectedFolder?.color || "#8B5CF6",
+                url: response.data.file.file_url || "",
+                thumbnail: response.data.file.file_url || "", // Use same URL for thumbnail
+                description: response.data.file.description || "",
+                tags: []
+              };
+
+              console.log("📄 Created document object:", newDocument);
+
+              // Add to documents list
+              setDocuments(prev => {
+                const updated = [newDocument, ...prev];
+                console.log("📋 Updated documents list:", updated.length, "items");
+                return updated;
+              });
+              successCount = 1;
+            } catch (docError) {
+              console.error("❌ Error creating document object:", docError);
+              toast.error("Error processing uploaded file data");
+              failCount = 1;
+            }
           } else {
             console.error("Upload failed:", response.error);
             toast.error(response.error || "Failed to upload file");
@@ -548,13 +611,13 @@ const Documents: React.FC = () => {
                 id: uploadResult.file.file_id,
                 name: uploadResult.file.file_name,
                 type: uploadResult.file.file_type?.startsWith('image/') ? 'image' : 'document',
-                size: `${(uploadResult.file.file_size || 0 / (1024 * 1024)).toFixed(1)} MB`,
+                size: `${((Number(uploadResult.file.file_size) || 0) / (1024 * 1024)).toFixed(1)} MB`,
                 uploadDate: new Date(uploadResult.file.upload_date).toISOString().split('T')[0],
                 uploadedBy: "You", // TODO: Get from auth context
                 category: selectedFolder?.folder_name || "Uncategorized",
                 folderId: uploadResult.file.folder_id,
                 folderName: selectedFolder?.folder_name || "Uncategorized",
-                folderColor: selectedFolder?.color || "purple",
+                folderColor: selectedFolder?.color || "#8B5CF6",
                 url: uploadResult.file.file_url,
                 thumbnail: uploadResult.file.file_url,
                 description: uploadResult.file.description || "",
@@ -586,26 +649,54 @@ const Documents: React.FC = () => {
         }
       }
 
+      console.log("🔄 Resetting form and showing results...");
+      console.log(`📊 Upload results: ${successCount} successful, ${failCount} failed`);
+
       // Reset form
-      setSelectedImages([]);
-      setUploadDescription("");
-      setUploadFolderId("");
-      setShowUploadForm(false);
+      try {
+        setSelectedImages([]);
+        setUploadDescription("");
+        setUploadFolderId("");
+        setShowUploadForm(false);
+        console.log("✅ Form reset successful");
+      } catch (resetError) {
+        console.error("❌ Error resetting form:", resetError);
+      }
+
+      // Refresh files data if any uploads were successful
+      if (successCount > 0) {
+        try {
+          console.log("🔄 Refreshing files after successful upload...");
+          await refreshFilesRef.current?.();
+        } catch (refreshError) {
+          console.error("❌ Error refreshing files:", refreshError);
+        }
+      }
 
       // Show success/error messages
-      if (successCount > 0 && failCount === 0) {
-        toast.success(`Successfully uploaded ${successCount} file(s)`);
-      } else if (successCount > 0 && failCount > 0) {
-        toast.warning(`Uploaded ${successCount} file(s), ${failCount} failed`);
-      } else if (failCount > 0) {
-        toast.error(`Failed to upload ${failCount} file(s)`);
+      try {
+        if (successCount > 0 && failCount === 0) {
+          toast.success(`Successfully uploaded ${successCount} file(s)`);
+        } else if (successCount > 0 && failCount > 0) {
+          toast.warning(`Uploaded ${successCount} file(s), ${failCount} failed`);
+        } else if (failCount > 0) {
+          toast.error(`Failed to upload ${failCount} file(s)`);
+        }
+        console.log("✅ Toast messages shown");
+      } catch (toastError) {
+        console.error("❌ Error showing toast:", toastError);
       }
 
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("💥 Upload error:", error);
       toast.error("Failed to upload files. Please try again.");
     } finally {
-      setIsUploading(false);
+      try {
+        setIsUploading(false);
+        console.log("✅ Upload process completed, loading state reset");
+      } catch (finalError) {
+        console.error("❌ Error in finally block:", finalError);
+      }
     }
   }, [selectedImages, uploadDescription, uploadFolderId, folders]);
 
@@ -614,12 +705,6 @@ const Documents: React.FC = () => {
 
   // File operation states
   const [deletingFiles, setDeletingFiles] = useState<Set<string>>(new Set());
-  const [editingFile, setEditingFile] = useState<DocumentFile | null>(null);
-  const [isEditFileOpen, setIsEditFileOpen] = useState(false);
-  const [editFileForm, setEditFileForm] = useState({
-    name: '',
-    description: ''
-  });
 
   // Cache for API calls to reduce requests
   const [filesCache, setFilesCache] = useState<Map<string, { data: DocumentFile[]; timestamp: number }>>(new Map());
@@ -628,6 +713,9 @@ const Documents: React.FC = () => {
 
   // Debounce timer ref
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Refresh files data after operations (will be updated with proper dependencies later)
+  const refreshFilesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Load files from database by folder with caching
   const loadFilesByFolder = useCallback(async (folderId: string, forceRefresh = false) => {
@@ -660,7 +748,7 @@ const Documents: React.FC = () => {
           category: folderData?.folder_name || "Uncategorized",
           folderId: file.folder_id,
           folderName: folderData?.folder_name || "Uncategorized",
-          folderColor: folderData?.color || "purple",
+          folderColor: folderData?.color || "#8B5CF6",
           url: file.file_url,
           thumbnail: file.file_url,
           description: file.description || "",
@@ -812,106 +900,59 @@ const Documents: React.FC = () => {
     setActiveTab("files");
   }, [handleFolderFilterChange]);
 
-  // Test server connection
-  const testServerConnection = useCallback(async () => {
-    try {
-      const response = await fetch('http://localhost:5004/health');
-      const result = await response.json();
-      console.log("Server health check:", result);
+  // Create the refresh function now that load functions are defined
+  const refreshFiles = useCallback(async () => {
+    console.log("🔄 Refreshing files data...");
 
-      if (response.ok) {
-        toast.success("Server is running and accessible");
+    try {
+      // Clear all cache to ensure fresh data
+      setFilesCache(new Map());
+
+      // Reset loading states
+      setIsLoadingFiles(false);
+
+      // Clear current documents to show loading state
+      setDocuments([]);
+
+      console.log("📂 Current view:", selectedCategory);
+      console.log("📁 Available folders:", folders.length);
+
+      // Refresh based on current view
+      if (selectedCategory === "all") {
+        console.log("🔄 Refreshing all files...");
+        await loadAllFiles(true); // Force refresh
       } else {
-        toast.error("Server is not responding properly");
+        // Find the selected folder and refresh its files
+        const selectedFolder = folders.find(f => f.folder_name === selectedCategory);
+        if (selectedFolder) {
+          console.log("🔄 Refreshing files for folder:", selectedFolder.folder_name, selectedFolder.folder_id);
+          await loadFilesByFolder(selectedFolder.folder_id, true); // Force refresh
+        } else {
+          console.warn("⚠️ Selected folder not found:", selectedCategory);
+          // Fallback to loading all files
+          await loadAllFiles(true);
+        }
       }
-    } catch (error) {
-      console.error("Server connection test failed:", error);
-      toast.error("Cannot connect to server. Please check if the backend is running.");
-    }
-  }, []);
 
-  // Handle file download
-  const handleDownloadFile = useCallback(async (document: DocumentFile) => {
-    try {
-      const link = window.document.createElement('a');
-      link.href = document.url;
-      link.download = document.name;
-      link.click();
-
-      toast.success(`Downloading ${document.name}`, {
-        position: "bottom-right",
-        duration: 2000
-      });
+      console.log("✅ Files data refreshed successfully");
     } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Failed to download file", {
+      console.error("❌ Error during files refresh:", error);
+      // Show error toast but don't throw to avoid breaking the UI
+      toast.error("Failed to refresh files. Please try again.", {
         position: "bottom-right",
         duration: 3000
       });
     }
-  }, []);
+  }, [selectedCategory, folders, loadAllFiles, loadFilesByFolder]);
 
-  // Handle file edit info
-  const handleEditFileInfo = useCallback((document: DocumentFile) => {
-    setEditingFile(document);
-    setEditFileForm({
-      name: document.name,
-      description: document.description || ''
-    });
-    setIsEditFileOpen(true);
-  }, []);
+  // Update the ref so it can be used in handlers
+  refreshFilesRef.current = refreshFiles;
 
-  // Handle file info update
-  const handleUpdateFileInfo = useCallback(async () => {
-    if (!editingFile) return;
 
-    try {
-      const loadingToast = toast.loading("Updating file info...", {
-        position: "bottom-right",
-        duration: Infinity
-      });
 
-      const response = await filesApi.updateMetadata(editingFile.id, {
-        file_name: editFileForm.name.trim(),
-        description: editFileForm.description.trim() || undefined
-      });
 
-      if (response.success && response.data) {
-        // Update local state
-        setDocuments(prev => prev.map(doc =>
-          doc.id === editingFile.id
-            ? { ...doc, name: editFileForm.name.trim(), description: editFileForm.description.trim() }
-            : doc
-        ));
 
-        // Clear cache for the folder
-        const cacheKey = `folder_${editingFile.folderId}`;
-        setFilesCache(prev => {
-          const newCache = new Map(prev);
-          newCache.delete(cacheKey);
-          return newCache;
-        });
 
-        toast.dismiss(loadingToast);
-        toast.success("File info updated successfully", {
-          position: "bottom-right",
-          duration: 3000
-        });
-
-        setIsEditFileOpen(false);
-        setEditingFile(null);
-        setEditFileForm({ name: '', description: '' });
-      } else {
-        throw new Error(response.message || 'Failed to update file info');
-      }
-    } catch (error) {
-      console.error("File update error:", error);
-      toast.error("Failed to update file info", {
-        position: "bottom-right",
-        duration: 4000
-      });
-    }
-  }, [editingFile, editFileForm]);
 
   // Handle file share
   const handleShareFile = useCallback(async (document: DocumentFile) => {
@@ -932,11 +973,26 @@ const Documents: React.FC = () => {
 
   // Handle document deletion with loading animation
   const handleDeleteDocument = useCallback(async (documentId: string) => {
+    console.log("🗑️ Attempting to delete document:", documentId);
+
+    // Check if document exists in current state
+    const documentExists = documents.find(doc => doc.id === documentId);
+    if (!documentExists) {
+      console.warn("⚠️ Document not found in current state:", documentId);
+      toast.error("Document not found. It may have already been deleted.", {
+        position: "bottom-right",
+        duration: 3000
+      });
+      return;
+    }
+
+    let loadingToast: string | number | undefined;
+
     try {
       // Add to deleting set and show loading toast
       setDeletingFiles(prev => new Set(prev).add(documentId));
 
-      const loadingToast = toast.loading("Deleting...", {
+      loadingToast = toast.loading("Deleting...", {
         position: "bottom-right",
         duration: Infinity,
         style: {
@@ -946,12 +1002,22 @@ const Documents: React.FC = () => {
         }
       });
 
+      console.log("📡 Calling backend API to delete file...");
+
       // Call backend API to delete file
       const response = await filesApi.delete(documentId);
 
+      console.log("📡 Delete API response:", response);
+
       if (response.success) {
+        console.log("✅ File deleted successfully from backend");
+
         // Remove from local state only after successful API call
-        setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+        setDocuments(prev => {
+          const updated = prev.filter(doc => doc.id !== documentId);
+          console.log("📋 Updated documents list after deletion:", updated.length, "items");
+          return updated;
+        });
 
         // Clear cache for the folder
         const deletedDoc = documents.find(doc => doc.id === documentId);
@@ -960,21 +1026,60 @@ const Documents: React.FC = () => {
           setFilesCache(prev => {
             const newCache = new Map(prev);
             newCache.delete(cacheKey);
+            console.log("🗑️ Cleared cache for folder:", deletedDoc.folderId);
             return newCache;
           });
         }
 
         // Dismiss loading toast and show success
-        toast.dismiss(loadingToast);
+        if (loadingToast) toast.dismiss(loadingToast);
         toast.success("Document deleted successfully", {
           position: "bottom-right",
           duration: 3000
         });
+
+        // Refresh files data after successful deletion
+        try {
+          console.log("🔄 Refreshing files after successful deletion...");
+          await refreshFilesRef.current?.();
+        } catch (refreshError) {
+          console.error("❌ Error refreshing files after deletion:", refreshError);
+        }
       } else {
-        throw new Error(response.error || "Failed to delete document");
+        console.error("❌ Backend delete failed:", response.error);
+        if (loadingToast) toast.dismiss(loadingToast);
+
+        // Handle specific error cases
+        if ((response as any).status === 404 || response.error?.includes('404') || response.error?.includes('not found')) {
+          // File already deleted, remove from local state and refresh
+          console.log("📄 File was already deleted, refreshing data");
+          toast.warning("Document was already deleted. Refreshing list.", {
+            position: "bottom-right",
+            duration: 3000
+          });
+
+          // Refresh files data to sync with backend
+          try {
+            await refreshFilesRef.current?.();
+          } catch (refreshError) {
+            console.error("❌ Error refreshing files after 404:", refreshError);
+          }
+        } else {
+          // Show specific error message from backend
+          const errorMessage = response.error || response.message || "Failed to delete document";
+          console.error("❌ Delete failed with error:", errorMessage);
+          toast.error(`Failed to delete document: ${errorMessage}`, {
+            position: "bottom-right",
+            duration: 4000
+          });
+        }
       }
     } catch (error) {
-      console.error("Delete error:", error);
+      console.error("💥 Delete error:", error);
+
+      // Make sure to dismiss loading toast
+      if (loadingToast) toast.dismiss(loadingToast);
+
       toast.error("Failed to delete document. Please try again.", {
         position: "bottom-right",
         duration: 4000
@@ -984,6 +1089,7 @@ const Documents: React.FC = () => {
       setDeletingFiles(prev => {
         const newSet = new Set(prev);
         newSet.delete(documentId);
+        console.log("🔄 Removed from deleting set:", documentId);
         return newSet;
       });
     }
@@ -1142,6 +1248,13 @@ const Documents: React.FC = () => {
     });
   };
 
+  console.log("📋 About to render Documents component with:", {
+    documentsCount: documents.length,
+    foldersCount: folders.length,
+    isUploading,
+    showUploadForm
+  });
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -1225,13 +1338,6 @@ const Documents: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={testServerConnection}
-                      className="text-sm"
-                    >
-                      Test Server
-                    </Button>
                     <Dialog open={isAddFolderOpen} onOpenChange={setIsAddFolderOpen}>
                       <DialogTrigger asChild>
                         <Button className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base">
@@ -1275,51 +1381,51 @@ const Documents: React.FC = () => {
                     {/* Folder Icon and Info */}
                     <div className="flex items-start justify-between mb-4">
                       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
-                        folder.color === "blue" ? "bg-blue-100 dark:bg-blue-900/30" :
-                        folder.color === "green" ? "bg-green-100 dark:bg-green-900/30" :
-                        folder.color === "purple" ? "bg-purple-100 dark:bg-purple-900/30" :
-                        folder.color === "orange" ? "bg-orange-100 dark:bg-orange-900/30" :
-                        folder.color === "red" ? "bg-red-100 dark:bg-red-900/30" :
+                        getColorName(folder.color) === "blue" ? "bg-blue-100 dark:bg-blue-900/30" :
+                        getColorName(folder.color) === "green" ? "bg-green-100 dark:bg-green-900/30" :
+                        getColorName(folder.color) === "purple" ? "bg-purple-100 dark:bg-purple-900/30" :
+                        getColorName(folder.color) === "orange" ? "bg-orange-100 dark:bg-orange-900/30" :
+                        getColorName(folder.color) === "red" ? "bg-red-100 dark:bg-red-900/30" :
                         "bg-blue-100 dark:bg-blue-900/30"
                       }`}>
                         {folder.icon === "FileText" && <FileText className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                          folder.color === "blue" ? "text-blue-600" :
-                          folder.color === "green" ? "text-green-600" :
-                          folder.color === "purple" ? "text-purple-600" :
-                          folder.color === "orange" ? "text-orange-600" :
-                          folder.color === "red" ? "text-red-600" :
+                          getColorName(folder.color) === "blue" ? "text-blue-600" :
+                          getColorName(folder.color) === "green" ? "text-green-600" :
+                          getColorName(folder.color) === "purple" ? "text-purple-600" :
+                          getColorName(folder.color) === "orange" ? "text-orange-600" :
+                          getColorName(folder.color) === "red" ? "text-red-600" :
                           "text-blue-600"
                         }`} />}
                         {folder.icon === "Receipt" && <Receipt className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                          folder.color === "blue" ? "text-blue-600" :
-                          folder.color === "green" ? "text-green-600" :
-                          folder.color === "purple" ? "text-purple-600" :
-                          folder.color === "orange" ? "text-orange-600" :
-                          folder.color === "red" ? "text-red-600" :
+                          getColorName(folder.color) === "blue" ? "text-blue-600" :
+                          getColorName(folder.color) === "green" ? "text-green-600" :
+                          getColorName(folder.color) === "purple" ? "text-purple-600" :
+                          getColorName(folder.color) === "orange" ? "text-orange-600" :
+                          getColorName(folder.color) === "red" ? "text-red-600" :
                           "text-blue-600"
                         }`} />}
                         {folder.icon === "Image" && <ImageIcon className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                          folder.color === "blue" ? "text-blue-600" :
-                          folder.color === "green" ? "text-green-600" :
-                          folder.color === "purple" ? "text-purple-600" :
-                          folder.color === "orange" ? "text-orange-600" :
-                          folder.color === "red" ? "text-red-600" :
+                          getColorName(folder.color) === "blue" ? "text-blue-600" :
+                          getColorName(folder.color) === "green" ? "text-green-600" :
+                          getColorName(folder.color) === "purple" ? "text-purple-600" :
+                          getColorName(folder.color) === "orange" ? "text-orange-600" :
+                          getColorName(folder.color) === "red" ? "text-red-600" :
                           "text-blue-600"
                         }`} />}
                         {folder.icon === "BarChart" && <BarChart className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                          folder.color === "blue" ? "text-blue-600" :
-                          folder.color === "green" ? "text-green-600" :
-                          folder.color === "purple" ? "text-purple-600" :
-                          folder.color === "orange" ? "text-orange-600" :
-                          folder.color === "red" ? "text-red-600" :
+                          getColorName(folder.color) === "blue" ? "text-blue-600" :
+                          getColorName(folder.color) === "green" ? "text-green-600" :
+                          getColorName(folder.color) === "purple" ? "text-purple-600" :
+                          getColorName(folder.color) === "orange" ? "text-orange-600" :
+                          getColorName(folder.color) === "red" ? "text-red-600" :
                           "text-blue-600"
                         }`} />}
                         {folder.icon === "Award" && <Award className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                          folder.color === "blue" ? "text-blue-600" :
-                          folder.color === "green" ? "text-green-600" :
-                          folder.color === "purple" ? "text-purple-600" :
-                          folder.color === "orange" ? "text-orange-600" :
-                          folder.color === "red" ? "text-red-600" :
+                          getColorName(folder.color) === "blue" ? "text-blue-600" :
+                          getColorName(folder.color) === "green" ? "text-green-600" :
+                          getColorName(folder.color) === "purple" ? "text-purple-600" :
+                          getColorName(folder.color) === "orange" ? "text-orange-600" :
+                          getColorName(folder.color) === "red" ? "text-red-600" :
                           "text-blue-600"
                         }`} />}
                       </div>
@@ -1335,37 +1441,61 @@ const Documents: React.FC = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Folder
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleManageFolder(folder);
-                            }}
-                          >
-                            <Settings className="h-4 w-4 mr-2" />
-                            Manage
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteFolder(folder.folder_id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {/* Only show edit/manage options for non-permanent folders */}
+                          {!folder.is_permanent && (
+                            <>
+                              <DropdownMenuItem>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Folder
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleManageFolder(folder);
+                                }}
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Manage
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteFolder(folder.folder_id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {/* Show view option for permanent folders */}
+                          {folder.is_permanent && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFolderNavigation(folder.folder_name);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Files
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
 
                     {/* Folder Details */}
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-base sm:text-lg group-hover:text-blue-600 transition-colors">{folder.folder_name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-base sm:text-lg group-hover:text-blue-600 transition-colors">{folder.folder_name}</h3>
+                        {folder.is_permanent && (
+                          <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 border-purple-200">
+                            System
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                         {folder.description || 'No description'}
                       </p>
@@ -1532,11 +1662,11 @@ const Documents: React.FC = () => {
                             <SelectItem key={folder.folder_id} value={folder.folder_id}>
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${
-                                  folder.color === "blue" ? "bg-blue-500" :
-                                  folder.color === "green" ? "bg-green-500" :
-                                  folder.color === "purple" ? "bg-purple-500" :
-                                  folder.color === "orange" ? "bg-orange-500" :
-                                  folder.color === "red" ? "bg-red-500" :
+                                  getColorName(folder.color) === "blue" ? "bg-blue-500" :
+                                  getColorName(folder.color) === "green" ? "bg-green-500" :
+                                  getColorName(folder.color) === "purple" ? "bg-purple-500" :
+                                  getColorName(folder.color) === "orange" ? "bg-orange-500" :
+                                  getColorName(folder.color) === "red" ? "bg-red-500" :
                                   "bg-blue-500"
                                 }`} />
                                 {folder.folder_name}
@@ -1632,11 +1762,11 @@ const Documents: React.FC = () => {
                           <Badge
                             variant="secondary"
                             className={`text-xs flex-shrink-0 ${
-                              doc.folderColor === "blue" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
-                              doc.folderColor === "green" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
-                              doc.folderColor === "purple" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
-                              doc.folderColor === "orange" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
-                              doc.folderColor === "red" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                              getColorName(doc.folderColor) === "blue" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                              getColorName(doc.folderColor) === "green" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                              getColorName(doc.folderColor) === "purple" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                              getColorName(doc.folderColor) === "orange" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                              getColorName(doc.folderColor) === "red" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
                               "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
                             }`}
                           >
@@ -1820,17 +1950,6 @@ const Documents: React.FC = () => {
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Handle download
-                                      }}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <Download className="h-4 w-4" />
-                                    </Button>
                                   </div>
                                 </div>
 
@@ -1839,6 +1958,12 @@ const Documents: React.FC = () => {
                                   <h4 className="font-medium text-xs sm:text-sm truncate" title={doc.name}>
                                     {doc.name}
                                   </h4>
+                                  {/* Description - Shows file description if available */}
+                                  {doc.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2" title={doc.description}>
+                                      {doc.description}
+                                    </p>
+                                  )}
                                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <span>{formatFileSize(doc.size)}</span>
                                     <span>{formatDate(doc.uploadDate)}</span>
@@ -1872,14 +1997,6 @@ const Documents: React.FC = () => {
                                         <DropdownMenuItem onClick={() => openDocument(doc)}>
                                           <Eye className="h-4 w-4 mr-2" />
                                           View
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem>
-                                          <Download className="h-4 w-4 mr-2" />
-                                          Download
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit Info
                                         </DropdownMenuItem>
                                         <DropdownMenuItem>
                                           <Share className="h-4 w-4 mr-2" />
@@ -1979,17 +2096,6 @@ const Documents: React.FC = () => {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Handle download
-                                  }}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
@@ -2005,14 +2111,6 @@ const Documents: React.FC = () => {
                                     <DropdownMenuItem onClick={() => openDocument(doc)}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       View
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Download className="h-4 w-4 mr-2" />
-                                      Download
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit Info
                                     </DropdownMenuItem>
                                     <DropdownMenuItem>
                                       <Share className="h-4 w-4 mr-2" />

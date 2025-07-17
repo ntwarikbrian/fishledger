@@ -14,13 +14,16 @@ import { categories } from './category.routes';
 import { sales } from './sales.routes';
 import { contacts } from './contact.routes';
 import { expenses } from './expense.routes';
-// Temporarily disabled due to TypeScript issues
-// import { folders } from './folder.routes';
-// import { files } from './file.routes';
+import { folders } from './folder.routes';
+import { files } from './file.routes';
+import { deposits } from './deposit.routes';
 import { stockAdditions } from './stock-additions.routes';
 import { stockCorrections } from './stock-corrections.routes';
 import { stockMovements } from './stock-movements.routes';
 import salesAuditRoutes from './salesAudit.routes';
+import { transactions } from './transaction.routes';
+import { dashboard } from './dashboard.routes';
+import upload from './upload';
  
 
 /**
@@ -37,13 +40,16 @@ export function createApiRoutes() {
   api.route('/sales', sales);
   api.route('/contacts', contacts);
   api.route('/expenses', expenses);
-  // Temporarily disabled due to TypeScript issues
-  // api.route('/folders', folders);
-  // api.route('/files', files);
+  api.route('/folders', folders);
+  api.route('/files', files);
+  api.route('/deposits', deposits);
   api.route('/stock-additions', stockAdditions);
   api.route('/stock-corrections', stockCorrections);
   api.route('/stock-movements', stockMovements);
   api.route('/sales-audit', salesAuditRoutes);
+  api.route('/transactions', transactions);
+  api.route('/dashboard', dashboard);
+  api.route('/upload', upload);
 
   return api;
 }
@@ -149,5 +155,4 @@ export function createDebugRoutes() {
 }
 
 // Export individual route modules for flexibility
-export { auth, users, products, categories, sales, contacts, expenses, stockAdditions, stockCorrections, stockMovements };
-// Temporarily disabled: folders, files
+export { auth, users, products, categories, sales, contacts, expenses, folders, files, deposits, stockAdditions, stockCorrections, stockMovements, dashboard };

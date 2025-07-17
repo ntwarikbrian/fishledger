@@ -101,6 +101,7 @@ export interface FolderData {
   icon: string;
   file_count: number;
   total_size: number;
+  is_permanent?: boolean; // Whether this is a permanent system folder
   created_by: string;
   created_at: string;
 }

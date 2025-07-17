@@ -107,10 +107,24 @@ export class ApiClient {
 
     try {
       const text = await response.text();
-      data = text ? JSON.parse(text) : {};
+      console.log('API Client - Raw response text:', text); // Debug log
+
+      if (!text || text.trim() === '') {
+        console.error('API Client - Empty response from server');
+        throw new ApiClientError(
+          'Empty response from server',
+          response.status,
+          'EMPTY_RESPONSE'
+        );
+      }
+
+      data = JSON.parse(text);
       console.log('API Client - Response status:', response.status, 'Data:', data); // Debug log
     } catch (error) {
       console.error('API Client - JSON parse error:', error); // Debug log
+      if (error instanceof ApiClientError) {
+        throw error; // Re-throw our custom errors
+      }
       throw new ApiClientError(
         'Invalid JSON response from server',
         response.status,

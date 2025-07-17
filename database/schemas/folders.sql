@@ -12,7 +12,11 @@ CREATE TABLE IF NOT EXISTS folders (
     icon VARCHAR(50) DEFAULT 'folder', -- Icon name for folder display
     file_count INTEGER DEFAULT 0, -- Number of files in this folder
     total_size BIGINT DEFAULT 0, -- Total size of all files in bytes
-    created_by UUID NOT NULL REFERENCES users(user_id)
+    is_permanent BOOLEAN DEFAULT false, -- Whether this is a permanent system folder
+    created_by UUID NOT NULL REFERENCES users(user_id),
+
+    -- Ensure unique folder names per user
+    UNIQUE(folder_name, created_by)
 );
 
 -- Comments for documentation
@@ -24,34 +28,15 @@ COMMENT ON COLUMN folders.color IS 'Hex color code for folder display in UI';
 COMMENT ON COLUMN folders.icon IS 'Icon name for folder display in UI';
 COMMENT ON COLUMN folders.file_count IS 'Number of files currently in this folder';
 COMMENT ON COLUMN folders.total_size IS 'Total size of all files in this folder (bytes)';
+COMMENT ON COLUMN folders.is_permanent IS 'Whether this is a permanent system folder that cannot be deleted';
 COMMENT ON COLUMN folders.created_by IS 'User who created this folder';
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(folder_name);
 CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by);
+CREATE INDEX IF NOT EXISTS idx_folders_permanent ON folders(is_permanent);
 
--- Row Level Security (RLS) policies
-ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
-
--- Policy: Business owners can view all folders
-CREATE POLICY folders_select_all ON folders
-    FOR SELECT
-    USING (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can insert folders
-CREATE POLICY folders_insert_owner ON folders
-    FOR INSERT
-    WITH CHECK (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can update folders
-CREATE POLICY folders_update_owner ON folders
-    FOR UPDATE
-    USING (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can delete folders
-CREATE POLICY folders_delete_owner ON folders
-    FOR DELETE
-    USING (auth.uid() IS NOT NULL);
+-- Note: RLS policies removed for simplified access control
 
 -- Function to update folder statistics
 CREATE OR REPLACE FUNCTION update_folder_stats()
@@ -89,6 +74,25 @@ BEGIN
     END IF;
     
     RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create permanent system folders that should exist for all users
+-- This function creates essential folders that every user needs
+CREATE OR REPLACE FUNCTION create_permanent_folders(user_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    -- Create Workers ID Image folder (permanent system folder)
+    INSERT INTO folders (folder_name, description, color, icon, created_by, is_permanent)
+    VALUES (
+        'Workers ID Image',
+        'Store worker identification images and documents for employee verification',
+        '#8B5CF6', -- Purple color
+        'id-card', -- ID card icon
+        user_id,
+        true -- Mark as permanent folder
+    )
+    ON CONFLICT (folder_name, created_by) DO NOTHING; -- Prevent duplicates
 END;
 $$ LANGUAGE plpgsql;
 

@@ -11,6 +11,12 @@ import {
   createExpenseHandler,
   updateExpenseHandler,
   deleteExpenseHandler,
+  getExpenseCategoriesHandler,
+  getExpenseCategoryHandler,
+  createExpenseCategoryHandler,
+  updateExpenseCategoryHandler,
+  deleteExpenseCategoryHandler,
+  createExpenseWithReceiptHandler,
 } from '../handlers/expenses';
 import { authenticate, apiRateLimit } from '../middleware';
 
@@ -24,6 +30,25 @@ expenses.use('*', authenticate);
 expenses.use('*', apiRateLimit());
 
 /**
+ * Expense categories management routes (must come before dynamic :id routes)
+ */
+
+// GET /expenses/categories - Get all expense categories
+expenses.get('/categories', getExpenseCategoriesHandler);
+
+// GET /expenses/categories/:id - Get specific expense category by ID
+expenses.get('/categories/:id', getExpenseCategoryHandler);
+
+// POST /expenses/categories - Create new expense category
+expenses.post('/categories', createExpenseCategoryHandler);
+
+// PUT /expenses/categories/:id - Update existing expense category
+expenses.put('/categories/:id', updateExpenseCategoryHandler);
+
+// DELETE /expenses/categories/:id - Delete expense category
+expenses.delete('/categories/:id', deleteExpenseCategoryHandler);
+
+/**
  * Expense management routes
  */
 
@@ -35,6 +60,9 @@ expenses.get('/:id', getExpenseHandler);
 
 // POST /expenses - Create new expense
 expenses.post('/', createExpenseHandler);
+
+// POST /expenses/upload - Create expense with receipt upload
+expenses.post('/upload', createExpenseWithReceiptHandler);
 
 // PUT /expenses/:id - Update existing expense
 expenses.put('/:id', updateExpenseHandler);

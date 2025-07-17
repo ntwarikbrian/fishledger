@@ -8,7 +8,11 @@ CREATE TABLE IF NOT EXISTS expense_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     category_name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
-    budget DECIMAL(12,2) DEFAULT 0 -- Budget allocation for this category
+    budget DECIMAL(12,2) DEFAULT 0, -- Budget allocation for this category
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Comments for documentation

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   Filter,
   Tag,
   Building,
+  RefreshCw,
   Car,
   Utensils,
   Zap,
@@ -76,10 +78,30 @@ interface Expense {
 }
 
 const Expenses = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<string>("all-expenses"); // Track active tab for dynamic header
+  const [activeTab, setActiveTab] = useState<string>("categories"); // Track active tab for dynamic header - Categories is now default
+
+  // State for category deletion error popup
+  const [showDeleteErrorPopup, setShowDeleteErrorPopup] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
+  const [failedDeleteCategory, setFailedDeleteCategory] = useState<any>(null);
+
+  // Set active tab based on URL
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/expenses/add-expenses') {
+      setActiveTab('add-expense');
+    } else if (path === '/expenses/all-expenses') {
+      setActiveTab('all-expenses');
+    } else if (path === '/expenses') {
+      setActiveTab('categories'); // Default to categories tab
+    }
+  }, [location.pathname]);
 
   // Form state for adding categories
   const [categoryForm, setCategoryForm] = useState({
@@ -116,11 +138,24 @@ const Expenses = () => {
   const [deletingExpense, setDeletingExpense] = useState<any>(null);
   const [isDeleteExpenseOpen, setIsDeleteExpenseOpen] = useState(false);
 
+  // Loading states for expense operations
+  const [isUpdatingExpense, setIsUpdatingExpense] = useState(false);
+  const [isDeletingExpense, setIsDeletingExpense] = useState(false);
+
+  // Loading states for category operations
+  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+  // Receipt popup state
+  const [isReceiptPopupOpen, setIsReceiptPopupOpen] = useState(false);
+  const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string>('');
+
   // Use expense categories hook
   const {
     categories: backendCategories,
     loading: categoriesLoading,
     error: categoriesError,
+    fetchCategories,
     createCategory,
     updateCategory,
     deleteCategory
@@ -131,6 +166,7 @@ const Expenses = () => {
     expenses,
     loading: expensesLoading,
     error: expensesError,
+    fetchExpenses,
     createExpense,
     createExpenseWithFile,
     updateExpense,
@@ -160,6 +196,8 @@ const Expenses = () => {
       setCategoryForm({ category_name: '', description: '', budget: '' });
       setIsAddCategoryOpen(false);
       toast.success('Category created successfully');
+      // Refresh expenses to update category bars
+      await fetchExpenses();
     } else {
       toast.error('Failed to create category');
     }
@@ -216,6 +254,8 @@ const Expenses = () => {
         setSelectedReceiptFile(null);
 
         toast.success('Expense added successfully!');
+        // Refresh categories to update category bars
+        await fetchCategories();
       } else {
         toast.error('Failed to create expense. Please try again.');
       }
@@ -253,17 +293,25 @@ const Expenses = () => {
       return;
     }
 
-    const success = await updateCategory(editingCategory.category_id, {
-      category_name: categoryForm.category_name.trim(),
-      description: categoryForm.description.trim() || undefined,
-      budget: budgetValue,
-    });
+    try {
+      setIsUpdatingCategory(true);
 
-    if (success) {
-      setCategoryForm({ category_name: '', description: '', budget: '' });
-      setIsEditCategoryOpen(false);
-      setEditingCategory(null);
-      toast.success('Category updated successfully!');
+      const success = await updateCategory(editingCategory.category_id, {
+        category_name: categoryForm.category_name.trim(),
+        description: categoryForm.description.trim() || undefined,
+        budget: budgetValue,
+      });
+
+      if (success) {
+        setCategoryForm({ category_name: '', description: '', budget: '' });
+        setIsEditCategoryOpen(false);
+        setEditingCategory(null);
+        toast.success('Category updated successfully!');
+        // Refresh expenses to update category bars
+        await fetchExpenses();
+      }
+    } finally {
+      setIsUpdatingCategory(false);
     }
   };
 
@@ -277,11 +325,32 @@ const Expenses = () => {
   const confirmDeleteCategory = async () => {
     if (!deletingCategory) return;
 
-    const success = await deleteCategory(deletingCategory.category_id);
-    if (success) {
-      setIsDeleteCategoryOpen(false);
-      setDeletingCategory(null);
-      toast.success('Category deleted successfully!');
+    try {
+      setIsDeletingCategory(true);
+
+      const result = await deleteCategory(deletingCategory.category_id);
+
+      if (result.success) {
+        // Success: close dialog, show success message, and refresh categories
+        setIsDeleteCategoryOpen(false);
+        setDeletingCategory(null);
+        toast.success('Category deleted successfully!');
+        // Refresh both categories and expenses to update category bars
+        await Promise.all([fetchCategories(), fetchExpenses()]);
+      } else {
+        // Failure: close delete dialog and show error popup (NO refresh)
+        setIsDeleteCategoryOpen(false);
+        setDeletingCategory(null);
+
+        // Set up error popup data
+        setFailedDeleteCategory(deletingCategory);
+        setDeleteErrorMessage(result.error || 'Failed to delete category');
+        setShowDeleteErrorPopup(true);
+
+        // DO NOT refresh categories list - this was the main issue
+      }
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -313,26 +382,38 @@ const Expenses = () => {
       return;
     }
 
-    const success = await updateExpense(editingExpense.expense_id, {
-      title: expenseForm.title.trim(),
-      amount: parseFloat(expenseForm.amount),
-      category_id: expenseForm.category_id,
-      date: expenseForm.date,
-      status: expenseForm.status
-    });
+    try {
+      setIsUpdatingExpense(true);
 
-    if (success) {
-      setExpenseForm({
-        title: '',
-        amount: '',
-        category_id: '',
-        date: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        receipt_url: ''
+      const success = await updateExpense(editingExpense.expense_id, {
+        title: expenseForm.title.trim(),
+        amount: parseFloat(expenseForm.amount),
+        category_id: expenseForm.category_id,
+        date: expenseForm.date,
+        status: expenseForm.status
       });
-      setIsEditExpenseOpen(false);
-      setEditingExpense(null);
-      toast.success('Expense updated successfully!');
+
+      if (success) {
+        // Reset form and close popup
+        setExpenseForm({
+          title: '',
+          amount: '',
+          category_id: '',
+          date: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          receipt_url: ''
+        });
+        setIsEditExpenseOpen(false);
+        setEditingExpense(null);
+
+        // Show success message
+        toast.success('Expense updated successfully!');
+
+        // Refresh both expenses table and categories to update category bars
+        await Promise.all([fetchExpenses(), fetchCategories()]);
+      }
+    } finally {
+      setIsUpdatingExpense(false);
     }
   };
 
@@ -346,11 +427,23 @@ const Expenses = () => {
   const confirmDeleteExpense = async () => {
     if (!deletingExpense) return;
 
-    const success = await deleteExpense(deletingExpense.expense_id);
-    if (success) {
-      setIsDeleteExpenseOpen(false);
-      setDeletingExpense(null);
-      toast.success('Expense deleted successfully!');
+    try {
+      setIsDeletingExpense(true);
+
+      const success = await deleteExpense(deletingExpense.expense_id);
+      if (success) {
+        // Close popup and reset state
+        setIsDeleteExpenseOpen(false);
+        setDeletingExpense(null);
+
+        // Show success message
+        toast.success('Expense deleted successfully!');
+
+        // Refresh both expenses table and categories to update category bars
+        await Promise.all([fetchExpenses(), fetchCategories()]);
+      }
+    } finally {
+      setIsDeletingExpense(false);
     }
   };
 
@@ -390,6 +483,13 @@ const Expenses = () => {
   const handleCategoryClick = (categoryId: string) => {
     setActiveTab("all-expenses"); // Switch to all expenses tab
     setSelectedFilter(categoryId); // Set the category filter
+    navigate('/expenses/all-expenses'); // Navigate to all expenses URL
+  };
+
+  // Function to handle receipt click - open receipt popup
+  const handleReceiptClick = (receiptUrl: string) => {
+    setSelectedReceiptUrl(receiptUrl);
+    setIsReceiptPopupOpen(true);
   };
 
   // Function to get filter label for display
@@ -406,25 +506,25 @@ const Expenses = () => {
   // Function to get header content based on active tab
   const getHeaderContent = () => {
     switch (activeTab) {
-      case "all-expenses":
+      case "categories":
         return {
-          title: "All Expenses",
-          description: "View and manage all your business expenses in one place"
+          title: "Expense Categories",
+          description: "Organize and manage expense categories with budget allocations"
         };
       case "add-expense":
         return {
           title: "Add New Expense",
           description: "Record and track new business expenses with receipt uploads"
         };
-      case "categories":
+      case "all-expenses":
         return {
-          title: "Expense Categories",
-          description: "Organize and manage expense categories with budget allocations"
+          title: "All Expenses",
+          description: "View and manage all your business expenses in one place"
         };
       default:
         return {
-          title: "Expenses Management",
-          description: "Track and manage business expenses across different categories"
+          title: "Expense Categories",
+          description: "Organize and manage expense categories with budget allocations"
         };
     }
   };
@@ -510,19 +610,29 @@ const Expenses = () => {
 
 
         {/* Expense Management Tabs */}
-        <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
+        <Tabs value={activeTab} className="w-full" onValueChange={(value) => {
+          setActiveTab(value);
+          // Update URL based on tab selection
+          if (value === 'categories') {
+            navigate('/expenses');
+          } else if (value === 'add-expense') {
+            navigate('/expenses/add-expenses');
+          } else if (value === 'all-expenses') {
+            navigate('/expenses/all-expenses');
+          }
+        }}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all-expenses">
-              <FileText className="mr-2 h-4 w-4" />
-              All Expenses
+            <TabsTrigger value="categories">
+              <Tag className="mr-2 h-4 w-4" />
+              Categories
             </TabsTrigger>
             <TabsTrigger value="add-expense">
               <Plus className="mr-2 h-4 w-4" />
               Add Expenses
             </TabsTrigger>
-            <TabsTrigger value="categories">
-              <Tag className="mr-2 h-4 w-4" />
-              Categories
+            <TabsTrigger value="all-expenses">
+              <FileText className="mr-2 h-4 w-4" />
+              All Expenses
             </TabsTrigger>
           </TabsList>
 
@@ -667,12 +777,30 @@ const Expenses = () => {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsEditCategoryOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsEditCategoryOpen(false)}
+                          disabled={isUpdatingCategory}
+                        >
                           Cancel
                         </Button>
-                        <Button type="button" onClick={handleUpdateCategory}>
-                          <Save className="mr-2 h-4 w-4" />
-                          Update Category
+                        <Button
+                          type="button"
+                          onClick={handleUpdateCategory}
+                          disabled={isUpdatingCategory || !categoryForm.category_name.trim()}
+                        >
+                          {isUpdatingCategory ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              Update Category
+                            </>
+                          )}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -688,12 +816,31 @@ const Expenses = () => {
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsDeleteCategoryOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsDeleteCategoryOpen(false)}
+                          disabled={isDeletingCategory}
+                        >
                           Cancel
                         </Button>
-                        <Button type="button" variant="destructive" onClick={confirmDeleteCategory}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Category
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={confirmDeleteCategory}
+                          disabled={isDeletingCategory}
+                        >
+                          {isDeletingCategory ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Category
+                            </>
+                          )}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -933,6 +1080,19 @@ const Expenses = () => {
                     <CardTitle>All Expenses</CardTitle>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        fetchExpenses();
+                        toast.success('Expenses refreshed');
+                      }}
+                      className="flex items-center gap-2"
+                      title="Refresh expenses data"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
                     <div className="relative w-full sm:w-64">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1052,16 +1212,28 @@ const Expenses = () => {
                               </div>
                             </td>
                             <td className="py-3 px-2">
-                              {expense.receipt_url ? (
-                                <a
-                                  href={expense.receipt_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center text-blue-600 hover:text-blue-700 text-sm"
-                                >
-                                  <FileText className="mr-1 h-3 w-3" />
-                                  View
-                                </a>
+                              {expense.receipt_url && expense.receipt_url.trim() !== '' ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleReceiptClick(expense.receipt_url!)}
+                                    className="flex items-center text-blue-600 hover:text-blue-700 text-sm hover:underline"
+                                    title="View receipt"
+                                  >
+                                    <FileText className="mr-1 h-3 w-3" />
+                                    View
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      // Copy URL to clipboard
+                                      navigator.clipboard.writeText(expense.receipt_url!);
+                                      toast.success('Receipt URL copied to clipboard');
+                                    }}
+                                    className="text-gray-400 hover:text-gray-600 text-xs"
+                                    title="Copy receipt URL"
+                                  >
+                                    📋
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground">No receipt</span>
                               )}
@@ -1384,12 +1556,30 @@ const Expenses = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEditExpenseOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditExpenseOpen(false)}
+                disabled={isUpdatingExpense}
+              >
                 Cancel
               </Button>
-              <Button type="button" onClick={handleUpdateExpense}>
-                <Save className="mr-2 h-4 w-4" />
-                Update Expense
+              <Button
+                type="button"
+                onClick={handleUpdateExpense}
+                disabled={isUpdatingExpense || !expenseForm.title.trim() || !expenseForm.amount || parseFloat(expenseForm.amount) <= 0}
+              >
+                {isUpdatingExpense ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Update Expense
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1405,14 +1595,175 @@ const Expenses = () => {
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDeleteExpenseOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDeleteExpenseOpen(false)}
+                disabled={isDeletingExpense}
+              >
                 Cancel
               </Button>
-              <Button type="button" variant="destructive" onClick={confirmDeleteExpense}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Expense
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmDeleteExpense}
+                disabled={isDeletingExpense}
+              >
+                {isDeletingExpense ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Expense
+                  </>
+                )}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Category Deletion Error Popup */}
+        <Dialog open={showDeleteErrorPopup} onOpenChange={setShowDeleteErrorPopup}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                  <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-red-900 dark:text-red-100">
+                    Cannot Delete Category
+                  </DialogTitle>
+                  <DialogDescription className="text-red-700 dark:text-red-300">
+                    This category is currently in use
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="py-4">
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+                  The category <strong>"{failedDeleteCategory?.category_name}"</strong> cannot be deleted because it is being used by one or more expenses.
+                </p>
+
+                <div className="text-sm text-red-700 dark:text-red-300">
+                  <p className="font-medium mb-2">To delete this category, you need to:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Delete all expenses that use this category, or</li>
+                    <li>Change those expenses to use a different category</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm text-blue-800 dark:text-blue-200">
+                    Want to see which expenses use this category?
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeleteErrorPopup(false);
+                    setActiveTab('all-expenses');
+                    setSelectedFilter(failedDeleteCategory?.category_id || 'all');
+                    navigate('/expenses/all-expenses');
+                  }}
+                  className="text-blue-600 border-blue-300 hover:bg-blue-100 dark:text-blue-400 dark:border-blue-600 dark:hover:bg-blue-950/30"
+                >
+                  View Expenses
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                onClick={() => setShowDeleteErrorPopup(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Got it
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Receipt Popup Dialog */}
+        <Dialog open={isReceiptPopupOpen} onOpenChange={setIsReceiptPopupOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Receipt Preview</DialogTitle>
+              <DialogDescription>
+                View the uploaded receipt image
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center items-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg max-h-[70vh] overflow-auto">
+              {selectedReceiptUrl ? (
+                <img
+                  src={selectedReceiptUrl}
+                  alt="Receipt"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'text-center text-red-600 p-8';
+                    errorDiv.innerHTML = `
+                      <div class="flex flex-col items-center space-y-2">
+                        <svg class="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        <p class="text-sm font-medium">Failed to load receipt image</p>
+                        <p class="text-xs text-gray-500">The image may be corrupted or the URL is invalid</p>
+                      </div>
+                    `;
+                    target.parentNode?.appendChild(errorDiv);
+                  }}
+                />
+              ) : (
+                <div className="text-center text-gray-500 p-8">
+                  <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p>No receipt to display</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between items-center pt-4">
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedReceiptUrl) {
+                      navigator.clipboard.writeText(selectedReceiptUrl);
+                      toast.success('Receipt URL copied to clipboard');
+                    }
+                  }}
+                  disabled={!selectedReceiptUrl}
+                >
+                  📋 Copy URL
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedReceiptUrl) {
+                      window.open(selectedReceiptUrl, '_blank');
+                    }
+                  }}
+                  disabled={!selectedReceiptUrl}
+                >
+                  🔗 Open in New Tab
+                </Button>
+              </div>
+              <Button onClick={() => setIsReceiptPopupOpen(false)}>
+                Close
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

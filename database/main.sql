@@ -72,7 +72,11 @@ CREATE TABLE IF NOT EXISTS expense_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     category_name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
-    budget DECIMAL(12,2) DEFAULT 0 -- Budget allocation for this category
+    budget DECIMAL(12,2) DEFAULT 0, -- Budget allocation for this category
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =====================================================
@@ -156,7 +160,11 @@ CREATE TABLE IF NOT EXISTS folders (
     icon VARCHAR(50) DEFAULT 'folder', -- Icon name for folder display
     file_count INTEGER DEFAULT 0, -- Number of files in this folder
     total_size BIGINT DEFAULT 0, -- Total size of all files in bytes
-    created_by UUID NOT NULL REFERENCES users(user_id)
+    is_permanent BOOLEAN DEFAULT false, -- Whether this is a permanent system folder
+    created_by UUID NOT NULL REFERENCES users(user_id),
+
+    -- Ensure unique folder names per user
+    UNIQUE(folder_name, created_by)
 );
 
 -- =====================================================
@@ -495,8 +503,8 @@ CREATE TABLE IF NOT EXISTS sales (
     -- User who performed the sale
     performed_by UUID NOT NULL REFERENCES users(user_id),
 
-    -- Client information (optional reference to contacts table)
-    client_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL,
+    -- Client information (independent UUID, not linked to contacts table)
+    client_id UUID, -- Independent client identifier
     client_name VARCHAR(100), -- Client name (required even if not in contacts)
     email_address VARCHAR(150), -- Client email
     phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
@@ -762,6 +770,7 @@ CREATE INDEX IF NOT EXISTS idx_files_file_type ON files(file_type);
 -- Folders table indexes
 CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(folder_name);
 CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by);
+CREATE INDEX IF NOT EXISTS idx_folders_permanent ON folders(is_permanent);
 
 -- Sales table indexes
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
@@ -897,15 +906,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     payment_status VARCHAR(10) DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'partial')),
     payment_method VARCHAR(15) CHECK (payment_method IN ('momo_pay', 'cash', 'bank_transfer')),
 
-    -- Deposit and reference information
-    deposit_id VARCHAR(100), -- External deposit/transaction ID
-    deposit_type VARCHAR(10) CHECK (deposit_type IN ('momo', 'bank', 'boss')),
-    account_number VARCHAR(50), -- Account number for bank transfers
-    reference VARCHAR(255), -- Additional reference information
-
-    -- Receipt/proof image
-    image_url TEXT, -- URL to receipt or proof image
-
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -922,7 +922,6 @@ CREATE INDEX IF NOT EXISTS idx_transactions_payment_status ON transactions(payme
 CREATE INDEX IF NOT EXISTS idx_transactions_payment_method ON transactions(payment_method);
 CREATE INDEX IF NOT EXISTS idx_transactions_client_name ON transactions(client_name);
 CREATE INDEX IF NOT EXISTS idx_transactions_product_name ON transactions(product_name);
-CREATE INDEX IF NOT EXISTS idx_transactions_deposit_type ON transactions(deposit_type);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_by ON transactions(created_by);
 
 -- Create composite indexes for common queries
@@ -994,7 +993,7 @@ BEGIN
         NEW.id,
         NEW.date_time,
         COALESCE(product_name_val, 'Unknown Product'),
-        NEW.client_name,
+        COALESCE(NEW.client_name, 'Walk-in Customer'), -- Handle null client_name
         NEW.boxes_quantity,
         NEW.kg_quantity,
         NEW.total_amount,
@@ -1028,7 +1027,7 @@ BEGIN
     UPDATE transactions SET
         date_time = NEW.date_time,
         product_name = COALESCE(product_name_val, 'Unknown Product'),
-        client_name = NEW.client_name,
+        client_name = COALESCE(NEW.client_name, 'Walk-in Customer'), -- Handle null client_name
         boxes_quantity = NEW.boxes_quantity,
         kg_quantity = NEW.kg_quantity,
         total_amount = NEW.total_amount,
@@ -1055,13 +1054,102 @@ COMMENT ON COLUMN transactions.sale_id IS 'Reference to the originating sale rec
 COMMENT ON COLUMN transactions.date_time IS 'Transaction timestamp copied from sales for performance';
 COMMENT ON COLUMN transactions.product_name IS 'Product name denormalized for quick access';
 COMMENT ON COLUMN transactions.client_name IS 'Client name denormalized for quick access';
-COMMENT ON COLUMN transactions.deposit_id IS 'External deposit or transaction reference ID';
-COMMENT ON COLUMN transactions.deposit_type IS 'Type of deposit: momo, bank, or boss';
-COMMENT ON COLUMN transactions.account_number IS 'Account number for bank transfers';
-COMMENT ON COLUMN transactions.reference IS 'Additional reference information';
-COMMENT ON COLUMN transactions.image_url IS 'URL to receipt or proof image';
+
+-- =====================================================
+-- DEPOSITS TABLE - Independent Deposits Management
+-- =====================================================
+
+-- Create deposits table
+CREATE TABLE IF NOT EXISTS deposits (
+    -- Primary key
+    deposit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Deposit information
+    date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deposit_type VARCHAR(10) NOT NULL CHECK (deposit_type IN ('momo', 'bank', 'boss')),
+    account_name VARCHAR(255) NOT NULL,
+    account_number VARCHAR(50),
+    amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
+    to_recipient VARCHAR(100), -- For boss type deposits, specifies who (boss, manager, etc.)
+
+    -- Image storage (Cloudinary integration)
+    deposit_image_url TEXT,
+
+    -- Approval workflow
+    approval VARCHAR(10) DEFAULT 'pending' CHECK (approval IN ('pending', 'approved', 'rejected')),
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_by UUID
+);
+
+-- Create indexes for deposits table
+CREATE INDEX IF NOT EXISTS idx_deposits_date_time ON deposits(date_time);
+CREATE INDEX IF NOT EXISTS idx_deposits_deposit_type ON deposits(deposit_type);
+CREATE INDEX IF NOT EXISTS idx_deposits_approval ON deposits(approval);
+CREATE INDEX IF NOT EXISTS idx_deposits_created_by ON deposits(created_by);
+CREATE INDEX IF NOT EXISTS idx_deposits_account_name ON deposits(account_name);
+CREATE INDEX IF NOT EXISTS idx_deposits_type_approval ON deposits(deposit_type, approval);
+CREATE INDEX IF NOT EXISTS idx_deposits_date_approval ON deposits(date_time, approval);
+CREATE INDEX IF NOT EXISTS idx_deposits_created_by_approval ON deposits(created_by, approval);
+
+-- Create trigger for automatic timestamp updates
+CREATE OR REPLACE FUNCTION update_deposits_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_deposits_updated_at
+    BEFORE UPDATE ON deposits
+    FOR EACH ROW
+    EXECUTE FUNCTION update_deposits_updated_at();
+
+-- Add comments for deposits table
+COMMENT ON TABLE deposits IS 'Independent deposits management system for tracking cash deposits';
+COMMENT ON COLUMN deposits.deposit_id IS 'Unique identifier for each deposit';
+COMMENT ON COLUMN deposits.date_time IS 'Date and time when the deposit was made';
+COMMENT ON COLUMN deposits.deposit_type IS 'Type of deposit: momo, bank, or boss';
+COMMENT ON COLUMN deposits.account_name IS 'Name of the account where deposit was made';
+COMMENT ON COLUMN deposits.account_number IS 'Account number (optional)';
+COMMENT ON COLUMN deposits.amount IS 'Amount of the deposit';
+COMMENT ON COLUMN deposits.deposit_image_url IS 'URL to deposit proof image stored in Cloudinary';
+COMMENT ON COLUMN deposits.approval IS 'Approval status: pending, approved, or rejected';
+COMMENT ON COLUMN deposits.created_at IS 'Timestamp when record was created';
+COMMENT ON COLUMN deposits.created_by IS 'User who created the deposit record';
+COMMENT ON COLUMN deposits.updated_at IS 'Timestamp when record was last updated';
+COMMENT ON COLUMN deposits.updated_by IS 'User who last updated the deposit record';
+
+-- =====================================================
+-- FOLDERS TABLE FUNCTIONS
+-- =====================================================
+
+-- Note: RLS policies removed for simplified access control
+
+-- Create permanent system folders that should exist for all users
+-- This function creates essential folders that every user needs
+CREATE OR REPLACE FUNCTION create_permanent_folders(user_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    -- Create Workers ID Image folder (permanent system folder)
+    INSERT INTO folders (folder_name, description, color, icon, created_by, is_permanent)
+    VALUES (
+        'Workers ID Image',
+        'Store worker identification images and documents for employee verification',
+        '#8B5CF6', -- Purple color
+        'id-card', -- ID card icon
+        user_id,
+        true -- Mark as permanent folder
+    )
+    ON CONFLICT (folder_name, created_by) DO NOTHING; -- Prevent duplicates
+END;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- END OF SCHEMA DEFINITION
--- Fish Selling Management System - 19 Tables Complete
+-- Fish Selling Management System - 20 Tables Complete
 -- =====================================================

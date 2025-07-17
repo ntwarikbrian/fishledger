@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS sales (
     -- User who performed the sale
     performed_by UUID NOT NULL REFERENCES users(user_id),
 
-    -- Client information (optional reference to contacts table)
-    client_id UUID REFERENCES contacts(contact_id) ON DELETE SET NULL,
+    -- Client information (independent UUID, not linked to contacts table)
+    client_id UUID, -- Independent client identifier
     client_name VARCHAR(100), -- Client name (required even if not in contacts)
     email_address VARCHAR(150), -- Client email
     phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
@@ -55,7 +55,7 @@ COMMENT ON COLUMN sales.date_time IS 'Date and time of sale';
 COMMENT ON COLUMN sales.payment_status IS 'Payment status (paid, pending, partial)';
 COMMENT ON COLUMN sales.payment_method IS 'Method of payment (cash, card, transfer)';
 COMMENT ON COLUMN sales.performed_by IS 'User who performed the sale';
-COMMENT ON COLUMN sales.client_id IS 'Optional reference to contacts table';
+COMMENT ON COLUMN sales.client_id IS 'Independent client identifier (not linked to any table)';
 COMMENT ON COLUMN sales.client_name IS 'Name of the client/customer';
 COMMENT ON COLUMN sales.email_address IS 'Email address of the client';
 COMMENT ON COLUMN sales.phone IS 'Phone number of the client';

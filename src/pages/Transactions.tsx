@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,17 +15,26 @@ import {
   Smartphone,
   Package,
   Eye,
-  Edit,
   Trash2,
   Plus,
   Banknote,
+  AlertTriangle,
   Building2,
   ArrowUpCircle,
   Upload,
   Image,
-  AlertTriangle,
   CheckCircle2,
-  Clock
+  Clock,
+  X,
+  Loader2,
+  RefreshCw,
+  Calendar,
+  User,
+  CreditCard,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink
 } from "lucide-react";
 import {
   Select,
@@ -50,499 +60,1024 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTransactions } from "@/hooks/use-transactions";
+import { useDeposits, type Deposit, type CreateDepositWithImageRequest } from "@/hooks/use-deposits";
+import { toast } from "sonner";
+import type { Transaction, TransactionFilters } from "@/types/transaction";
+import { PAYMENT_METHODS, PAYMENT_STATUSES, DEPOSIT_TYPES } from "@/types/transaction";
 
-// Mock transaction data with client column
-const mockTransactions = [
-  {
-    id: "TXN-001",
-    date: "2024-01-15",
-    time: "14:30",
-    productName: "Atlantic Salmon",
-    quantity: 5,
-    unitPrice: 25.00,
-    totalAmount: 125.00,
-    paymentMethod: "momo",
-    clientName: "John Doe",
-    status: "completed"
-  },
-  {
-    id: "TXN-002",
-    date: "2024-01-15",
-    time: "15:45",
-    productName: "Sea Bass",
-    quantity: 3,
-    unitPrice: 30.00,
-    totalAmount: 90.00,
-    paymentMethod: "cash",
-    clientName: "Jane Smith",
-    status: "completed"
-  },
-  {
-    id: "TXN-003",
-    date: "2024-01-14",
-    time: "11:20",
-    productName: "Tilapia Fillets",
-    quantity: 8,
-    unitPrice: 15.00,
-    totalAmount: 120.00,
-    paymentMethod: "momo",
-    clientName: "Mike Johnson",
-    status: "completed"
-  },
-  {
-    id: "TXN-004",
-    date: "2024-01-14",
-    time: "16:10",
-    productName: "Rainbow Trout",
-    quantity: 2,
-    unitPrice: 35.00,
-    totalAmount: 70.00,
-    paymentMethod: "cash",
-    clientName: "Sarah Wilson",
-    status: "pending"
-  }
-];
+// Remove the old Deposit interface as we're now using the one from the hook
 
-// Mock cash deposit data with approval workflow and photo attachments
-const mockCashDeposits = [
-  {
-    id: "DEP-001",
-    date: "2024-01-15",
-    time: "16:30",
-    amount: 500.00,
-    depositType: "bank",
-    accountNumber: "****1234",
-    accountName: "Business Account",
-    reference: "DEP20240115001",
-    status: "completed",
-    approvalStatus: "accepted", // accepted, pending, rejected
-    approvedBy: "Manager John",
-    approvedAt: "2024-01-15 16:45",
-    requiresApproval: false, // amounts over $1000 require approval
-    notes: "Daily cash deposit",
-    attachments: [
-      {
-        id: "att-001",
-        name: "deposit_slip_001.jpg",
-        url: "/api/files/deposit_slip_001.jpg",
-        type: "image/jpeg",
-        size: "245 KB"
-      }
-    ]
-  },
-  {
-    id: "DEP-002",
-    date: "2024-01-14",
-    time: "17:15",
-    amount: 1500.00, // Large amount requiring approval
-    depositType: "momo",
-    accountNumber: "****5678",
-    accountName: "MoMo Business",
-    reference: "MM20240114002",
-    status: "pending",
-    approvalStatus: "pending",
-    approvedBy: null,
-    approvedAt: null,
-    requiresApproval: true,
-    notes: "Weekend sales deposit - requires approval",
-    attachments: [
-      {
-        id: "att-002",
-        name: "momo_receipt_002.jpg",
-        url: "/api/files/momo_receipt_002.jpg",
-        type: "image/jpeg",
-        size: "189 KB"
-      },
-      {
-        id: "att-003",
-        name: "transaction_summary.pdf",
-        url: "/api/files/transaction_summary.pdf",
-        type: "application/pdf",
-        size: "67 KB"
-      }
-    ]
-  },
-  {
-    id: "DEP-003",
-    date: "2024-01-13",
-    time: "15:45",
-    amount: 300.00,
-    depositType: "bank",
-    accountNumber: "****1234",
-    accountName: "Business Account",
-    reference: "DEP20240113003",
-    status: "completed",
-    approvalStatus: "accepted",
-    approvedBy: "Manager John",
-    approvedAt: "2024-01-13 15:45",
-    requiresApproval: false,
-    notes: "Partial deposit",
-    attachments: []
-  },
-  {
-    id: "DEP-004",
-    date: "2024-01-12",
-    time: "14:20",
-    amount: 2500.00, // Large amount - rejected
-    depositType: "bank",
-    accountNumber: "****1234",
-    accountName: "Business Account",
-    reference: "DEP20240112004",
-    status: "rejected",
-    approvalStatus: "rejected",
-    approvedBy: "Manager Sarah",
-    approvedAt: "2024-01-12 16:30",
-    requiresApproval: true,
-    notes: "Large deposit - documentation insufficient",
-    rejectionReason: "Insufficient supporting documentation",
-    attachments: [
-      {
-        id: "att-004",
-        name: "bank_slip_004.jpg",
-        url: "/api/files/bank_slip_004.jpg",
-        type: "image/jpeg",
-        size: "312 KB"
-      }
-    ]
-  },
-  {
-    id: "DEP-005",
-    date: "2024-01-11",
-    time: "18:00",
-    amount: 800.00,
-    depositType: "handed_to_boss",
-    accountNumber: "N/A",
-    accountName: "Boss - Direct Handover",
-    reference: "BOSS20240111005",
-    status: "completed",
-    approvalStatus: "accepted",
-    approvedBy: "Manager John",
-    approvedAt: "2024-01-11 18:00",
-    requiresApproval: false,
-    notes: "Cash handed directly to boss",
-    attachments: []
+/**
+ * New deposit form interface
+ */
+interface NewDepositForm {
+  amount: string;
+  deposit_type: string;
+  account_name: string;
+  account_number: string;
+  boss_type: string; // For when deposit_type is "boss", specify the type (boss, manager, etc.)
+  image: File | null;
+}
+
+/**
+ * Helper function to format currency
+ */
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+};
+
+/**
+ * Helper function to format date and time
+ */
+const formatDateTime = (dateTime: string): { date: string; time: string } => {
+  const dt = new Date(dateTime);
+  return {
+    date: dt.toLocaleDateString(),
+    time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+};
+
+/**
+ * Helper function to get payment method display info
+ */
+const getPaymentMethodInfo = (method: string | null) => {
+  switch (method) {
+    case 'momo_pay':
+      return { label: 'Mobile Money', icon: Smartphone, color: 'bg-blue-100 text-blue-800' };
+    case 'cash':
+      return { label: 'Cash', icon: Banknote, color: 'bg-green-100 text-green-800' };
+    case 'bank_transfer':
+      return { label: 'Bank Transfer', icon: Building2, color: 'bg-purple-100 text-purple-800' };
+    default:
+      return { label: 'Unknown', icon: CreditCard, color: 'bg-gray-100 text-gray-800' };
   }
-];
+};
+
+/**
+ * Helper function to get payment status display info
+ */
+const getPaymentStatusInfo = (status: string) => {
+  switch (status) {
+    case 'paid':
+      return { label: 'Paid', icon: CheckCircle2, color: 'bg-green-100 text-green-800' };
+    case 'pending':
+      return { label: 'Pending', icon: Clock, color: 'bg-yellow-100 text-yellow-800' };
+    case 'partial':
+      return { label: 'Partial', icon: AlertTriangle, color: 'bg-orange-100 text-orange-800' };
+    default:
+      return { label: 'Unknown', icon: AlertTriangle, color: 'bg-gray-100 text-gray-800' };
+  }
+};
+
+/**
+ * Helper function to get status badge component
+ */
+const getStatusBadge = (status: string) => {
+  return status === "completed" ? (
+    <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+      Completed
+    </Badge>
+  ) : (
+    <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
+      Pending
+    </Badge>
+  );
+};
+
+/**
+ * Helper function to get deposit type badge component
+ */
+const getDepositTypeBadge = (type: string) => {
+  switch (type) {
+    case "bank":
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          <Building2 className="h-3 w-3 mr-1" />
+          Bank
+        </Badge>
+      );
+    case "momo":
+      return (
+        <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100">
+          <Smartphone className="h-3 w-3 mr-1" />
+          MoMo
+        </Badge>
+      );
+    case "boss":
+      return (
+        <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
+          <Eye className="h-3 w-3 mr-1" />
+          To
+        </Badge>
+      );
+    case "handed_to_boss":
+      return (
+        <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
+          <Eye className="h-3 w-3 mr-1" />
+          Handed to Boss
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="secondary">
+          Unknown
+        </Badge>
+      );
+  }
+};
+
+/**
+ * Helper function to get approval status badge component
+ */
+const getApprovalStatusBadge = (approvalStatus: string) => {
+  switch (approvalStatus) {
+    case "accepted":
+      return (
+        <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Accepted
+        </Badge>
+      );
+    case "pending":
+      return (
+        <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
+          <Clock className="h-3 w-3 mr-1" />
+          Pending
+        </Badge>
+      );
+    case "rejected":
+      return (
+        <Badge variant="destructive" className="bg-red-500 hover:bg-red-600">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Rejected
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="secondary">
+          Unknown
+        </Badge>
+      );
+  }
+};
 
 const Transactions = () => {
-  const [transactions] = useState(mockTransactions);
-  const [cashDeposits] = useState(mockCashDeposits);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterPayment, setFilterPayment] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [selectedDeposit, setSelectedDeposit] = useState<any>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Deposit filters
-  const [depositSearchTerm, setDepositSearchTerm] = useState("");
-  const [filterDepositType, setFilterDepositType] = useState("all");
-
-  // Add deposit modal state
-  const [isAddDepositOpen, setIsAddDepositOpen] = useState(false);
-  const [newDeposit, setNewDeposit] = useState({
-    amount: "",
-    depositType: "bank",
-    accountName: "",
-    reference: "",
-    notes: "",
-    attachments: [] as File[]
-  });
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-
-  // Filter transactions based on search and filters
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch =
-      transaction.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesPayment = filterPayment === "all" || transaction.paymentMethod === filterPayment;
-    const matchesStatus = filterStatus === "all" || transaction.status === filterStatus;
-
-    return matchesSearch && matchesPayment && matchesStatus;
-  });
-
-  // Filter deposits based on search and filters
-  const filteredDeposits = cashDeposits.filter(deposit => {
-    const matchesSearch =
-      deposit.reference.toLowerCase().includes(depositSearchTerm.toLowerCase()) ||
-      deposit.accountName.toLowerCase().includes(depositSearchTerm.toLowerCase()) ||
-      deposit.id.toLowerCase().includes(depositSearchTerm.toLowerCase());
-
-    const matchesType = filterDepositType === "all" || deposit.depositType === filterDepositType;
-
-    return matchesSearch && matchesType;
-  });
-
-  // Calculate summary statistics
-  const totalTransactions = filteredTransactions.length;
-  const totalRevenue = filteredTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
-  const momoTransactions = filteredTransactions.filter(t => t.paymentMethod === "momo").length;
-  const cashTransactions = filteredTransactions.filter(t => t.paymentMethod === "cash").length;
-  
-  // Calculate deposit statistics
-  const totalDeposits = filteredDeposits.length;
-  const totalDepositAmount = filteredDeposits.reduce((sum, d) => sum + d.amount, 0);
-  const bankDeposits = filteredDeposits.filter(d => d.depositType === "bank").length;
-  const momoDeposits = filteredDeposits.filter(d => d.depositType === "momo").length;
-
-  const getPaymentBadge = (method: string) => {
-    return method === "momo" ? (
-      <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-        <Smartphone className="h-3 w-3 mr-1" />
-        MoMo Pay
-      </Badge>
-    ) : (
-      <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-        <DollarSign className="h-3 w-3 mr-1" />
-        Cash
-      </Badge>
-    );
+  // Get current tab from URL
+  const getCurrentTab = () => {
+    const path = location.pathname;
+    if (path.includes('/deposits')) {
+      return 'deposits';
+    }
+    return 'transactions';
   };
 
-  // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setNewDeposit({
-      ...newDeposit,
-      attachments: [...newDeposit.attachments, ...files]
-    });
-  };
+  const [activeTab, setActiveTab] = useState(getCurrentTab());
 
-  // Remove uploaded file
-  const removeFile = (index: number) => {
-    const updatedFiles = newDeposit.attachments.filter((_, i) => i !== index);
-    setNewDeposit({
-      ...newDeposit,
-      attachments: updatedFiles
-    });
-  };
-
-  // Check if deposit requires approval (amounts over $1000)
-  const requiresApproval = (amount: number) => amount > 1000;
-
-  // Handle add deposit form submission
-  const handleAddDeposit = () => {
-    const depositAmount = parseFloat(newDeposit.amount);
-    const needsApproval = requiresApproval(depositAmount);
-
-    // Here you would typically send the data to your backend
-    console.log("New deposit:", {
-      ...newDeposit,
-      amount: depositAmount,
-      requiresApproval: needsApproval,
-      approvalStatus: needsApproval ? "pending" : "accepted",
-      status: needsApproval ? "pending" : "completed"
-    });
-
-    // Reset form and close modal
-    setNewDeposit({
-      amount: "",
-      depositType: "bank",
-      accountName: "",
-      reference: "",
-      notes: "",
-      attachments: []
-    });
-    setIsAddDepositOpen(false);
-
-    // Show appropriate message based on approval requirement
-    if (needsApproval) {
-      alert("Deposit submitted for approval. Large deposits require manager approval.");
+  // Handle tab change with URL navigation
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === 'deposits') {
+      navigate('/transactions/deposits');
     } else {
-      alert("Deposit added successfully!");
+      navigate('/transactions');
     }
   };
+
+  // Update tab when URL changes
+  useEffect(() => {
+    const currentTab = getCurrentTab();
+    if (currentTab !== activeTab) {
+      setActiveTab(currentTab);
+    }
+  }, [location.pathname, activeTab]);
+
+  // Use the transaction hook for state management
+  const {
+    transactions,
+    loading,
+    error,
+    pagination,
+    filters,
+    fetchTransactions,
+    searchTransactions,
+    setFilters,
+    clearFilters,
+    refetch,
+  } = useTransactions();
+
+  // Initialize deposits hook
+  const {
+    deposits: realDeposits,
+    stats: depositStats,
+    loading: depositsLoading,
+    fetchDeposits,
+    fetchStats: fetchDepositStats,
+    createDepositWithImage,
+    getDeposit,
+    deleteDeposit,
+  } = useDeposits();
+
+  // Fetch deposits data when deposits tab becomes active
+  useEffect(() => {
+    if (activeTab === 'deposits') {
+      fetchDeposits();
+      fetchDepositStats();
+    }
+  }, [activeTab, fetchDeposits, fetchDepositStats]);
+
+  // Local state for UI
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+
+  // Deposit management state
+  const [depositSearchTerm, setDepositSearchTerm] = useState("");
+  const [filterDepositType, setFilterDepositType] = useState("all");
+  const [filterToRecipient, setFilterToRecipient] = useState("all");
+  const [isAddDepositOpen, setIsAddDepositOpen] = useState(false);
+  const [newDeposit, setNewDeposit] = useState<NewDepositForm>({
+    amount: "",
+    deposit_type: "",
+    account_name: "",
+    account_number: "",
+    boss_type: "",
+    image: null
+  });
+
+  // State for deposit preview and delete
+  const [isPreviewDepositOpen, setIsPreviewDepositOpen] = useState(false);
+  const [isDeleteDepositOpen, setIsDeleteDepositOpen] = useState(false);
+  const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
+  const [deletingDeposit, setDeletingDeposit] = useState<Deposit | null>(null);
+
+  // State for image popup
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
+  // Initialize data on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Fetch only transactions data (stats will be calculated from table data)
+        await fetchTransactions();
+
+        // Initialize deposits data only if on deposits tab
+        if (getCurrentTab() === 'deposits') {
+          fetchDeposits();
+          fetchDepositStats();
+        }
+      } catch (error) {
+        console.error('Error initializing transaction data:', error);
+      }
+    };
+
+    initializeData();
+  }, []); // Empty dependency array to run only once
+
+  // Computed transaction statistics from table data (no API calls, with null checks)
+  const totalTransactions = transactions?.length || 0;
+  const totalTransactionAmount = transactions?.reduce((sum, transaction) => sum + transaction.total_amount, 0) || 0;
+  const paidTransactions = transactions?.filter(t => t.payment_status === 'paid').length || 0;
+  const pendingTransactions = transactions?.filter(t => t.payment_status === 'pending').length || 0;
+  const partialTransactions = transactions?.filter(t => t.payment_status === 'partial').length || 0;
+
+  // Computed values for deposit statistics using real data (with null checks)
+  const totalDeposits = realDeposits?.length || 0;
+  const totalDepositAmount = realDeposits?.reduce((sum, deposit) => sum + deposit.amount, 0) || 0;
+  const bankDeposits = realDeposits?.filter(d => d.deposit_type === 'bank').length || 0;
+  const momoDeposits = realDeposits?.filter(d => d.deposit_type === 'momo').length || 0;
+  const bossDeposits = realDeposits?.filter(d => d.deposit_type === 'boss').length || 0;
+
+  // Get unique to_recipient values for filter options
+  const uniqueToRecipients = Array.from(
+    new Set(
+      realDeposits
+        ?.filter(d => d.deposit_type === 'boss' && d.to_recipient)
+        .map(d => d.to_recipient)
+        .filter(Boolean)
+    )
+  ).sort();
+
+  // Filter deposits based on search and type (with null check)
+  const filteredDeposits = realDeposits?.filter(deposit => {
+    const matchesSearch = depositSearchTerm === "" ||
+      deposit.account_name.toLowerCase().includes(depositSearchTerm.toLowerCase()) ||
+      (deposit.account_number && deposit.account_number.toLowerCase().includes(depositSearchTerm.toLowerCase())) ||
+      (deposit.to_recipient && deposit.to_recipient.toLowerCase().includes(depositSearchTerm.toLowerCase())) ||
+      deposit.deposit_id.toLowerCase().includes(depositSearchTerm.toLowerCase());
+
+    const matchesType = filterDepositType === "all" || deposit.deposit_type === filterDepositType;
+
+    const matchesToRecipient = filterToRecipient === "all" ||
+      (filterToRecipient === "none" && (!deposit.to_recipient || deposit.to_recipient === "")) ||
+      (deposit.to_recipient && deposit.to_recipient.toLowerCase() === filterToRecipient.toLowerCase());
+
+    return matchesSearch && matchesType && matchesToRecipient;
+  }) || [];
+
+  // Handle search with automatic debouncing
+  const handleSearch = async () => {
+    try {
+      if (searchTerm.trim()) {
+        await searchTransactions(searchTerm.trim());
+      } else {
+        await fetchTransactions();
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    }
+  };
+
+  // Auto-search when search term changes (debounced)
+  useEffect(() => {
+    // Only search if component is mounted and not in initial loading state
+    if (searchTerm !== undefined) {
+      handleSearch();
+    }
+  }, [searchTerm]); // This will trigger the debounced search
+
+  // Handle filter changes
+  const handleFilterChange = (key: keyof TransactionFilters, value: string) => {
+    const newValue = value === 'all' ? undefined : value;
+    setFilters({ [key]: newValue });
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage: number) => {
+    fetchTransactions(newPage, pagination?.limit || 10);
+  };
+
+  // Handle transaction detail view
+  const handleViewTransaction = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionDetail(true);
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    await refetch();
+    toast.success('Data refreshed successfully');
+  };
+
+  // Handle file upload for deposits
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files[0]) {
+      setNewDeposit(prev => ({
+        ...prev,
+        image: files[0]
+      }));
+    }
+  };
+
+  // Remove file from attachments
+  const removeFile = () => {
+    setNewDeposit(prev => ({
+      ...prev,
+      image: null
+    }));
+  };
+
+  // Handle add deposit
+  const handleAddDeposit = async () => {
+    if (!newDeposit.amount || !newDeposit.account_name || !newDeposit.deposit_type) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+
+    // Additional validation for boss type
+    if (newDeposit.deposit_type === 'boss' && !newDeposit.boss_type) {
+      toast.error('Please specify who you are giving the deposit to');
+      return;
+    }
+
+    try {
+      const amount = parseFloat(newDeposit.amount);
+
+      const depositData: CreateDepositWithImageRequest = {
+        amount,
+        deposit_type: newDeposit.deposit_type as 'bank' | 'momo' | 'boss',
+        account_name: newDeposit.account_name,
+        account_number: newDeposit.account_number || undefined,
+        to_recipient: newDeposit.deposit_type === 'boss' ? newDeposit.boss_type : undefined,
+        image: newDeposit.image || undefined,
+      };
+
+      await createDepositWithImage(depositData);
+
+      // Reset form
+      setNewDeposit({
+        amount: "",
+        deposit_type: "",
+        account_name: "",
+        account_number: "",
+        boss_type: "",
+        image: null
+      });
+
+      setIsAddDepositOpen(false);
+
+      // Note: Auto-refresh is now handled by the hook
+
+    } catch (error) {
+      console.error('Error adding deposit:', error);
+      // Error is already handled by the hook
+    }
+  };
+
+  // Handle deposit preview
+  const handlePreviewDeposit = (deposit: Deposit) => {
+    setSelectedDeposit(deposit);
+    setIsPreviewDepositOpen(true);
+  };
+
+  // Handle deposit delete click
+  const handleDeleteDepositClick = (deposit: Deposit) => {
+    setDeletingDeposit(deposit);
+    setIsDeleteDepositOpen(true);
+  };
+
+  // Confirm deposit deletion
+  const confirmDeleteDeposit = async () => {
+    if (!deletingDeposit) return;
+
+    try {
+      await deleteDeposit(deletingDeposit.deposit_id);
+      setIsDeleteDepositOpen(false);
+      setDeletingDeposit(null);
+      // Note: Auto-refresh is now handled by the hook
+    } catch (error) {
+      console.error('Error deleting deposit:', error);
+      // Error is already handled by the hook
+    }
+  };
+
+  // Handle image click to show in modal
+  const handleImageClick = (imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+    setIsImageModalOpen(true);
+  };
+
+  // Calculate filtered transactions for display
+  const filteredTransactions = transactions;
+  // Show error message if there's an error (only once per error)
+  useEffect(() => {
+    if (error) {
+      console.error('Transaction error:', error);
+      toast.error(error, {
+        duration: 5000, // Show for 5 seconds
+        action: {
+          label: 'Retry',
+          onClick: handleRefresh,
+        },
+      });
+    }
+  }, [error, handleRefresh]);
 
   return (
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Receipt className="h-8 w-8 text-blue-600" />
-            Transactions & Deposits
-          </h1>
-          <p className="text-muted-foreground">Track sales transactions and cash deposits</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Receipt className="h-8 w-8 text-blue-600" />
+              Transaction Management
+            </h1>
+            <p className="text-muted-foreground">Comprehensive transaction tracking and management</p>
+          </div>
+          <Button onClick={handleRefresh} disabled={loading} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="transactions" className="w-full">
+        {/* Transaction Management Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="transactions" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
+            <TabsTrigger value="transactions">
+              <Receipt className="mr-2 h-4 w-4" />
               Transactions
             </TabsTrigger>
-            <TabsTrigger value="deposits" className="flex items-center gap-2">
-              <Banknote className="h-4 w-4" />
-              Cash Deposits
+            <TabsTrigger value="deposits">
+              <Banknote className="mr-2 h-4 w-4" />
+              Deposits
             </TabsTrigger>
           </TabsList>
 
-          {/* Transactions Tab */}
           <TabsContent value="transactions" className="space-y-6">
+            {/* Backend Connection Status */}
+            {totalTransactions === 0 && !loading && !error && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800">
+                      Backend Connected - No transactions found
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      The system is working correctly. Add some transactions to see them here.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Transactions</p>
+                  <p className="text-2xl font-bold">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : error ? (
+                      <span className="text-red-500 text-sm">Error</span>
+                    ) : (
+                      totalTransactions
+                    )}
+                  </p>
+                </div>
+                <Receipt className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="text-2xl font-bold">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : error ? (
+                      <span className="text-red-500 text-sm">Error</span>
+                    ) : (
+                      formatCurrency(totalTransactionAmount)
+                    )}
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Paid Transactions</p>
+                  <p className="text-2xl font-bold">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : error ? (
+                      <span className="text-red-500 text-sm">Error</span>
+                    ) : (
+                      paidTransactions
+                    )}
+                  </p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending Transactions</p>
+                  <p className="text-2xl font-bold">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : error ? (
+                      <span className="text-red-500 text-sm">Error</span>
+                    ) : (
+                      pendingTransactions
+                    )}
+                  </p>
+                </div>
+                <Clock className="h-8 w-8 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filters & Search
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Transactions</p>
-                      <p className="text-2xl font-bold">{totalTransactions}</p>
-                    </div>
-                    <Receipt className="h-8 w-8 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-2">
+                <Label htmlFor="search">Search Transactions</Label>
+                <div className="relative">
+                  {loading ? (
+                    <Loader2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground animate-spin" />
+                  ) : (
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Input
+                    id="search"
+                    placeholder="Search by product, client, reference..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="pl-10"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Revenue</p>
-                      <p className="text-2xl font-bold">${totalRevenue.toFixed(2)}</p>
-                    </div>
-                    <DollarSign className="h-8 w-8 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-2">
+                <Label>Payment Status</Label>
+                <Select
+                  value={filters.payment_status || 'all'}
+                  onValueChange={(value) => handleFilterChange('payment_status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {PAYMENT_STATUSES.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">MoMo Payments</p>
-                      <p className="text-2xl font-bold">{momoTransactions}</p>
-                    </div>
-                    <Smartphone className="h-8 w-8 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select
+                  value={filters.payment_method || 'all'}
+                  onValueChange={(value) => handleFilterChange('payment_method', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Methods" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Methods</SelectItem>
+                    {PAYMENT_METHODS.map((method) => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Cash Payments</p>
-                      <p className="text-2xl font-bold">{cashTransactions}</p>
-                    </div>
-                    <DollarSign className="h-8 w-8 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-2">
+                <Label>Deposit Type</Label>
+                <Select
+                  value={filters.deposit_type || 'all'}
+                  onValueChange={(value) => handleFilterChange('deposit_type', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {DEPOSIT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Filters and Search */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Filters & Search
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="search">Search Transactions</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="search"
-                        placeholder="Search by product, client, or ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={handleSearch} disabled={loading}>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+              <Button onClick={clearFilters} variant="outline" disabled={loading}>
+                Clear Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <div className="space-y-2">
-                    <Label>Payment Method</Label>
-                    <Select value={filterPayment} onValueChange={setFilterPayment}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All Methods" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Methods</SelectItem>
-                        <SelectItem value="momo">MoMo Pay</SelectItem>
-                        <SelectItem value="cash">Cash</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Transactions Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5" />
-                  Transaction History
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {filteredTransactions.length} transaction(s) found
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
+        {/* Transactions Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Transaction History
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {loading ? 'Loading...' : `${filteredTransactions.length} transaction(s) found`}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading transactions...</span>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTransactions.length === 0 ? (
                       <TableRow>
-                        <TableHead>Transaction ID</TableHead>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableCell colSpan={9} className="text-center py-8">
+                          <div className="flex flex-col items-center gap-2">
+                            <Receipt className="h-8 w-8 text-muted-foreground" />
+                            <p className="text-muted-foreground">
+                              {error ? 'Error loading transactions' : 'No transactions found'}
+                            </p>
+                            {error && (
+                              <Button onClick={handleRefresh} variant="outline" size="sm">
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Retry
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTransactions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
-                            <div className="flex flex-col items-center gap-2">
-                              <Receipt className="h-8 w-8 text-muted-foreground" />
-                              <p className="text-muted-foreground">No transactions found</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredTransactions.map((transaction) => (
-                          <TableRow key={transaction.id}>
-                            <TableCell className="font-medium">{transaction.id}</TableCell>
+                    ) : (
+                      filteredTransactions.map((transaction) => {
+                        const { date, time } = formatDateTime(transaction.date_time);
+                        const paymentMethodInfo = getPaymentMethodInfo(transaction.payment_method);
+                        const statusInfo = getPaymentStatusInfo(transaction.payment_status);
+                        const PaymentIcon = paymentMethodInfo.icon;
+                        const StatusIcon = statusInfo.icon;
+
+                        return (
+                          <TableRow key={transaction.transaction_id}>
+                            <TableCell className="font-medium">
+                              {transaction.transaction_id.slice(0, 8)}...
+                            </TableCell>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="text-sm">{transaction.date}</span>
-                                <span className="text-xs text-muted-foreground">{transaction.time}</span>
+                                <span className="text-sm">{date}</span>
+                                <span className="text-xs text-muted-foreground">{time}</span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4 text-blue-600" />
-                                {transaction.productName}
+                                <span className="truncate max-w-[150px]" title={transaction.product_name}>
+                                  {transaction.product_name}
+                                </span>
                               </div>
                             </TableCell>
-                            <TableCell className="font-medium">{transaction.clientName}</TableCell>
-                            <TableCell>{transaction.quantity} kg</TableCell>
-                            <TableCell className="font-semibold">${transaction.totalAmount.toFixed(2)}</TableCell>
-                            <TableCell>{getPaymentBadge(transaction.paymentMethod)}</TableCell>
-                            <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-gray-600" />
+                                <span className="truncate max-w-[120px]" title={transaction.client_name}>
+                                  {transaction.client_name}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {transaction.boxes_quantity > 0 && (
+                                  <div>{transaction.boxes_quantity} boxes</div>
+                                )}
+                                {transaction.kg_quantity > 0 && (
+                                  <div>{transaction.kg_quantity} kg</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {formatCurrency(transaction.total_amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className={paymentMethodInfo.color}>
+                                <PaymentIcon className="h-3 w-3 mr-1" />
+                                {paymentMethodInfo.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className={statusInfo.color}>
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {statusInfo.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                onClick={() => handleViewTransaction(transaction)}
+                                size="sm"
+                                variant="outline"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                  {pagination.total} transactions
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={!pagination.hasPrev || loading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <Button
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={!pagination.hasNext || loading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {/* Transaction Detail Dialog */}
+        <Dialog open={showTransactionDetail} onOpenChange={setShowTransactionDetail}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Transaction Details
+              </DialogTitle>
+              <DialogDescription>
+                Comprehensive transaction information and details
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedTransaction && (
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Transaction ID</Label>
+                    <p className="text-sm font-mono">{selectedTransaction.transaction_id}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Date & Time</Label>
+                    <p className="text-sm">{formatDateTime(selectedTransaction.date_time).date} at {formatDateTime(selectedTransaction.date_time).time}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Product</Label>
+                    <p className="text-sm">{selectedTransaction.product_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Client</Label>
+                    <p className="text-sm">{selectedTransaction.client_name}</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Quantity and Amount */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Boxes</Label>
+                    <p className="text-sm">{selectedTransaction.boxes_quantity}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Kilograms</Label>
+                    <p className="text-sm">{selectedTransaction.kg_quantity}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Total Amount</Label>
+                    <p className="text-lg font-semibold">{formatCurrency(selectedTransaction.total_amount)}</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Payment Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Payment Status</Label>
+                    <div className="mt-1">
+                      {(() => {
+                        const statusInfo = getPaymentStatusInfo(selectedTransaction.payment_status);
+                        const StatusIcon = statusInfo.icon;
+                        return (
+                          <Badge variant="secondary" className={statusInfo.color}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Payment Method</Label>
+                    <div className="mt-1">
+                      {selectedTransaction.payment_method && (() => {
+                        const methodInfo = getPaymentMethodInfo(selectedTransaction.payment_method);
+                        const MethodIcon = methodInfo.icon;
+                        return (
+                          <Badge variant="secondary" className={methodInfo.color}>
+                            <MethodIcon className="h-3 w-3 mr-1" />
+                            {methodInfo.label}
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                {(selectedTransaction.deposit_id || selectedTransaction.account_number || selectedTransaction.reference) && (
+                  <>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedTransaction.deposit_id && (
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Deposit ID</Label>
+                          <p className="text-sm font-mono">{selectedTransaction.deposit_id}</p>
+                        </div>
+                      )}
+                      {selectedTransaction.account_number && (
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Account Number</Label>
+                          <p className="text-sm">{selectedTransaction.account_number}</p>
+                        </div>
+                      )}
+                      {selectedTransaction.reference && (
+                        <div className="col-span-2">
+                          <Label className="text-sm font-medium text-muted-foreground">Reference</Label>
+                          <p className="text-sm">{selectedTransaction.reference}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Receipt Image */}
+                {selectedTransaction.image_url && (
+                  <>
+                    <Separator />
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Receipt Image</Label>
+                      <div className="mt-2">
+                        <img
+                          src={selectedTransaction.image_url}
+                          alt="Transaction receipt"
+                          className="max-w-full h-auto rounded-lg border"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
           </TabsContent>
 
-          {/* Cash Deposits Tab */}
           <TabsContent value="deposits" className="space-y-6">
             {/* Deposit Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -629,7 +1164,25 @@ const Transactions = () => {
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="bank">Bank</SelectItem>
                         <SelectItem value="momo">MoMo</SelectItem>
-                        <SelectItem value="handed_to_boss">Handed to Boss</SelectItem>
+                        <SelectItem value="boss">To</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>To Recipient</Label>
+                    <Select value={filterToRecipient} onValueChange={setFilterToRecipient}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Recipients" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Recipients</SelectItem>
+                        <SelectItem value="none">No Recipient</SelectItem>
+                        {uniqueToRecipients.map((recipient) => (
+                          <SelectItem key={recipient} value={recipient!}>
+                            {recipient}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -680,18 +1233,32 @@ const Transactions = () => {
 
                           <div className="space-y-1">
                             <Label className="text-sm">Type *</Label>
-                            <Select value={newDeposit.depositType} onValueChange={(value) => setNewDeposit({...newDeposit, depositType: value})}>
+                            <Select value={newDeposit.deposit_type} onValueChange={(value) => setNewDeposit({...newDeposit, deposit_type: value, boss_type: ""})}>
                               <SelectTrigger className="h-8">
                                 <SelectValue placeholder="Select type" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="bank">Bank</SelectItem>
                                 <SelectItem value="momo">MoMo</SelectItem>
-                                <SelectItem value="handed_to_boss">To Boss</SelectItem>
+                                <SelectItem value="boss">To</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
+
+                        {/* Conditional boss type field */}
+                        {newDeposit.deposit_type === 'boss' && (
+                          <div className="space-y-1">
+                            <Label htmlFor="bossType" className="text-sm">To (Specify) *</Label>
+                            <Input
+                              id="bossType"
+                              placeholder="e.g., boss, manager, supervisor"
+                              className="h-8"
+                              value={newDeposit.boss_type}
+                              onChange={(e) => setNewDeposit({...newDeposit, boss_type: e.target.value})}
+                            />
+                          </div>
+                        )}
 
                         <div className="space-y-1">
                           <Label htmlFor="accountName" className="text-sm">Account Name *</Label>
@@ -699,34 +1266,23 @@ const Transactions = () => {
                             id="accountName"
                             placeholder="Business Account"
                             className="h-8"
-                            value={newDeposit.accountName}
-                            onChange={(e) => setNewDeposit({...newDeposit, accountName: e.target.value})}
+                            value={newDeposit.account_name}
+                            onChange={(e) => setNewDeposit({...newDeposit, account_name: e.target.value})}
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label htmlFor="reference" className="text-sm">Reference</Label>
-                            <Input
-                              id="reference"
-                              placeholder="DEP001"
-                              className="h-8"
-                              value={newDeposit.reference}
-                              onChange={(e) => setNewDeposit({...newDeposit, reference: e.target.value})}
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <Label htmlFor="notes" className="text-sm">Notes</Label>
-                            <Input
-                              id="notes"
-                              placeholder="Optional"
-                              className="h-8"
-                              value={newDeposit.notes}
-                              onChange={(e) => setNewDeposit({...newDeposit, notes: e.target.value})}
-                            />
-                          </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="accountNumber" className="text-sm">Account Number</Label>
+                          <Input
+                            id="accountNumber"
+                            placeholder="123456789 (Optional)"
+                            className="h-8"
+                            value={newDeposit.account_number}
+                            onChange={(e) => setNewDeposit({...newDeposit, account_number: e.target.value})}
+                          />
                         </div>
+
+
 
                         {/* Photo Upload Section */}
                         <div className="space-y-1">
@@ -740,7 +1296,6 @@ const Transactions = () => {
                               <input
                                 id="file-upload"
                                 type="file"
-                                multiple
                                 accept="image/*,.pdf"
                                 className="hidden"
                                 onChange={handleFileUpload}
@@ -748,26 +1303,24 @@ const Transactions = () => {
                             </label>
                           </div>
 
-                          {/* Display uploaded files */}
-                          {newDeposit.attachments.length > 0 && (
+                          {/* Display uploaded file */}
+                          {newDeposit.image && (
                             <div className="space-y-1">
-                              {newDeposit.attachments.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-1 bg-gray-50 rounded text-xs">
-                                  <div className="flex items-center gap-1">
-                                    <Image className="h-3 w-3 text-blue-600" />
-                                    <span className="truncate max-w-[120px]">{file.name}</span>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeFile(index)}
-                                    className="h-4 w-4 p-0 text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-2 w-2" />
-                                  </Button>
+                              <div className="flex items-center justify-between p-1 bg-gray-50 rounded text-xs">
+                                <div className="flex items-center gap-1">
+                                  <Image className="h-3 w-3 text-blue-600" />
+                                  <span className="truncate max-w-[120px]">{newDeposit.image.name}</span>
                                 </div>
-                              ))}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={removeFile}
+                                  className="h-4 w-4 p-0 text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-2 w-2" />
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -797,7 +1350,12 @@ const Transactions = () => {
                             size="sm"
                             className="flex-1 h-8 bg-green-600 hover:bg-green-700"
                             onClick={handleAddDeposit}
-                            disabled={!newDeposit.amount || !newDeposit.accountName}
+                            disabled={
+                              !newDeposit.amount ||
+                              !newDeposit.account_name ||
+                              !newDeposit.deposit_type ||
+                              (newDeposit.deposit_type === 'boss' && !newDeposit.boss_type)
+                            }
                           >
                             Add Deposit
                           </Button>
@@ -815,8 +1373,9 @@ const Transactions = () => {
                         <TableHead>Date & Time</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead>To</TableHead>
                         <TableHead>Account</TableHead>
-                        <TableHead>Reference</TableHead>
+                        <TableHead>Deposit ID</TableHead>
                         <TableHead>Approval</TableHead>
                         <TableHead>Attachments</TableHead>
                         <TableHead>Actions</TableHead>
@@ -825,7 +1384,7 @@ const Transactions = () => {
                     <TableBody>
                       {filteredDeposits.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
+                          <TableCell colSpan={9} className="text-center py-8">
                             <div className="flex flex-col items-center gap-2">
                               <Banknote className="h-8 w-8 text-muted-foreground" />
                               <p className="text-muted-foreground">No deposits found</p>
@@ -834,37 +1393,67 @@ const Transactions = () => {
                         </TableRow>
                       ) : (
                         filteredDeposits.map((deposit) => (
-                          <TableRow key={deposit.id}>
+                          <TableRow key={deposit.deposit_id}>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="text-sm">{deposit.date}</span>
-                                <span className="text-xs text-muted-foreground">{deposit.time}</span>
+                                <span className="text-sm">{new Date(deposit.date_time).toLocaleDateString()}</span>
+                                <span className="text-xs text-muted-foreground">{new Date(deposit.date_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-semibold text-green-600">${deposit.amount.toFixed(2)}</span>
-                                {deposit.requiresApproval && (
-                                  <span className="text-xs text-orange-600">Requires Approval</span>
-                                )}
                               </div>
                             </TableCell>
-                            <TableCell>{getDepositTypeBadge(deposit.depositType)}</TableCell>
+                            <TableCell>{getDepositTypeBadge(deposit.deposit_type)}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium">{deposit.accountName}</span>
-                                <span className="text-xs text-muted-foreground">{deposit.accountNumber}</span>
+                                <span className="text-sm font-medium">
+                                  {deposit.deposit_type === 'boss' && deposit.to_recipient
+                                    ? deposit.to_recipient
+                                    : deposit.deposit_type === 'boss'
+                                      ? 'Boss'
+                                      : '-'
+                                  }
+                                </span>
                               </div>
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{deposit.reference}</TableCell>
-                            <TableCell>{getApprovalStatusBadge(deposit.approvalStatus)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">{deposit.account_name}</span>
+                                <span className="text-xs text-muted-foreground">{deposit.account_number || 'N/A'}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{deposit.deposit_id}</TableCell>
+                            <TableCell>
+                              {deposit.approval === 'approved' ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Approved
+                                </Badge>
+                              ) : deposit.approval === 'rejected' ? (
+                                <Badge variant="destructive" className="bg-red-100 text-red-800">
+                                  <X className="h-3 w-3 mr-1" />
+                                  Rejected
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                {deposit.attachments.length > 0 ? (
-                                  <>
-                                    <Image className="h-4 w-4 text-blue-600" />
-                                    <span className="text-sm text-blue-600">{deposit.attachments.length}</span>
-                                  </>
+                                {deposit.deposit_image_url ? (
+                                  <button
+                                    onClick={() => handleImageClick(deposit.deposit_image_url!)}
+                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    title="Click to view image"
+                                  >
+                                    <Image className="h-4 w-4" />
+                                    <span className="text-sm">1</span>
+                                  </button>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">None</span>
                                 )}
@@ -872,13 +1461,21 @@ const Transactions = () => {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handlePreviewDeposit(deposit)}
+                                  title="Preview deposit details"
+                                >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteDepositClick(deposit)}
+                                  title="Delete deposit"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -893,85 +1490,194 @@ const Transactions = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Deposit Preview Modal */}
+        <Dialog open={isPreviewDepositOpen} onOpenChange={setIsPreviewDepositOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Deposit Details
+              </DialogTitle>
+              <DialogDescription>
+                View deposit information and status
+              </DialogDescription>
+            </DialogHeader>
+            {selectedDeposit && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Amount</label>
+                    <p className="text-lg font-semibold text-green-600">${selectedDeposit.amount.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Type</label>
+                    <p className="text-sm">
+                      {selectedDeposit.deposit_type === 'boss' ? 'TO' : selectedDeposit.deposit_type.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Show To field for boss type deposits */}
+                {selectedDeposit.deposit_type === 'boss' && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">To</label>
+                    <p className="text-sm">{selectedDeposit.to_recipient || 'Boss'}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Account Name</label>
+                    <p className="text-sm">{selectedDeposit.account_name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Account Number</label>
+                    <p className="text-sm">{selectedDeposit.account_number || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Date & Time</label>
+                  <p className="text-sm">{new Date(selectedDeposit.date_time).toLocaleString()}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Approval Status</label>
+                  <div className="mt-1">
+                    {selectedDeposit.approval === 'approved' ? (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Approved
+                      </Badge>
+                    ) : selectedDeposit.approval === 'rejected' ? (
+                      <Badge variant="destructive" className="bg-red-100 text-red-800">
+                        <X className="h-3 w-3 mr-1" />
+                        Rejected
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {selectedDeposit.deposit_image_url && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Attachment</label>
+                    <div className="mt-2">
+                      <img
+                        src={selectedDeposit.deposit_image_url}
+                        alt="Deposit proof"
+                        className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleImageClick(selectedDeposit.deposit_image_url!)}
+                        title="Click to view full size"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Deposit ID</label>
+                  <p className="text-xs font-mono bg-gray-100 dark:bg-gray-800 p-2 rounded">
+                    {selectedDeposit.deposit_id}
+                  </p>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Deposit Confirmation Modal */}
+        <Dialog open={isDeleteDepositOpen} onOpenChange={setIsDeleteDepositOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Delete Deposit
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this deposit? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {deletingDeposit && (
+              <div className="space-y-4">
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 text-red-800 dark:text-red-200 mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="font-medium">Deposit to be deleted:</span>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <p><strong>Amount:</strong> ${deletingDeposit.amount.toFixed(2)}</p>
+                    <p><strong>Type:</strong> {deletingDeposit.deposit_type.toUpperCase()}</p>
+                    <p><strong>Account:</strong> {deletingDeposit.account_name}</p>
+                    <p><strong>Date:</strong> {new Date(deletingDeposit.date_time).toLocaleDateString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsDeleteDepositOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={confirmDeleteDeposit}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Image Preview Modal */}
+        <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle className="flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                Deposit Image
+              </DialogTitle>
+              <DialogDescription>
+                Click outside or press ESC to close
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 pb-6">
+              {selectedImageUrl && (
+                <div className="relative">
+                  <img
+                    src={selectedImageUrl}
+                    alt="Deposit proof"
+                    className="w-full h-auto max-h-[70vh] object-contain rounded-lg border"
+                    style={{ maxHeight: '70vh' }}
+                  />
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(selectedImageUrl, '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open in New Tab
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
 };
 
 export default Transactions;
-
-  const getStatusBadge = (status: string) => {
-    return status === "completed" ? (
-      <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-        Completed
-      </Badge>
-    ) : (
-      <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
-        Pending
-      </Badge>
-    );
-  };
-
-  const getDepositTypeBadge = (type: string) => {
-    switch (type) {
-      case "bank":
-        return (
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-            <Building2 className="h-3 w-3 mr-1" />
-            Bank
-          </Badge>
-        );
-      case "momo":
-        return (
-          <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100">
-            <Smartphone className="h-3 w-3 mr-1" />
-            MoMo
-          </Badge>
-        );
-      case "handed_to_boss":
-        return (
-          <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
-            <Eye className="h-3 w-3 mr-1" />
-            Handed to Boss
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary">
-            Unknown
-          </Badge>
-        );
-    }
-  };
-
-  const getApprovalStatusBadge = (approvalStatus: string) => {
-    switch (approvalStatus) {
-      case "accepted":
-        return (
-          <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Accepted
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge variant="destructive" className="bg-red-500 hover:bg-red-600">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Rejected
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary">
-            Unknown
-          </Badge>
-        );
-    }
-  };

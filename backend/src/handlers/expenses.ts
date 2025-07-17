@@ -19,12 +19,19 @@ import {
   getTotalCount,
   recordExists,
 } from '../utils/db';
+import {
+  initializeCloudinary,
+  uploadToCloudinary,
+  validateFileType,
+  validateFileSize,
+  generateUniqueFilename,
+} from '../utils/cloudinary';
 
 // Validation schemas
 const getExpensesQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10),
-  sortBy: z.enum(['created_at', 'amount', 'expense_date', 'description']).default('created_at'),
+  sortBy: z.enum(['created_at', 'amount', 'date', 'title']).default('created_at'), // Updated to match database columns
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   category_id: z.string().uuid().optional(),
@@ -35,16 +42,21 @@ const getExpensesQuerySchema = z.object({
 });
 
 const createExpenseSchema = z.object({
-  description: z.string().min(1).max(255),
+  title: z.string().min(1).max(255), // Changed from description to title
   amount: z.number().positive(),
-  expense_date: z.string(),
+  date: z.string(), // Changed from expense_date to date
   category_id: z.string().uuid(),
   receipt_url: z.string().url().optional(),
-  notes: z.string().max(1000).optional(),
-  payment_method: z.enum(['cash', 'card', 'bank_transfer', 'check']).default('cash'),
-  vendor_name: z.string().max(255).optional(),
-  is_recurring: z.boolean().default(false),
-  recurring_frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  status: z.enum(['pending', 'paid']).default('pending'), // Updated to match database schema
+});
+
+// Schema for expense with receipt upload
+const createExpenseWithReceiptSchema = z.object({
+  title: z.string().min(1).max(255),
+  amount: z.number().positive(),
+  date: z.string(),
+  category_id: z.string().uuid(),
+  status: z.enum(['pending', 'paid']).default('pending'),
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();
@@ -52,8 +64,7 @@ const updateExpenseSchema = createExpenseSchema.partial();
 const createExpenseCategorySchema = z.object({
   category_name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
-  is_active: z.boolean().default(true),
+  budget: z.number().min(0).default(0), // Added budget field from database schema
 });
 
 const updateExpenseCategorySchema = createExpenseCategorySchema.partial();
@@ -76,26 +87,30 @@ export const getExpensesHandler = async (c: HonoContext) => {
 
     const { page, limit, sortBy, sortOrder, search, category_id, start_date, end_date, min_amount, max_amount } = validation.data;
 
-    // Build query
+    // Build query - Updated to match database schema and include user information
     let query = c.get('supabase')
       .from('expenses')
       .select(`
         expense_id,
-        description,
+        title,
         amount,
-        expense_date,
+        category_id,
+        date,
         receipt_url,
-        notes,
-        payment_method,
-        vendor_name,
-        is_recurring,
-        recurring_frequency,
+        status,
+        added_by,
         created_at,
         updated_at,
         expense_categories (
           category_id,
           category_name,
-          color
+          description,
+          budget
+        ),
+        users (
+          user_id,
+          owner_name,
+          business_name
         )
       `);
 
@@ -105,11 +120,11 @@ export const getExpensesHandler = async (c: HonoContext) => {
     }
 
     if (start_date) {
-      query = query.gte('expense_date', start_date);
+      query = query.gte('date', start_date); // Updated column name
     }
 
     if (end_date) {
-      query = query.lte('expense_date', end_date);
+      query = query.lte('date', end_date); // Updated column name
     }
 
     if (min_amount) {
@@ -120,9 +135,9 @@ export const getExpensesHandler = async (c: HonoContext) => {
       query = query.lte('amount', max_amount);
     }
 
-    // Apply search
+    // Apply search - Updated to match database columns
     if (search) {
-      query = applySearch(query, search, ['description', 'vendor_name', 'notes']);
+      query = applySearch(query, search, ['title']); // Only search in title field as per database schema
     }
 
     // Get total count for pagination
@@ -176,7 +191,12 @@ export const getExpenseHandler = async (c: HonoContext) => {
           category_id,
           category_name,
           description,
-          color
+          budget
+        ),
+        users (
+          user_id,
+          owner_name,
+          business_name
         )
       `)
       .eq('expense_id', id)
@@ -203,7 +223,19 @@ export const getExpenseHandler = async (c: HonoContext) => {
  */
 export const createExpenseHandler = async (c: HonoContext) => {
   try {
-    const body = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+      return c.json({
+        success: false,
+        error: 'Invalid JSON in request body',
+        details: { error: jsonError instanceof Error ? jsonError.message : 'Invalid JSON format' },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
 
     const validation = createExpenseSchema.safeParse(body);
     if (!validation.success) {
@@ -211,7 +243,13 @@ export const createExpenseHandler = async (c: HonoContext) => {
         field: err.path.join('.'),
         message: err.message,
       }));
-      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: { errors },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
     const expenseData = validation.data;
@@ -219,14 +257,21 @@ export const createExpenseHandler = async (c: HonoContext) => {
     // Verify category exists
     const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', expenseData.category_id, 'category_id');
     if (!categoryExists) {
-      return c.json(createErrorResponse('Invalid category ID', 400, { error: 'The specified expense category does not exist' }, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Invalid category ID',
+        details: { error: 'The specified expense category does not exist' },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
-    // Create expense
+    // Create expense - Add required added_by field from authenticated user
     const { data: newExpense, error } = await c.get('supabase')
       .from('expenses')
       .insert({
         ...expenseData,
+        added_by: c.get('user')?.id, // Add the authenticated user ID
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -235,7 +280,8 @@ export const createExpenseHandler = async (c: HonoContext) => {
         expense_categories (
           category_id,
           category_name,
-          color
+          description,
+          budget
         )
       `)
       .single();
@@ -253,7 +299,13 @@ export const createExpenseHandler = async (c: HonoContext) => {
 
   } catch (error) {
     console.error('Create expense error:', error);
-    return c.json(createErrorResponse('Failed to create expense', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to create expense',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };
 
@@ -308,7 +360,8 @@ export const updateExpenseHandler = async (c: HonoContext) => {
         expense_categories (
           category_id,
           category_name,
-          color
+          description,
+          budget
         )
       `)
       .single();
@@ -382,11 +435,23 @@ export const getExpenseCategoriesHandler = async (c: HonoContext) => {
       throw new Error(`Failed to fetch expense categories: ${error.message}`);
     }
 
-    return c.json(createSuccessResponse(categories || [], 'Expense categories retrieved successfully', c.get('requestId')));
+    return c.json({
+      success: true,
+      data: categories || [],
+      message: 'Expense categories retrieved successfully',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
 
   } catch (error) {
     console.error('Get expense categories error:', error);
-    return c.json(createErrorResponse('Failed to retrieve expense categories', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to retrieve expense categories',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };
 
@@ -398,7 +463,12 @@ export const getExpenseCategoryHandler = async (c: HonoContext) => {
     const id = c.req.param('id');
 
     if (!id) {
-      return c.json(createErrorResponse('Category ID is required', 400, undefined, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Category ID is required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
     const { data: category, error } = await c.get('supabase')
@@ -408,18 +478,35 @@ export const getExpenseCategoryHandler = async (c: HonoContext) => {
       .single();
 
     if (error && error.code === 'PGRST116') {
-      return c.json(createNotFoundResponse('Expense Category', c.get('requestId')), 404);
+      return c.json({
+        success: false,
+        error: 'Expense Category not found',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 404);
     }
 
     if (error) {
       throw new Error(`Failed to fetch expense category: ${error.message}`);
     }
 
-    return c.json(createSuccessResponse(category, 'Expense category retrieved successfully', c.get('requestId')));
+    return c.json({
+      success: true,
+      data: category,
+      message: 'Expense category retrieved successfully',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
 
   } catch (error) {
     console.error('Get expense category error:', error);
-    return c.json(createErrorResponse('Failed to retrieve expense category', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to retrieve expense category',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };
 
@@ -476,7 +563,13 @@ export const createExpenseCategoryHandler = async (c: HonoContext) => {
 
   } catch (error) {
     console.error('Create expense category error:', error);
-    return c.json(createErrorResponse('Failed to create expense category', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to create expense category',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };
 
@@ -488,7 +581,12 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
     const id = c.req.param('id');
 
     if (!id) {
-      return c.json(createErrorResponse('Category ID is required', 400, undefined, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Category ID is required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
     const body = await c.req.json();
@@ -499,7 +597,13 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
         field: err.path.join('.'),
         message: err.message,
       }));
-      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: { errors },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
     const updateData = validation.data;
@@ -520,7 +624,13 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
         .single();
 
       if (existingCategory) {
-        return c.json(createErrorResponse('Category name already exists', 409, { error: 'An expense category with this name already exists' }, c.get('requestId')), 409);
+        return c.json({
+          success: false,
+          error: 'Category name already exists',
+          details: { error: 'An expense category with this name already exists' },
+          timestamp: new Date().toISOString(),
+          requestId: c.get('requestId'),
+        }, 409);
       }
     }
 
@@ -539,11 +649,23 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
       throw new Error(`Failed to update expense category: ${error.message}`);
     }
 
-    return c.json(createSuccessResponse(updatedCategory, 'Expense category updated successfully', c.get('requestId')));
+    return c.json({
+      success: true,
+      data: updatedCategory,
+      message: 'Expense category updated successfully',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
 
   } catch (error) {
     console.error('Update expense category error:', error);
-    return c.json(createErrorResponse('Failed to update expense category', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to update expense category',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };
 
@@ -555,13 +677,23 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
     const id = c.req.param('id');
 
     if (!id) {
-      return c.json(createErrorResponse('Category ID is required', 400, undefined, c.get('requestId')), 400);
+      return c.json({
+        success: false,
+        error: 'Category ID is required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
     }
 
     // Check if category exists
     const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', id, 'category_id');
     if (!categoryExists) {
-      return c.json(createNotFoundResponse('Expense Category', c.get('requestId')), 404);
+      return c.json({
+        success: false,
+        error: 'Expense Category not found',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 404);
     }
 
     // Check if category is being used by any expenses
@@ -576,7 +708,16 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
     }
 
     if (expensesUsingCategory && expensesUsingCategory.length > 0) {
-      return c.json(createErrorResponse('Cannot delete category', 409, { error: 'This category is being used by one or more expenses' }, c.get('requestId')), 409);
+      return c.json({
+        success: false,
+        error: 'Cannot delete category: This category is being used by one or more expenses',
+        details: {
+          error: 'This category is being used by one or more expenses',
+          expenseCount: expensesUsingCategory.length
+        },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 409);
     }
 
     // Delete category
@@ -589,14 +730,211 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
       throw new Error(`Failed to delete expense category: ${error.message}`);
     }
 
-    return c.json(createSuccessResponse(
-      { deleted: true, category_id: id },
-      'Expense category deleted successfully',
-      c.get('requestId'),
-    ));
+    return c.json({
+      success: true,
+      data: { deleted: true, category_id: id },
+      message: 'Expense category deleted successfully',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
 
   } catch (error) {
     console.error('Delete expense category error:', error);
-    return c.json(createErrorResponse('Failed to delete expense category', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    return c.json({
+      success: false,
+      error: 'Failed to delete expense category',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
+  }
+};
+
+/**
+ * Create expense with receipt upload
+ */
+export const createExpenseWithReceiptHandler = async (c: HonoContext) => {
+  try {
+    const user = c.get('user');
+    if (!user) {
+      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
+    }
+
+    // Parse form data
+    const formData = await c.req.formData();
+    const title = formData.get('title') as string;
+    const amount = parseFloat(formData.get('amount') as string);
+    const date = formData.get('date') as string;
+    const category_id = formData.get('category_id') as string;
+    const status = (formData.get('status') as string) || 'pending';
+    const receipt = formData.get('receipt') as File | null;
+
+    // Validate required fields
+    const validation = createExpenseWithReceiptSchema.safeParse({
+      title,
+      amount,
+      date,
+      category_id,
+      status,
+    });
+
+    if (!validation.success) {
+      const errors = validation.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: { errors },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+
+    const expenseData = validation.data;
+
+    // Verify category exists
+    const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', expenseData.category_id, 'category_id');
+    if (!categoryExists) {
+      return c.json({
+        success: false,
+        error: 'Invalid category ID',
+        details: { error: 'The specified expense category does not exist' },
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+
+    let receiptUrl = null;
+
+    // Handle receipt upload if provided
+    if (receipt && receipt.size > 0) {
+      console.log('📎 Receipt file detected:');
+      console.log('   Name:', receipt.name);
+      console.log('   Type:', receipt.type);
+      console.log('   Size:', receipt.size, 'bytes');
+
+      // Validate file
+      const isValidType = validateFileType(receipt.type);
+      console.log('   Type validation:', isValidType ? '✅ Valid' : '❌ Invalid');
+
+      if (!isValidType) {
+        return c.json({
+          success: false,
+          error: 'Invalid file type',
+          details: { error: 'Receipt file type not supported' },
+          timestamp: new Date().toISOString(),
+          requestId: c.get('requestId'),
+        }, 400);
+      }
+
+      const isValidSize = validateFileSize(receipt.size);
+      console.log('   Size validation:', isValidSize ? '✅ Valid' : '❌ Invalid');
+
+      if (!isValidSize) {
+        return c.json({
+          success: false,
+          error: 'File too large',
+          details: { error: 'Receipt file size exceeds 10MB limit' },
+          timestamp: new Date().toISOString(),
+          requestId: c.get('requestId'),
+        }, 400);
+      }
+
+      // Check if Cloudinary is configured
+      if (c.env.CLOUDINARY_CLOUD_NAME && c.env.CLOUDINARY_API_KEY && c.env.CLOUDINARY_API_SECRET) {
+        console.log('🔧 Cloudinary configuration found, attempting upload...');
+        console.log('   Cloud name:', c.env.CLOUDINARY_CLOUD_NAME);
+        console.log('   API key:', c.env.CLOUDINARY_API_KEY?.substring(0, 8) + '...');
+        console.log('   File size:', receipt.size, 'bytes');
+        console.log('   File type:', receipt.type);
+
+        try {
+          // Initialize Cloudinary
+          initializeCloudinary({
+            cloud_name: c.env.CLOUDINARY_CLOUD_NAME,
+            api_key: c.env.CLOUDINARY_API_KEY,
+            api_secret: c.env.CLOUDINARY_API_SECRET,
+          });
+
+          // Upload receipt to Cloudinary
+          const fileBuffer = await receipt.arrayBuffer();
+          const uniqueFilename = generateUniqueFilename(receipt.name, 'expense_receipt');
+
+          console.log('📤 Uploading to Cloudinary with filename:', uniqueFilename);
+
+          const cloudinaryResult = await uploadToCloudinary(fileBuffer, {
+            folder: 'local-fishing/expenses',
+            public_id: uniqueFilename,
+            resource_type: 'auto',
+            tags: ['expense', 'receipt', 'local-fishing'],
+          });
+
+          receiptUrl = cloudinaryResult.secure_url;
+          console.log('✅ Cloudinary upload successful:', receiptUrl);
+        } catch (uploadError) {
+          console.error('❌ Receipt upload error:', uploadError);
+          console.error('   Error details:', uploadError instanceof Error ? uploadError.message : 'Unknown error');
+          console.error('   Stack trace:', uploadError instanceof Error ? uploadError.stack : 'No stack trace');
+          return c.json({
+            success: false,
+            error: 'Failed to upload receipt',
+            details: { error: 'Receipt upload failed' },
+            timestamp: new Date().toISOString(),
+            requestId: c.get('requestId'),
+          }, 500);
+        }
+      } else {
+        console.log('⚠️  Cloudinary not configured - receipt will not be uploaded');
+        console.log('   Missing credentials:');
+        console.log('   - CLOUDINARY_CLOUD_NAME:', !!c.env.CLOUDINARY_CLOUD_NAME);
+        console.log('   - CLOUDINARY_API_KEY:', !!c.env.CLOUDINARY_API_KEY);
+        console.log('   - CLOUDINARY_API_SECRET:', !!c.env.CLOUDINARY_API_SECRET);
+      }
+    }
+
+    // Create expense with receipt URL
+    const { data: newExpense, error } = await c.get('supabase')
+      .from('expenses')
+      .insert({
+        ...expenseData,
+        receipt_url: receiptUrl,
+        added_by: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select(`
+        *,
+        expense_categories (
+          category_id,
+          category_name,
+          description,
+          budget
+        )
+      `)
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create expense: ${error.message}`);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Expense created successfully',
+      data: newExpense,
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 201);
+
+  } catch (error) {
+    console.error('Create expense with receipt error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create expense',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
   }
 };

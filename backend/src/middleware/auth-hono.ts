@@ -86,10 +86,14 @@ export const authenticate = createMiddleware<{ Bindings: any; Variables: any }>(
  */
 export const requireRole = (allowedRoles: string[]) =>
   createMiddleware<{ Bindings: any; Variables: any }>(async (c, next) => {
+    console.log(`🔐 requireRole middleware called for roles: ${allowedRoles.join(', ')}`);
+
     const user = c.get('user') as AuthenticatedUser | undefined;
+    console.log('👤 User in requireRole:', user ? { id: user.id, role: user.role } : 'NO USER');
 
     // Check if user is authenticated
     if (!user) {
+      console.log('❌ No user found, returning 401');
       return c.json(
         {
           success: false,
@@ -103,6 +107,7 @@ export const requireRole = (allowedRoles: string[]) =>
 
     // Check if user has required role
     if (!allowedRoles.includes(user.role)) {
+      console.log(`❌ User role '${user.role}' not in allowed roles: ${allowedRoles.join(', ')}`);
       return c.json(
         {
           success: false,
@@ -114,6 +119,7 @@ export const requireRole = (allowedRoles: string[]) =>
       );
     }
 
+    console.log('✅ User authorized, continuing to handler');
     // User is authorized, continue
     return await next();
   });

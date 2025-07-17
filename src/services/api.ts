@@ -301,9 +301,17 @@ export const authAPI = {
       const response = await apiClient.post<AuthResponse>('/api/auth/worker-login', data);
 
       if (response.success && response.data) {
-        apiClient.setToken(response.data.token);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
-        localStorage.setItem('refresh_token', response.data.refresh_token);
+        const accessToken = response.data.tokens?.accessToken;
+        const refreshToken = response.data.tokens?.refreshToken;
+
+        if (accessToken) {
+          apiClient.setToken(accessToken);
+          localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        }
+
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
       }
 
       return response;
@@ -387,6 +395,83 @@ export const authAPI = {
 export const healthAPI = {
   check: async (): Promise<any> => {
     return fetch('http://localhost:5004/health').then(res => res.json());
+  },
+};
+
+// Dashboard API types
+export interface DashboardStats {
+  totalRevenue: number;
+  totalProfit: number;
+  totalExpenses: number;
+  productsInStock: number;
+  lowStockItems: number;
+  damagedItems: number;
+  revenueGrowth: number;
+  profitMargin: number;
+}
+
+export interface RevenueChartData {
+  month: string;
+  profit: number;
+  invest: number;
+  isCurrentMonth: boolean;
+}
+
+export interface FinancialOverviewData {
+  name: string;
+  value: number;
+  amount: number;
+  color: string;
+  icon: string;
+}
+
+export interface DashboardApiResponse<T> {
+  success: boolean;
+  data: T;
+  message: string;
+  timestamp: string;
+  requestId?: string;
+}
+
+// Dashboard API
+export const dashboardAPI = {
+  // Get comprehensive dashboard statistics
+  getStats: async (): Promise<DashboardApiResponse<DashboardStats>> => {
+    console.log('🔄 Calling dashboard stats API...');
+    try {
+      const response = await apiClient.get<DashboardApiResponse<DashboardStats>>('/api/dashboard/stats');
+      console.log('✅ Dashboard stats API response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Dashboard stats API error:', error);
+      throw error;
+    }
+  },
+
+  // Get revenue chart data for different time periods
+  getRevenueChart: async (period: 'week' | 'month' | '6months' = 'month'): Promise<DashboardApiResponse<RevenueChartData[]>> => {
+    console.log('🔄 Calling revenue chart API with period:', period);
+    try {
+      const response = await apiClient.get<DashboardApiResponse<RevenueChartData[]>>(`/api/dashboard/revenue-chart?period=${period}`);
+      console.log('✅ Revenue chart API response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Revenue chart API error:', error);
+      throw error;
+    }
+  },
+
+  // Get financial overview data for pie chart
+  getFinancialOverview: async (): Promise<DashboardApiResponse<FinancialOverviewData[]>> => {
+    console.log('🔄 Calling financial overview API...');
+    try {
+      const response = await apiClient.get<DashboardApiResponse<FinancialOverviewData[]>>('/api/dashboard/financial-overview');
+      console.log('✅ Financial overview API response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Financial overview API error:', error);
+      throw error;
+    }
   },
 };
 

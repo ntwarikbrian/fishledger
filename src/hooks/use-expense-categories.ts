@@ -106,24 +106,25 @@ export const useExpenseCategories = () => {
   /**
    * Delete an expense category
    */
-  const deleteCategory = async (id: string): Promise<boolean> => {
+  const deleteCategory = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await expenseCategoriesApi.delete(id);
-      
+
       if (response.success) {
-        // Refresh categories list
-        await fetchCategories();
-        return true;
+        // Don't auto-refresh here - let the caller decide when to refresh
+        return { success: true };
       } else {
-        setError(response.error || 'Failed to delete expense category');
-        return false;
+        const errorMessage = response.error || 'Failed to delete expense category';
+        // Don't set error in state - let caller handle it
+        return { success: false, error: errorMessage };
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
-      return false;
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      // Don't set error in state - let caller handle it
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }

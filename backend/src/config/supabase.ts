@@ -380,6 +380,72 @@ export interface Database {
           budget?: number;
         };
       };
+      // Transactions table - comprehensive transaction management
+      transactions: {
+        Row: {
+          transaction_id: string;
+          sale_id: string;
+          date_time: string;
+          product_name: string;
+          client_name: string;
+          boxes_quantity: number;
+          kg_quantity: number;
+          total_amount: number;
+          payment_status: 'paid' | 'pending' | 'partial';
+          payment_method: 'momo_pay' | 'cash' | 'bank_transfer' | null;
+          deposit_id: string | null;
+          deposit_type: 'momo' | 'bank' | 'boss' | null;
+          account_number: string | null;
+          reference: string | null;
+          image_url: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null; // Nullable for backward compatibility
+          updated_by?: string | null; // Optional field for backward compatibility
+        };
+        Insert: {
+          transaction_id?: string;
+          sale_id: string;
+          date_time: string;
+          product_name: string;
+          client_name: string;
+          boxes_quantity?: number;
+          kg_quantity?: number;
+          total_amount: number;
+          payment_status?: 'paid' | 'pending' | 'partial';
+          payment_method?: 'momo_pay' | 'cash' | 'bank_transfer' | null;
+          deposit_id?: string | null;
+          deposit_type?: 'momo' | 'bank' | 'boss' | null;
+          account_number?: string | null;
+          reference?: string | null;
+          image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null; // Optional for backward compatibility
+          updated_by?: string | null;
+        };
+        Update: {
+          transaction_id?: string;
+          sale_id?: string;
+          date_time?: string;
+          product_name?: string;
+          client_name?: string;
+          boxes_quantity?: number;
+          kg_quantity?: number;
+          total_amount?: number;
+          payment_status?: 'paid' | 'pending' | 'partial';
+          payment_method?: 'momo_pay' | 'cash' | 'bank_transfer' | null;
+          deposit_id?: string | null;
+          deposit_type?: 'momo' | 'bank' | 'boss' | null;
+          account_number?: string | null;
+          reference?: string | null;
+          image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string;
+          updated_by?: string | null;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

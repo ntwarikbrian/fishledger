@@ -9,33 +9,90 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, ChevronLeft, ChevronRight, Package, AlertTriangle, Zap, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, ChevronLeft, ChevronRight, Package, AlertTriangle, Zap, ChevronDown, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useUser, getUserDisplayName } from "@/hooks/use-user";
+import { useDashboardStats, useRevenueChart, useFinancialOverview } from "@/hooks/use-dashboard-data";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine, PieChart, Pie, Cell } from "recharts";
+
+/**
+ * Skeleton Components for Loading States
+ */
+const StatCardSkeleton = () => (
+  <Card className="p-6">
+    <div className="flex items-center justify-between">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      <Skeleton className="h-12 w-12 rounded-full" />
+    </div>
+  </Card>
+);
+
+const ChartSkeleton = ({ height = "h-[200px] md:h-[300px]" }: { height?: string }) => (
+  <div className={`w-full ${height} flex flex-col space-y-4 p-4`}>
+    <div className="flex justify-between items-center">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-8 w-24" />
+    </div>
+    <div className="flex-1 space-y-2">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-4 w-2/3" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-4/5" />
+    </div>
+  </div>
+);
+
+const FinancialOverviewSkeleton = () => (
+  <div className="flex flex-col items-center space-y-6">
+    {/* Donut Chart Skeleton */}
+    <div className="relative w-32 h-32 md:w-40 md:h-40">
+      <Skeleton className="w-full h-full rounded-full" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center space-y-1">
+          <Skeleton className="h-6 w-16 mx-auto" />
+          <Skeleton className="h-4 w-12 mx-auto" />
+        </div>
+      </div>
+    </div>
+
+    {/* Legend Skeleton */}
+    <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Skeleton className="h-3 w-3 rounded-full" />
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-4 w-12" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 /**
  * Revenue Chart Component
  * Displays profit and investment data over time with area chart
  */
-const RevenueChart = () => {
+const RevenueChart = ({ data, loading, error }: {
+  data: any[] | null;
+  loading: boolean;
+  error: string | null;
+}) => {
   const { t, i18n } = useTranslation();
 
-  // Sample data for the revenue chart
-  const revenueData = [
-    { month: "Jan", profit: 65000, invest: 45000, isCurrentMonth: false },
-    { month: "Feb", profit: 85000, invest: 55000, isCurrentMonth: false },
-    { month: "Mar", profit: 95000, invest: 65000, isCurrentMonth: false },
-    { month: "Apr", profit: 75000, invest: 50000, isCurrentMonth: false },
-    { month: "May", profit: 88000, invest: 58000, isCurrentMonth: true },
-    { month: "Jun", profit: 105000, invest: 70000, isCurrentMonth: false },
-    { month: "Jul", profit: 98000, invest: 68000, isCurrentMonth: false },
-    { month: "Aug", profit: 110000, invest: 75000, isCurrentMonth: false },
-    { month: "Sep", profit: 120000, invest: 80000, isCurrentMonth: false },
-  ];
+  // Use real data or fallback to empty array
+  const revenueData = data || [];
 
   const chartConfig = React.useMemo(() => ({
     profit: {
@@ -109,6 +166,35 @@ const RevenueChart = () => {
     }
     return null;
   };
+
+  // Show loading state
+  if (loading) {
+    return <ChartSkeleton />;
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="w-full h-[200px] md:h-[300px] flex items-center justify-center">
+        <div className="text-center text-red-500">
+          <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (!revenueData || revenueData.length === 0) {
+    return (
+      <div className="w-full h-[200px] md:h-[300px] flex items-center justify-center">
+        <div className="text-center text-gray-500">
+          <TrendingUp className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-sm">{t('dashboard.noRevenueData', 'No revenue data available')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -214,16 +300,25 @@ const RevenueChart = () => {
  * Financial Overview Component
  * Displays revenue, profit, expense, and damaged values with beautiful donut chart
  */
-const FinancialOverviewChart = () => {
+const FinancialOverviewChart = ({ data, loading, error }: {
+  data: any[] | null;
+  loading: boolean;
+  error: string | null;
+}) => {
   const { t, i18n } = useTranslation();
 
-  // Sample data for financial overview - memoized to handle language changes properly
-  const financialData = React.useMemo(() => [
-    { name: t('dashboard.revenue', 'Revenue'), value: 45, amount: 16500, color: "#22c55e", icon: "💰" }, // green-500
-    { name: t('dashboard.profit', 'Profit'), value: 30, amount: 8200, color: "#3b82f6", icon: "📈" }, // blue-500
-    { name: t('dashboard.expense', 'Expense'), value: 20, amount: 6800, color: "#f59e0b", icon: "💸" }, // amber-500
-    { name: t('dashboard.damaged', 'Damaged'), value: 5, amount: 1500, color: "#ef4444", icon: "⚠️" }, // red-500
-  ], [t, i18n.language]);
+  // Use real data or fallback to empty array
+  const financialData = React.useMemo(() => {
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Map the data to include translated names
+    return data.map(item => ({
+      ...item,
+      name: t(`dashboard.${item.name.toLowerCase()}`, item.name)
+    }));
+  }, [data, t, i18n.language]);
 
   // Calculate total for center display
   const totalAmount = React.useMemo(() =>
@@ -244,6 +339,31 @@ const FinancialOverviewChart = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
+        {/* Loading State */}
+        {loading && <FinancialOverviewSkeleton />}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center text-red-500">
+              <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && (!financialData || financialData.length === 0) && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center text-gray-500">
+              <DollarSign className="h-8 w-8 mx-auto mb-2" />
+              <p className="text-sm">{t('dashboard.noFinancialData', 'No financial data available')}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Chart Content */}
+        {!loading && !error && financialData && financialData.length > 0 && (
         <div className="flex flex-col items-center space-y-6">
           {/* Donut Chart */}
           <div className="relative w-32 h-32 md:w-40 md:h-40 financial-chart-container">
@@ -370,6 +490,7 @@ const FinancialOverviewChart = () => {
             </div>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -380,9 +501,38 @@ const Dashboard = () => {
   usePageTitle('navigation.dashboard', 'Dashboard');
   const userInfo = useUser();
 
+  // Revenue chart period state
+  const [revenueChartPeriod, setRevenueChartPeriod] = useState<'week' | 'month' | '6months'>('month');
+
+  // Fetch dashboard data using individual hooks for better control
+  const stats = useDashboardStats();
+  const revenueChart = useRevenueChart(revenueChartPeriod);
+  const financialOverview = useFinancialOverview();
+
+  // Combined loading and error states for backward compatibility
+  const isLoading = stats.loading || revenueChart.loading || financialOverview.loading;
+  const hasError = stats.error || revenueChart.error || financialOverview.error;
+
+  // Function to refresh all dashboard data (for manual refresh if needed)
+  const refreshAll = useCallback(() => {
+    console.log('🔄 Refreshing all dashboard data...');
+    stats.refresh();
+    revenueChart.refresh();
+    financialOverview.refresh();
+  }, [stats.refresh, revenueChart.refresh, financialOverview.refresh]);
+
   const [mobileChartView, setMobileChartView] = useState(0); // 0 = Revenue Chart, 1 = Financial Overview
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+
+  // Handle period change - only refresh revenue chart, not other components
+  const handlePeriodChange = useCallback((newPeriod: 'week' | 'month' | '6months') => {
+    console.log('🔄 Changing revenue chart period to:', newPeriod, '- Only refreshing revenue chart');
+    setRevenueChartPeriod(newPeriod);
+    // Only refresh the revenue chart, not stats or financial overview
+    // This provides better UX as other components remain stable during filter changes
+    revenueChart.refresh(newPeriod);
+  }, [revenueChart]);
 
   // Mobile chart navigation functions
   const nextChart = () => {
@@ -476,17 +626,33 @@ const Dashboard = () => {
 
                     {/* Main figure */}
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      $18,450
+                      {stats.loading ? (
+                        <Skeleton className="h-8 w-32" />
+                      ) : stats.error ? (
+                        <span className="text-red-500 text-lg">Error</span>
+                      ) : (
+                        `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                      )}
                     </div>
 
                     {/* Growth indicator */}
                     <div className="flex items-center mt-2">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        +15%
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        {t('dashboard.fromLastMonth', 'from last month')}
-                      </span>
+                      {stats.loading ? (
+                        <Skeleton className="h-6 w-24" />
+                      ) : !stats.error && stats.data && (
+                        <>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            stats.data.revenueGrowth >= 0
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {stats.data.revenueGrowth >= 0 ? '+' : ''}{stats.data.revenueGrowth.toFixed(1)}%
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            {t('dashboard.fromLastMonth', 'from last month')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -514,17 +680,29 @@ const Dashboard = () => {
 
                     {/* Main figure */}
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      12
+                      {stats.loading ? (
+                        <Skeleton className="h-8 w-20" />
+                      ) : stats.error ? (
+                        <span className="text-red-500 text-lg">Error</span>
+                      ) : (
+                        stats.data?.productsInStock || '0'
+                      )}
                     </div>
 
                     {/* Growth indicator */}
                     <div className="flex items-center mt-2">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                        5 {t('dashboard.types', 'types')}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        {t('dashboard.differentFish', 'different fish')}
-                      </span>
+                      {stats.loading ? (
+                        <Skeleton className="h-6 w-20" />
+                      ) : !stats.error && (
+                        <>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                            {stats.data?.productsInStock || 0} {t('dashboard.types', 'types')}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            {t('dashboard.differentFish', 'different fish')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -552,17 +730,33 @@ const Dashboard = () => {
 
                     {/* Main figure */}
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      4
+                      {stats.loading ? (
+                        <Skeleton className="h-8 w-16" />
+                      ) : stats.error ? (
+                        <span className="text-red-500 text-lg">Error</span>
+                      ) : (
+                        stats.data?.lowStockItems || '0'
+                      )}
                     </div>
 
                     {/* Growth indicator */}
                     <div className="flex items-center mt-2">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                        {t('dashboard.critical', 'Critical')}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        {t('dashboard.needRestocking', 'need restocking')}
-                      </span>
+                      {stats.loading ? (
+                        <Skeleton className="h-6 w-24" />
+                      ) : !stats.error && (
+                        <>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            (stats.data?.lowStockItems || 0) > 0
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          }`}>
+                            {(stats.data?.lowStockItems || 0) > 0 ? t('dashboard.critical', 'Critical') : t('dashboard.good', 'Good')}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            {(stats.data?.lowStockItems || 0) > 0 ? t('dashboard.needRestocking', 'need restocking') : t('dashboard.stockLevels', 'stock levels')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -590,17 +784,33 @@ const Dashboard = () => {
 
                     {/* Main figure */}
                     <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      7
+                      {stats.loading ? (
+                        <Skeleton className="h-8 w-16" />
+                      ) : stats.error ? (
+                        <span className="text-red-500 text-lg">Error</span>
+                      ) : (
+                        stats.data?.damagedItems || '0'
+                      )}
                     </div>
 
                     {/* Growth indicator */}
                     <div className="flex items-center mt-2">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                        -2 {t('dashboard.today', 'today')}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        {t('dashboard.needDisposal', 'need disposal')}
-                      </span>
+                      {stats.loading ? (
+                        <Skeleton className="h-6 w-24" />
+                      ) : !stats.error && (
+                        <>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            (stats.data?.damagedItems || 0) > 0
+                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                              : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          }`}>
+                            {(stats.data?.damagedItems || 0) > 0 ? `${stats.data?.damagedItems} ${t('dashboard.items', 'items')}` : t('dashboard.none', 'None')}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            {(stats.data?.damagedItems || 0) > 0 ? t('dashboard.needDisposal', 'need disposal') : t('dashboard.allGood', 'all good')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -753,17 +963,33 @@ const Dashboard = () => {
 
                   {/* Main figure */}
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    $18,450
+                    {stats.loading ? (
+                      <Skeleton className="h-8 w-32" />
+                    ) : stats.error ? (
+                      <span className="text-red-500 text-lg">Error</span>
+                    ) : (
+                      `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                    )}
                   </div>
 
                   {/* Growth indicator */}
                   <div className="flex items-center mt-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      +15%
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {t('dashboard.fromLastMonth', 'from last month')}
-                    </span>
+                    {stats.loading ? (
+                      <Skeleton className="h-6 w-24" />
+                    ) : !stats.error && stats.data && (
+                      <>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          stats.data.revenueGrowth >= 0
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                          {stats.data.revenueGrowth >= 0 ? '+' : ''}{stats.data.revenueGrowth.toFixed(1)}%
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {t('dashboard.fromLastMonth', 'from last month')}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -791,17 +1017,29 @@ const Dashboard = () => {
 
                   {/* Main figure */}
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    12
+                    {stats.loading ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : stats.error ? (
+                      <span className="text-red-500 text-lg">Error</span>
+                    ) : (
+                      stats.data?.productsInStock || '0'
+                    )}
                   </div>
 
                   {/* Growth indicator */}
                   <div className="flex items-center mt-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                      5 {t('dashboard.types', 'types')}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {t('dashboard.differentFish', 'different fish')}
-                    </span>
+                    {stats.loading ? (
+                      <Skeleton className="h-6 w-20" />
+                    ) : !stats.error && (
+                      <>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                          {stats.data?.productsInStock || 0} {t('dashboard.types', 'types')}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {t('dashboard.differentFish', 'different fish')}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -829,17 +1067,33 @@ const Dashboard = () => {
 
                   {/* Main figure */}
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    4
+                    {stats.loading ? (
+                      <Skeleton className="h-8 w-16" />
+                    ) : stats.error ? (
+                      <span className="text-red-500 text-lg">Error</span>
+                    ) : (
+                      stats.data?.lowStockItems || '0'
+                    )}
                   </div>
 
                   {/* Growth indicator */}
                   <div className="flex items-center mt-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                      {t('dashboard.critical', 'Critical')}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {t('dashboard.needRestocking', 'need restocking')}
-                    </span>
+                    {stats.loading ? (
+                      <Skeleton className="h-6 w-24" />
+                    ) : !stats.error && (
+                      <>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          (stats.data?.lowStockItems || 0) > 0
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        }`}>
+                          {(stats.data?.lowStockItems || 0) > 0 ? t('dashboard.critical', 'Critical') : t('dashboard.good', 'Good')}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {(stats.data?.lowStockItems || 0) > 0 ? t('dashboard.needRestocking', 'need restocking') : t('dashboard.stockLevels', 'stock levels')}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -867,17 +1121,33 @@ const Dashboard = () => {
 
                   {/* Main figure */}
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    7
+                    {stats.loading ? (
+                      <Skeleton className="h-8 w-16" />
+                    ) : stats.error ? (
+                      <span className="text-red-500 text-lg">Error</span>
+                    ) : (
+                      stats.data?.damagedItems || '0'
+                    )}
                   </div>
 
                   {/* Growth indicator */}
                   <div className="flex items-center mt-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                      -2 {t('dashboard.today', 'today')}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {t('dashboard.needDisposal', 'need disposal')}
-                    </span>
+                    {stats.loading ? (
+                      <Skeleton className="h-6 w-24" />
+                    ) : !stats.error && (
+                      <>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          (stats.data?.damagedItems || 0) > 0
+                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        }`}>
+                          {(stats.data?.damagedItems || 0) > 0 ? `${stats.data?.damagedItems} ${t('dashboard.items', 'items')}` : t('dashboard.none', 'None')}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {(stats.data?.damagedItems || 0) > 0 ? t('dashboard.needDisposal', 'need disposal') : t('dashboard.allGood', 'all good')}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -904,42 +1174,71 @@ const Dashboard = () => {
                       </CardTitle>
                       <div className="flex items-center gap-4 mt-1">
                         <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                          $16,500
+                          {stats.loading ? (
+                            <Skeleton className="h-8 w-32" />
+                          ) : stats.error ? (
+                            <span className="text-red-500">Error</span>
+                          ) : (
+                            `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                          )}
                         </span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                          {t('dashboard.comparedToLastMonth', '+15% Compared to last month')}
-                        </span>
+                        {stats.loading ? (
+                          <Skeleton className="h-6 w-20" />
+                        ) : !stats.error && stats.data && (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            stats.data.revenueGrowth >= 0
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {stats.data.revenueGrowth >= 0 ? '+' : ''}{stats.data.revenueGrowth.toFixed(1)}% {t('dashboard.comparedToLastMonth', 'Compared to last month')}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Monthly Dropdown */}
+                  {/* Period Filter Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        {t('dashboard.monthly', 'Monthly')}
+                        {revenueChartPeriod === 'week' ? t('dashboard.thisWeek', 'This Week') :
+                         revenueChartPeriod === 'month' ? t('dashboard.thisMonth', 'This Month') :
+                         t('dashboard.last6Months', 'Last 6 Months')}
                         <ChevronDown className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-32">
-                      <DropdownMenuItem>{t('dashboard.weekly', 'Weekly')}</DropdownMenuItem>
-                      <DropdownMenuItem>{t('dashboard.monthly', 'Monthly')}</DropdownMenuItem>
-                      <DropdownMenuItem>{t('dashboard.quarterly', 'Quarterly')}</DropdownMenuItem>
-                      <DropdownMenuItem>{t('dashboard.yearly', 'Yearly')}</DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={() => handlePeriodChange('week')}>
+                        {t('dashboard.thisWeek', 'This Week')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePeriodChange('month')}>
+                        {t('dashboard.thisMonth', 'This Month')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePeriodChange('6months')}>
+                        {t('dashboard.last6Months', 'Last 6 Months')}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <RevenueChart />
+                <RevenueChart
+                  data={revenueChart.data}
+                  loading={revenueChart.loading}
+                  error={revenueChart.error}
+                />
               </CardContent>
             </Card>
           </div>
 
           {/* Financial Overview - Takes 1/3 width on desktop */}
           <div className="lg:col-span-1">
-            <FinancialOverviewChart />
+            <FinancialOverviewChart
+              data={financialOverview.data}
+              loading={financialOverview.loading}
+              error={financialOverview.error}
+            />
           </div>
         </div>
 
@@ -1006,35 +1305,62 @@ const Dashboard = () => {
                               <ChevronDown className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem>{t('dashboard.weekly', 'Weekly')}</DropdownMenuItem>
-                            <DropdownMenuItem>{t('dashboard.monthly', 'Monthly')}</DropdownMenuItem>
-                            <DropdownMenuItem>{t('dashboard.quarterly', 'Quarterly')}</DropdownMenuItem>
-                            <DropdownMenuItem>{t('dashboard.yearly', 'Yearly')}</DropdownMenuItem>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => handlePeriodChange('week')}>
+                              {t('dashboard.thisWeek', 'This Week')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePeriodChange('month')}>
+                              {t('dashboard.thisMonth', 'This Month')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePeriodChange('6months')}>
+                              {t('dashboard.last6Months', 'Last 6 Months')}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
 
                       {/* Amount */}
                       <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        $16500
+                        {stats.loading ? (
+                          <Skeleton className="h-9 w-40" />
+                        ) : stats.error ? (
+                          <span className="text-red-500">Error</span>
+                        ) : (
+                          `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                        )}
                       </div>
 
                       {/* Comparison text */}
-                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                        {t('dashboard.comparedToLastMonth', '+15% Compared to last month')}
-                      </div>
+                      {stats.loading ? (
+                        <Skeleton className="h-5 w-32" />
+                      ) : !stats.error && stats.data && (
+                        <div className={`text-sm font-medium ${
+                          stats.data.revenueGrowth >= 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {stats.data.revenueGrowth >= 0 ? '+' : ''}{stats.data.revenueGrowth.toFixed(1)}% {t('dashboard.comparedToLastMonth', 'Compared to last month')}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <RevenueChart />
+                    <RevenueChart
+                      data={revenueChart.data}
+                      loading={revenueChart.loading}
+                      error={revenueChart.error}
+                    />
                   </CardContent>
                 </Card>
               </div>
 
               {/* Financial Overview Slide */}
               <div className="w-full flex-shrink-0">
-                <FinancialOverviewChart />
+                <FinancialOverviewChart
+                  data={financialOverview.data}
+                  loading={financialOverview.loading}
+                  error={financialOverview.error}
+                />
               </div>
             </div>
           </div>
