@@ -1,22 +1,25 @@
-import React from "react";
+import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import ReportFilters from "@/components/reports/ReportFilters";
+import PDFViewer from "@/components/ui/pdf-viewer";
 import {
   FileText,
-  Package,
   ShoppingCart,
   DollarSign,
   TrendingUp,
-  Brain,
+  CreditCard,
   BarChart3,
-  PieChart,
-  LineChart,
-  Activity,
-  Eye,
-  Download
+  Eye
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  ReportType,
+  ReportFilters as IReportFilters,
+  viewReportInPopup,
+  getDownloadUrl
+} from "@/services/reports";
 
 /**
  * Reports Page
@@ -25,48 +28,86 @@ import { toast } from "sonner";
  */
 
 const Reports = () => {
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentReportType, setCurrentReportType] = useState<ReportType>('sales');
+  const [currentReportTitle, setCurrentReportTitle] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+
   /**
-   * Handle viewing a report
+   * Handle viewing a report with filters
    */
-  const handleViewReport = (reportType: string, reportTitle: string) => {
-    toast.info(`Opening ${reportTitle}...`, {
-      description: "Report viewer will be implemented soon"
-    });
-    console.log(`Viewing ${reportType} report`);
+  const handleViewReport = (reportType: ReportType, reportTitle: string) => {
+    setCurrentReportType(reportType);
+    setCurrentReportTitle(reportTitle);
+    setShowFilters(true);
   };
 
   /**
-   * Handle downloading a report as PDF
+   * Handle applying filters and generating report
    */
-  const handleDownloadPDF = (reportType: string, reportTitle: string) => {
-    toast.success(`Downloading ${reportTitle} PDF...`, {
-      description: "PDF generation will be implemented soon"
-    });
-    console.log(`Downloading ${reportType} report as PDF`);
+  const handleApplyFilters = async (filters: IReportFilters) => {
+    setIsLoading(true);
+    try {
+      // Get PDF URL for popup viewing
+      const url = viewReportInPopup(currentReportType, filters);
+      setPdfUrl(url);
+      setShowPDFViewer(true);
+      setShowFilters(false);
+
+      toast.success(`${currentReportTitle} is ready!`, {
+        description: "The report is now displayed in the popup viewer"
+      });
+    } catch (error) {
+      console.error(`Error viewing ${currentReportType} report:`, error);
+      toast.error(`Failed to view ${currentReportTitle}`, {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Handle PDF download
+   */
+  const handleDownloadPDF = () => {
+    if (currentReportType) {
+      try {
+        const downloadUrl = getDownloadUrl(currentReportType, {});
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `${currentReportTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success('Download started!', {
+          description: 'The PDF report is being downloaded'
+        });
+      } catch (error) {
+        console.error('Error downloading PDF:', error);
+        toast.error('Failed to download PDF', {
+          description: error instanceof Error ? error.message : 'An unexpected error occurred'
+        });
+      }
+    }
   };
 
   // Report categories with their respective icons and descriptions
   const reportCategories = [
     {
-      id: "general",
+      id: "general" as ReportType,
       title: "General Report",
-      description: "Comprehensive overview of all business activities and key performance indicators",
+      description: "Comprehensive overview of business operations and key performance indicators",
       icon: FileText,
       color: "from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
       iconColor: "text-blue-600",
       iconBg: "bg-blue-100 dark:bg-blue-900/30"
     },
     {
-      id: "stock",
-      title: "Stock Report",
-      description: "Detailed inventory levels, stock movements, and product availability analysis",
-      icon: Package,
-      color: "from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30",
-      iconColor: "text-green-600",
-      iconBg: "bg-green-100 dark:bg-green-900/30"
-    },
-    {
-      id: "sales",
+      id: "sales" as ReportType,
       title: "Sales Report",
       description: "Sales performance metrics, revenue trends, and customer transaction analysis",
       icon: ShoppingCart,
@@ -75,31 +116,31 @@ const Reports = () => {
       iconBg: "bg-purple-100 dark:bg-purple-900/30"
     },
     {
-      id: "expense",
-      title: "Expense Report",
-      description: "Business expenditure breakdown, cost analysis, and budget tracking",
-      icon: DollarSign,
+      id: "top-selling" as ReportType,
+      title: "Top Selling",
+      description: "Analysis of best-performing products and highest revenue generating items",
+      icon: TrendingUp,
+      color: "from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30",
+      iconColor: "text-green-600",
+      iconBg: "bg-green-100 dark:bg-green-900/30"
+    },
+    {
+      id: "debtor-credit" as ReportType,
+      title: "Debtor/Credit Report",
+      description: "Outstanding debts, credit balances, and accounts receivable analysis",
+      icon: CreditCard,
       color: "from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30",
       iconColor: "text-orange-600",
       iconBg: "bg-orange-100 dark:bg-orange-900/30"
     },
     {
-      id: "profit-loss",
+      id: "profit-loss" as ReportType,
       title: "Profit and Loss Report",
-      description: "Financial performance analysis including revenue, costs, and net profit calculations",
-      icon: TrendingUp,
+      description: "Detailed profit and loss statement with revenue, expenses, and net income analysis",
+      icon: DollarSign,
       color: "from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30",
       iconColor: "text-red-600",
       iconBg: "bg-red-100 dark:bg-red-900/30"
-    },
-    {
-      id: "smart",
-      title: "Smart Report",
-      description: "AI-powered insights and predictive analytics for business intelligence",
-      icon: Brain,
-      color: "from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30",
-      iconColor: "text-cyan-600",
-      iconBg: "bg-cyan-100 dark:bg-cyan-900/30"
     }
   ];
 
@@ -141,22 +182,15 @@ const Reports = () => {
                     {report.description}
                   </p>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                  {/* Action Button */}
+                  <div className="mb-4">
                     <Button
                       onClick={() => handleViewReport(report.id, report.title)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm h-9"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm h-9"
+                      disabled={isLoading}
                     >
                       <Eye className="mr-2 h-4 w-4" />
-                      View Report
-                    </Button>
-                    <Button
-                      onClick={() => handleDownloadPDF(report.id, report.title)}
-                      variant="outline"
-                      className="flex-1 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm h-9"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download PDF
+                      View Reports
                     </Button>
                   </div>
 
@@ -167,9 +201,9 @@ const Reports = () => {
                       <span>Report Category</span>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <PieChart className="h-3 w-3 text-gray-400" />
-                      <LineChart className="h-3 w-3 text-gray-400" />
-                      <Activity className="h-3 w-3 text-gray-400" />
+                      <BarChart3 className="h-3 w-3 text-gray-400" />
+                      <TrendingUp className="h-3 w-3 text-gray-400" />
+                      <DollarSign className="h-3 w-3 text-gray-400" />
                     </div>
                   </div>
                 </CardContent>
@@ -197,6 +231,23 @@ const Reports = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Report Filters Modal */}
+        <ReportFilters
+          reportType={currentReportType}
+          isOpen={showFilters}
+          onClose={() => setShowFilters(false)}
+          onApplyFilters={handleApplyFilters}
+        />
+
+        {/* PDF Viewer Modal */}
+        <PDFViewer
+          isOpen={showPDFViewer}
+          onClose={() => setShowPDFViewer(false)}
+          pdfUrl={pdfUrl}
+          title={currentReportTitle}
+          onDownload={handleDownloadPDF}
+        />
       </div>
     </AppLayout>
   );

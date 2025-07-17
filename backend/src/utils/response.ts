@@ -297,3 +297,26 @@ export function calculatePagination(
 export function getRequestId(request: Request): string {
   return request.headers.get('X-Request-ID') || generateRequestId();
 }
+
+/**
+ * Creates an error response with simplified parameters for handlers
+ * @param message - Error message
+ * @param requestId - Request identifier
+ * @param details - Additional error details
+ * @param status - HTTP status code (default: 500)
+ * @returns Formatted error response
+ */
+export function createHandlerErrorResponse(
+  message: string,
+  requestId: string,
+  details?: string,
+  status = 500,
+): ErrorResponse {
+  return {
+    success: false,
+    error: message,
+    ...(details && { details: { message: details } }),
+    timestamp: new Date().toISOString(),
+    requestId,
+  };
+}

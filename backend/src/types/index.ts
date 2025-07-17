@@ -309,3 +309,184 @@ export interface SystemHealth {
   uptime: number;
   version: string;
 }
+
+// Report types
+export type ReportType = 'stock' | 'sales' | 'financial' | 'transactions' | 'products' | 'customers';
+
+export interface ReportRequest {
+  type: ReportType;
+  dateFrom?: string;
+  dateTo?: string;
+  filters?: ReportFilters;
+  format?: 'pdf' | 'csv' | 'json';
+}
+
+export interface ReportFilters {
+  categoryId?: string;
+  productId?: string;
+  customerId?: string;
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  minAmount?: number;
+  maxAmount?: number;
+  userId?: string;
+}
+
+export interface StockReportData {
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  currentStock: number;
+  minStockLevel: number;
+  maxStockLevel: number;
+  stockValue: number;
+  lastMovementDate?: string;
+  status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'overstock';
+}
+
+export interface SalesReportData {
+  saleId: string;
+  saleDate: string;
+  customerName?: string;
+  totalAmount: number;
+  taxAmount: number;
+  discountAmount: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  items: SalesReportItem[];
+}
+
+export interface SalesReportItem {
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface FinancialReportData {
+  period: string;
+  totalSales: number;
+  totalExpenses: number;
+  totalDeposits: number;
+  netProfit: number;
+  salesCount: number;
+  expenseCount: number;
+  depositCount: number;
+  averageSaleAmount: number;
+  topSellingProducts: TopSellingProduct[];
+  salesByPaymentMethod: PaymentMethodSummary[];
+}
+
+export interface TopSellingProduct {
+  productId: string;
+  productName: string;
+  quantitySold: number;
+  totalRevenue: number;
+}
+
+export interface PaymentMethodSummary {
+  paymentMethod: PaymentMethod;
+  totalAmount: number;
+  transactionCount: number;
+}
+
+export interface TransactionReportData {
+  transactionId: string;
+  date: string;
+  type: 'sale' | 'expense' | 'deposit';
+  description: string;
+  amount: number;
+  paymentMethod?: PaymentMethod;
+  category?: string;
+  reference?: string;
+}
+
+export interface ProductReportData {
+  productId: string;
+  name: string;
+  sku: string;
+  category: string;
+  price: number;
+  cost: number;
+  currentStock: number;
+  totalSold: number;
+  totalRevenue: number;
+  profitMargin: number;
+  lastSaleDate?: string | undefined;
+  createdAt: string;
+}
+
+export interface CustomerReportData {
+  customerId?: string;
+  customerName: string;
+  customerEmail?: string | undefined;
+  customerPhone?: string | undefined;
+  totalPurchases: number;
+  totalSpent: number;
+  averageOrderValue: number;
+  lastPurchaseDate?: string | undefined;
+  firstPurchaseDate?: string | undefined;
+}
+
+export interface GeneralReportData {
+  productName: string;
+  openingStock: {
+    boxes: number;
+    kg: number;
+  };
+  newStock: {
+    boxes: number;
+    kg: number;
+  };
+  damaged: {
+    boxes: number;
+    kg: number;
+  };
+  closingStock: {
+    boxes: number;
+    kg: number;
+  };
+  unpaid: {
+    boxes: number;
+    kg: number;
+    amount: number;
+  };
+  sales: {
+    boxes: number;
+    kg: number;
+    amount: number;
+  };
+  unitPrice: {
+    boxPrice: number;
+    kgPrice: number;
+  };
+  sellingPrice: {
+    boxPrice: number;
+    kgPrice: number;
+  };
+  profit: {
+    boxProfit: number;
+    kgProfit: number;
+    totalProfit: number;
+  };
+  totalPrice: number;
+}
+
+export interface ReportResponse<T = unknown> extends ApiResponse<T> {
+  reportType: ReportType;
+  generatedAt: string;
+  period?: {
+    from: string;
+    to: string;
+  };
+  summary?: ReportSummary;
+}
+
+export interface ReportSummary {
+  totalRecords: number;
+  totalValue?: number;
+  averageValue?: number;
+  filters?: ReportFilters;
+}

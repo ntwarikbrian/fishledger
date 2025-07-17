@@ -74,6 +74,15 @@ export interface ApiConfig {
     dashboard: {
       stats: string;
     };
+    reports: {
+      list: string;
+      health: string;
+      general: string;
+      sales: string;
+      'top-selling': string;
+      'debtor-credit': string;
+      'profit-loss': string;
+    };
   };
 }
 
@@ -186,6 +195,15 @@ export const createApiConfig = (): ApiConfig => {
       },
       dashboard: {
         stats: '/api/dashboard/stats',
+      },
+      reports: {
+        list: '/api/reports',
+        health: '/api/reports/health',
+        general: '/api/reports/general/pdf',
+        sales: '/api/reports/sales/pdf',
+        'top-selling': '/api/reports/top-selling/pdf',
+        'debtor-credit': '/api/reports/debtor-credit/pdf',
+        'profit-loss': '/api/reports/profit-loss/pdf',
       },
     },
   };
