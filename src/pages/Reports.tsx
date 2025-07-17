@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ReportFilters from "@/components/reports/ReportFilters";
-import PDFViewer from "@/components/ui/pdf-viewer";
+import { PDFViewer } from "@/components/ui/pdf-viewer";
 import {
   FileText,
   ShoppingCart,

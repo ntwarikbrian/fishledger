@@ -1,4 +1,7 @@
 # Cloudflare Pages configuration for Local Fishing Frontend
+# Note: For Pages deployment, build configuration is handled in the Cloudflare dashboard
+# This file is used for Pages Functions and environment variables only
+
 name = "local-fishing-frontend"
 compatibility_date = "2025-07-10"
 compatibility_flags = ["nodejs_compat"]
@@ -10,14 +13,17 @@ pages_build_output_dir = "dist"
 [env.production]
 name = "local-fishing-frontend"
 
+[env.production.vars]
+VITE_API_BASE_URL = "https://local-fishing-backend.ntwaribrian262.workers.dev"
+VITE_ENVIRONMENT = "production"
+
 # Environment variables for development/preview
 [env.preview]
 name = "local-fishing-frontend-preview"
 
-# Build configuration
-[build]
-command = "npm run build"
-cwd = "."
+[env.preview.vars]
+VITE_API_BASE_URL = "https://local-fishing-backend.ntwaribrian262.workers.dev"
+VITE_ENVIRONMENT = "preview"
 
 # Custom domains (configure these in Cloudflare dashboard)
 # [env.production.route]

@@ -111,7 +111,7 @@ export const getApiBaseUrl = (): string => {
 
   if (mode === 'workers') {
     return isProduction
-      ? 'https://local-fishing-backend.your-username.workers.dev'
+      ? 'https://local-fishing-backend.ntwaribrian262.workers.dev'
       : 'http://localhost:8787';
   } else {
     return isProduction
