@@ -10,11 +10,16 @@
     "build:prod": "vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy:frontend": "npm run build:prod && wrangler pages deploy dist",
+    "deploy": "npm run build:prod && wrangler deploy",
+    "deploy:prod": "npm run build:prod && wrangler deploy --env production",
+    "deploy:preview": "npm run build:prod && wrangler deploy --env preview",
+    "deploy:dev": "npm run build:dev && wrangler deploy --env development",
     "deploy:backend": "cd backend && npm run deploy",
-    "deploy:all": "npm run deploy:backend && npm run deploy:frontend",
+    "deploy:all": "npm run deploy:backend && npm run deploy:prod",
     "dev:backend": "cd backend && npm run dev",
-    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev\""
+    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev\"",
+    "wrangler:dev": "wrangler dev",
+    "wrangler:tail": "wrangler tail"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
