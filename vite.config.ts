@@ -17,6 +17,8 @@ export default defineConfig({
     },
   },
   build: {
+    // Explicitly set output directory for Cloudflare Pages
+    outDir: 'dist',
     // Optimize build for Cloudflare Pages
     target: 'esnext',
     minify: 'esbuild',
