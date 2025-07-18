@@ -17,28 +17,6 @@ export default defineConfig({
     },
   },
   build: {
-    // Explicitly set output directory for Cloudflare Pages
     outDir: 'dist',
-    // Optimize build for Cloudflare Pages
-    target: 'esnext',
-    minify: 'esbuild',
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        // Better chunk splitting for large bundles
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-          charts: ['recharts'],
-          utils: ['date-fns', 'clsx', 'tailwind-merge']
-        }
-      }
-    },
-    // Increase chunk size warning limit
-    chunkSizeWarningLimit: 1000
   },
-  // Optimize dependencies
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom']
-  }
 });
