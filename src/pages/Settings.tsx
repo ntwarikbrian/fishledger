@@ -185,7 +185,6 @@ const Settings: React.FC = () => {
                 <>
                   <div className="flex items-center gap-4">
                     <Avatar className="h-20 w-20">
-                      <AvatarImage src="/placeholder-avatar.jpg" />
                       <AvatarFallback className="text-lg">
                         {userDetails.ownerName ? userDetails.ownerName.split(' ').map(n => n[0]).join('') : 'U'}
                       </AvatarFallback>
