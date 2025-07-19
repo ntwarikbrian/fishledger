@@ -3,6 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ReportFilters from "@/components/reports/ReportFilters";
+import SalesReportDatePicker from "@/components/reports/SalesReportDatePicker";
 import { PDFViewer } from "@/components/ui/pdf-viewer";
 import {
   FileText,
@@ -29,6 +30,7 @@ import {
 
 const Reports = () => {
   const [showFilters, setShowFilters] = useState(false);
+  const [showSalesDatePicker, setShowSalesDatePicker] = useState(false);
   const [currentReportType, setCurrentReportType] = useState<ReportType>('sales');
   const [currentReportTitle, setCurrentReportTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +43,13 @@ const Reports = () => {
   const handleViewReport = (reportType: ReportType, reportTitle: string) => {
     setCurrentReportType(reportType);
     setCurrentReportTitle(reportTitle);
-    setShowFilters(true);
+
+    // Show sales date picker for sales report, general filters for others
+    if (reportType === 'sales') {
+      setShowSalesDatePicker(true);
+    } else {
+      setShowFilters(true);
+    }
   };
 
   /**
@@ -62,6 +70,37 @@ const Reports = () => {
     } catch (error) {
       console.error(`Error viewing ${currentReportType} report:`, error);
       toast.error(`Failed to view ${currentReportTitle}`, {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Handle sales report generation with date range
+   */
+  const handleGenerateSalesReport = async (dateFrom: string, dateTo: string) => {
+    setIsLoading(true);
+    try {
+      // Create filters with selected dates
+      const filters: IReportFilters = {
+        dateFrom,
+        dateTo
+      };
+
+      // Get PDF URL for popup viewing
+      const url = viewReportInPopup('sales', filters);
+      setPdfUrl(url);
+      setShowPDFViewer(true);
+      setShowSalesDatePicker(false);
+
+      toast.success('Sales Report is ready!', {
+        description: `Report generated for ${new Date(dateFrom).toLocaleDateString()} - ${new Date(dateTo).toLocaleDateString()}`
+      });
+    } catch (error) {
+      console.error('Error viewing sales report:', error);
+      toast.error('Failed to generate Sales Report', {
         description: error instanceof Error ? error.message : 'An unexpected error occurred'
       });
     } finally {
@@ -238,6 +277,15 @@ const Reports = () => {
           isOpen={showFilters}
           onClose={() => setShowFilters(false)}
           onApplyFilters={handleApplyFilters}
+          isLoading={isLoading}
+        />
+
+        {/* Sales Report Date Picker Modal */}
+        <SalesReportDatePicker
+          isOpen={showSalesDatePicker}
+          onClose={() => setShowSalesDatePicker(false)}
+          onGenerateReport={handleGenerateSalesReport}
+          isLoading={isLoading}
         />
 
         {/* PDF Viewer Modal */}

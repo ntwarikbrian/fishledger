@@ -34,7 +34,10 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  TrendingUp,
+  Phone,
+  Mail
 } from "lucide-react";
 import {
   Select,
@@ -62,9 +65,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useDeposits, type Deposit, type CreateDepositWithImageRequest } from "@/hooks/use-deposits";
+import { useDebtors } from "@/hooks/use-debtors";
 import { toast } from "sonner";
-import type { Transaction, TransactionFilters } from "@/types/transaction";
+import type { Transaction, TransactionFilters, Debtor } from "@/types/transaction";
 import { PAYMENT_METHODS, PAYMENT_STATUSES, DEPOSIT_TYPES } from "@/types/transaction";
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 // Remove the old Deposit interface as we're now using the one from the hook
 
@@ -80,15 +85,7 @@ interface NewDepositForm {
   image: File | null;
 }
 
-/**
- * Helper function to format currency
- */
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-};
+// Note: formatCurrency function removed - now using useCurrency hook
 
 /**
  * Helper function to format date and time
@@ -228,12 +225,15 @@ const getApprovalStatusBadge = (approvalStatus: string) => {
 const Transactions = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { formatCurrency } = useCurrency();
 
   // Get current tab from URL
   const getCurrentTab = () => {
     const path = location.pathname;
     if (path.includes('/deposits')) {
       return 'deposits';
+    } else if (path.includes('/debtors')) {
+      return 'debtors';
     }
     return 'transactions';
   };
@@ -245,6 +245,8 @@ const Transactions = () => {
     setActiveTab(value);
     if (value === 'deposits') {
       navigate('/transactions/deposits');
+    } else if (value === 'debtors') {
+      navigate('/transactions/debtors');
     } else {
       navigate('/transactions');
     }
@@ -284,13 +286,29 @@ const Transactions = () => {
     deleteDeposit,
   } = useDeposits();
 
+  // Initialize debtors hook
+  const {
+    debtors,
+    loading: debtorsLoading,
+    error: debtorsError,
+    pagination: debtorsPagination,
+    filters: debtorsFilters,
+    fetchDebtors,
+    searchDebtors,
+    setFilters: setDebtorsFilters,
+    clearFilters: clearDebtorsFilters,
+    refetch: refetchDebtors,
+  } = useDebtors();
+
   // Fetch deposits data when deposits tab becomes active
   useEffect(() => {
     if (activeTab === 'deposits') {
       fetchDeposits();
       fetchDepositStats();
+    } else if (activeTab === 'debtors') {
+      fetchDebtors();
     }
-  }, [activeTab, fetchDeposits, fetchDepositStats]);
+  }, [activeTab, fetchDeposits, fetchDepositStats, fetchDebtors]);
 
   // Local state for UI
   const [searchTerm, setSearchTerm] = useState("");
@@ -332,6 +350,8 @@ const Transactions = () => {
         if (getCurrentTab() === 'deposits') {
           fetchDeposits();
           fetchDepositStats();
+        } else if (getCurrentTab() === 'debtors') {
+          fetchDebtors();
         }
       } catch (error) {
         console.error('Error initializing transaction data:', error);
@@ -561,7 +581,7 @@ const Transactions = () => {
 
         {/* Transaction Management Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="transactions">
               <Receipt className="mr-2 h-4 w-4" />
               Transactions
@@ -569,6 +589,10 @@ const Transactions = () => {
             <TabsTrigger value="deposits">
               <Banknote className="mr-2 h-4 w-4" />
               Deposits
+            </TabsTrigger>
+            <TabsTrigger value="debtors">
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Debtors
             </TabsTrigger>
           </TabsList>
 
@@ -1478,6 +1502,235 @@ const Transactions = () => {
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="debtors" className="space-y-6">
+            {/* Debtor Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Debtors</p>
+                      <p className="text-2xl font-bold">{debtors.length}</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-orange-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {formatCurrency(debtors.reduce((sum, debtor) => sum + debtor.totalOwed, 0))}
+                      </p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-red-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Sales Value</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(debtors.reduce((sum, debtor) => sum + debtor.totalAmount, 0))}
+                      </p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Amount Paid</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {formatCurrency(debtors.reduce((sum, debtor) => sum + debtor.totalPaid, 0))}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Debtors Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-orange-500" />
+                      Outstanding Payments
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Customers with unpaid or partially paid sales
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search customers..."
+                        value={debtorsFilters.search || ''}
+                        onChange={(e) => searchDebtors(e.target.value)}
+                        className="pl-8 w-64"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchDebtors()}
+                      disabled={debtorsLoading}
+                    >
+                      {debtorsLoading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Sales Count</TableHead>
+                        <TableHead>Total Amount</TableHead>
+                        <TableHead>Amount Paid</TableHead>
+                        <TableHead>Outstanding</TableHead>
+                        <TableHead>Last Sale</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {debtorsLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              Loading debtors...
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : debtorsError ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-red-600">
+                            Error loading debtors: {debtorsError}
+                          </TableCell>
+                        </TableRow>
+                      ) : debtors.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <div className="flex flex-col items-center gap-2">
+                              <CheckCircle2 className="h-8 w-8 text-green-500" />
+                              <p className="text-muted-foreground">No outstanding payments found</p>
+                              <p className="text-sm text-muted-foreground">All customers have paid their bills!</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        debtors.map((debtor, index) => (
+                          <TableRow key={`${debtor.clientName}-${index}`}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{debtor.clientName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {debtor.salesCount} sale{debtor.salesCount !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                {debtor.email && (
+                                  <p className="text-sm">{debtor.email}</p>
+                                )}
+                                {debtor.phone && (
+                                  <p className="text-sm text-muted-foreground">{debtor.phone}</p>
+                                )}
+                                {!debtor.email && !debtor.phone && (
+                                  <p className="text-sm text-muted-foreground">No contact info</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {debtor.salesCount}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium">
+                                {formatCurrency(debtor.totalAmount)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-green-600 font-medium">
+                                {formatCurrency(debtor.totalPaid)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-red-600 font-bold">
+                                {formatCurrency(debtor.totalOwed)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(debtor.lastSaleDate).toLocaleDateString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="View Sales Details"
+                                  onClick={() => {
+                                    // TODO: Implement view sales details modal
+                                    console.log('View sales for:', debtor.clientName);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {debtor.phone && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Call Customer"
+                                    onClick={() => window.open(`tel:${debtor.phone}`, '_self')}
+                                  >
+                                    <Phone className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {debtor.email && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Email Customer"
+                                    onClick={() => window.open(`mailto:${debtor.email}?subject=Payment Reminder&body=Dear ${debtor.clientName}, this is a friendly reminder about your outstanding balance of ${formatCurrency(debtor.totalOwed)}.`, '_blank')}
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

@@ -346,24 +346,20 @@ export interface StockReportData {
 }
 
 export interface SalesReportData {
-  saleId: string;
-  saleDate: string;
-  customerName?: string;
-  totalAmount: number;
-  taxAmount: number;
-  discountAmount: number;
-  paymentMethod: PaymentMethod;
+  productName: string;
+  quantitySold: string; // Combined boxes and kg display (e.g., "2 boxes, 5.5 kg")
+  clientName: string;
+  unitPrice: string; // Combined unit prices display (e.g., "$25.99/box, $1.30/kg")
+  sellingPrice: string; // Same as unit price (this is the selling price)
+  profit: number; // Calculated profit for this sale
+  total: number; // Total amount for this sale
+  seller: string; // Name of the user who performed the sale
   paymentStatus: PaymentStatus;
-  items: SalesReportItem[];
+  saleDate: string;
+  paymentMethod: PaymentMethod;
 }
 
-export interface SalesReportItem {
-  productName: string;
-  sku: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-}
+
 
 export interface FinancialReportData {
   period: string;
@@ -377,6 +373,9 @@ export interface FinancialReportData {
   averageSaleAmount: number;
   topSellingProducts: TopSellingProduct[];
   salesByPaymentMethod: PaymentMethodSummary[];
+  // Additional fields for profit and loss report
+  costOfStock?: number; // Cost of goods sold
+  damagedValue?: number; // Value of damaged products
 }
 
 export interface TopSellingProduct {
@@ -384,6 +383,29 @@ export interface TopSellingProduct {
   productName: string;
   quantitySold: number;
   totalRevenue: number;
+}
+
+/**
+ * Top Selling Report Data Interface
+ * Used for the dedicated top selling products report with damage rate calculation
+ */
+export interface TopSellingReportData {
+  product: string; // Product name
+  totalSold: number; // Total quantity sold (boxes + kg converted)
+  totalRevenue: number; // Total revenue from sales
+  damageRate: number; // Damage rate as percentage (damaged quantity / total handled quantity * 100)
+}
+
+/**
+ * Debtor/Credit Report Data Interface
+ * Used for the debtor/credit report with client payment information
+ */
+export interface DebtorCreditReportData {
+  clientName: string; // Client name
+  amountOwed: number; // Total amount owed (remaining_amount)
+  amountPaid: number; // Amount already paid
+  phoneNumber: string; // Client phone number
+  email: string; // Client email address
 }
 
 export interface PaymentMethodSummary {

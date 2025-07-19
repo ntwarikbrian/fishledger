@@ -9,7 +9,11 @@ import {
   getStockMovementsHandler,
   createStockMovementHandler,
   getProductStockMovementsHandler,
-  getStockSummaryHandler
+  getStockSummaryHandler,
+  approveProductEditHandler,
+  rejectProductEditHandler,
+  approveProductDeleteHandler,
+  rejectProductDeleteHandler
 } from '../handlers/stock-movements';
 import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
 
@@ -37,5 +41,17 @@ stockMovements.get('/product/:productId', requireEmployee, getProductStockMoveme
 
 // GET /stock-movements/summary/:productId - Get stock summary for a product (any authenticated user)
 stockMovements.get('/summary/:productId', requireEmployee, getStockSummaryHandler);
+
+// POST /stock-movements/:movementId/approve - Approve pending product edit (manager or admin)
+stockMovements.post('/:movementId/approve', requireManager, approveProductEditHandler);
+
+// POST /stock-movements/:movementId/reject - Reject pending product edit (manager or admin)
+stockMovements.post('/:movementId/reject', requireManager, rejectProductEditHandler);
+
+// POST /stock-movements/:movementId/approve-delete - Approve pending product delete (manager or admin)
+stockMovements.post('/:movementId/approve-delete', requireManager, approveProductDeleteHandler);
+
+// POST /stock-movements/:movementId/reject-delete - Reject pending product delete (manager or admin)
+stockMovements.post('/:movementId/reject-delete', requireManager, rejectProductDeleteHandler);
 
 export { stockMovements };

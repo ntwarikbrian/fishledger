@@ -2,13 +2,14 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Scale, Edit, Eye, Plus, FileText, ShoppingCart, Package, Fish, Calculator, Truck, CreditCard, Calendar, MapPin, DollarSign, Hash, AlertTriangle, CheckCircle, Box, Trash2, X, Check } from "lucide-react";
+import { Search, Scale, Edit, Eye, Plus, FileText, ShoppingCart, Package, Fish, Calculator, Truck, CreditCard, Calendar, MapPin, DollarSign, Hash, AlertTriangle, CheckCircle, Box, Trash2, X, Check, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useState, useEffect } from "react";
-import { inventoryService, SaleRequest, InventoryPreview } from "@/lib/api/services/inventory";
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { inventoryService, SaleRequest, FishSaleRequest, FishSaleResult, InventoryPreview } from "@/lib/api/services/inventory";
 import { useProducts } from "@/hooks/use-products";
 import { useSales } from "@/hooks/use-sales";
 import { useAudits, type AuditRecord } from "@/hooks/use-audits";
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
 const Sales = () => {
   const { t } = useTranslation();
   usePageTitle('navigation.sales', 'Sales');
+  const { formatCurrency } = useCurrency();
 
   // Products hook for real data
   const { products, loading: productsLoading } = useProducts();
@@ -38,7 +40,20 @@ const Sales = () => {
     rejectAudit
   } = useAudits();
 
-  // Sale form state
+  // Fish sale form state (new algorithm)
+  const [fishSaleForm, setFishSaleForm] = useState({
+    product_id: '',
+    requested_kg: 0,
+    requested_boxes: 0,
+    amount_paid: 0,
+    client_name: '',
+    email_address: '',
+    phone: '',
+    payment_method: 'cash' as 'momo_pay' | 'cash' | 'bank_transfer' | '',
+    payment_status: 'paid' as 'paid' | 'pending' | 'partial'
+  });
+
+  // Legacy sale form state (for backward compatibility)
   const [saleForm, setSaleForm] = useState({
     product_id: '',
     boxes_quantity: 0,
@@ -59,16 +74,15 @@ const Sales = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
+  // Sale details popup state
+  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [isSaleDetailsPopupOpen, setIsSaleDetailsPopupOpen] = useState(false);
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     boxes_quantity: 0,
     kg_quantity: 0,
-    payment_status: 'pending' as 'paid' | 'pending' | 'partial',
     payment_method: '' as 'momo_pay' | 'cash' | 'bank_transfer' | '',
-    amount_paid: 0,
-    client_name: '',
-    email_address: '',
-    phone: '',
     reason: '', // Reason for the edit
   });
 
@@ -92,11 +106,120 @@ const Sales = () => {
 
   // Remove old preview logic - no longer needed with new schema
 
-  // Calculate total amount when quantities or prices change
+  // Calculate total amount for fish sale (new algorithm)
+  const calculateFishSaleTotal = () => {
+    const selectedProduct = products.find(p => p.product_id === fishSaleForm.product_id);
+    if (!selectedProduct) return 0;
+
+    let total = 0;
+
+    // Add kg amount
+    if (fishSaleForm.requested_kg > 0) {
+      total += fishSaleForm.requested_kg * selectedProduct.price_per_kg;
+    }
+
+    // Add box amount
+    if (fishSaleForm.requested_boxes > 0) {
+      total += fishSaleForm.requested_boxes * selectedProduct.price_per_box;
+    }
+
+    return total;
+  };
+
+  // Calculate total amount when quantities or prices change (legacy)
   const calculateTotal = () => {
     return (saleForm.boxes_quantity * saleForm.box_price) + (saleForm.kg_quantity * saleForm.kg_price);
   };
 
+  // Fish sale submission handler (new algorithm)
+  const handleSubmitFishSale = async () => {
+    setIsSubmitting(true);
+
+    try {
+      // Validate fish sale form
+      const validation = inventoryService.validateFishSaleRequest(fishSaleForm as FishSaleRequest);
+      if (!validation.isValid) {
+        alert(`Validation errors:\n${validation.errors.join('\n')}`);
+        return;
+      }
+
+      console.log('🐟 Submitting fish sale:', fishSaleForm);
+      console.log('🐟 Fish sale form validation check:', {
+        product_id: !!fishSaleForm.product_id,
+        requested_kg: fishSaleForm.requested_kg,
+        requested_boxes: fishSaleForm.requested_boxes,
+        payment_method: fishSaleForm.payment_method,
+        payment_status: fishSaleForm.payment_status
+      });
+
+      const result = await inventoryService.createFishSale(fishSaleForm as FishSaleRequest);
+
+      if (result.success) {
+        // Reset form and show success
+        setFishSaleForm({
+          product_id: '',
+          requested_kg: 0,
+          requested_boxes: 0,
+          amount_paid: 0,
+          client_name: '',
+          email_address: '',
+          phone: '',
+          payment_method: '',
+          payment_status: 'paid'
+        });
+
+        // Show detailed success message with algorithm info
+        let message = `🐟 Fish sale completed successfully!\n\n`;
+        message += `Sale ID: ${result.data?.id}\n`;
+
+        // Show what was sold
+        const soldItems = [];
+        if (result.algorithm?.result?.sold_kg > 0) {
+          soldItems.push(`${result.algorithm.result.sold_kg}kg`);
+        }
+        if (result.algorithm?.result?.sold_boxes > 0) {
+          soldItems.push(`${result.algorithm.result.sold_boxes} box(es)`);
+        }
+        message += `Sold: ${soldItems.join(' + ')}\n`;
+        message += `Total: ${formatCurrency(result.algorithm?.result?.total_amount || 0)}\n`;
+
+        if (result.algorithm?.steps) {
+          message += `\nAlgorithm steps:\n${result.algorithm.steps.join('\n')}`;
+        }
+
+        if (result.stockInfo) {
+          message += `\nStock after sale:\n`;
+          message += `Boxes: ${result.stockInfo.after.boxes}\n`;
+          message += `Kg: ${result.stockInfo.after.kg}`;
+        }
+
+        alert(message);
+        handleSaleSuccess();
+      } else {
+        alert(`Fish sale failed: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error('Error creating fish sale:', error);
+
+      // Try to extract validation errors from the response
+      let errorMessage = 'Unknown error';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // If it's an ApiClientError with validation details
+      if (error.name === 'ApiClientError' && error.details && error.details.validationErrors) {
+        const validationErrors = error.details.validationErrors;
+        errorMessage = `Validation failed:\n${validationErrors.map((err: any) => `• ${err.field}: ${err.message}`).join('\n')}`;
+      }
+
+      alert(`Fish sale failed: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Legacy sale submission handler
   const handleSubmitSale = async () => {
     // Validate form before submission
     const validation = inventoryService.validateSaleRequest(saleForm as any);
@@ -173,8 +296,9 @@ const Sales = () => {
   };
 
   const selectedProduct = products.find(p => p.product_id === saleForm.product_id);
+  const selectedFishProduct = products.find(p => p.product_id === fishSaleForm.product_id);
 
-  // Auto-populate prices when product is selected
+  // Auto-populate prices when product is selected (legacy)
   useEffect(() => {
     if (selectedProduct && saleForm.product_id && (!saleForm.box_price && !saleForm.kg_price)) {
       setSaleForm(prev => ({
@@ -200,12 +324,29 @@ const Sales = () => {
   const formatPrice = (sale: any) => {
     const parts = [];
     if (sale.boxes_quantity > 0 && sale.box_price > 0) {
-      parts.push(`$${sale.box_price}/box`);
+      parts.push(`${formatCurrency(sale.box_price)}/box`);
     }
     if (sale.kg_quantity > 0 && sale.kg_price > 0) {
-      parts.push(`$${sale.kg_price}/kg`);
+      parts.push(`${formatCurrency(sale.kg_price)}/kg`);
     }
     return parts.join(', ') || 'N/A';
+  };
+
+  // Helper function to calculate and format total profit for the sale
+  const formatProfit = (sale: any) => {
+    let totalProfit = 0;
+
+    // Calculate total profit from boxes: (profit per box) × (quantity of boxes)
+    if (sale.boxes_quantity > 0 && sale.profit_per_box !== undefined && sale.profit_per_box !== null) {
+      totalProfit += sale.boxes_quantity * sale.profit_per_box;
+    }
+
+    // Calculate total profit from kg: (profit per kg) × (quantity of kg)
+    if (sale.kg_quantity > 0 && sale.profit_per_kg !== undefined && sale.profit_per_kg !== null) {
+      totalProfit += sale.kg_quantity * sale.profit_per_kg;
+    }
+
+    return formatCurrency(totalProfit);
   };
 
   const formatPaymentMethod = (method: string) => {
@@ -253,7 +394,7 @@ const Sales = () => {
   const formatAuditType = (type: string) => {
     switch (type) {
       case 'quantity_change': return 'Quantity Change';
-      case 'payment_update': return 'Payment Update';
+      case 'payment_method_change': return 'Payment Method Change';
       case 'deletion': return 'Deletion';
       default: return type;
     }
@@ -262,7 +403,7 @@ const Sales = () => {
   const getAuditTypeBadgeColor = (type: string) => {
     switch (type) {
       case 'quantity_change': return 'bg-blue-100 text-blue-800';
-      case 'payment_update': return 'bg-purple-100 text-purple-800';
+      case 'payment_method_change': return 'bg-purple-100 text-purple-800';
       case 'deletion': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -287,12 +428,20 @@ const Sales = () => {
       if (audit.kg_change !== 0) {
         details.push(`KG: ${audit.kg_change > 0 ? '+' : ''}${audit.kg_change}`);
       }
-    } else if (audit.audit_type === 'payment_update') {
+    } else if (audit.audit_type === 'payment_method_change') {
       if (audit.old_values && audit.new_values) {
-        const oldStatus = audit.old_values.payment_status;
-        const newStatus = audit.new_values.payment_status;
-        if (oldStatus !== newStatus) {
-          details.push(`${oldStatus} → ${newStatus}`);
+        const oldMethod = audit.old_values.payment_method;
+        const newMethod = audit.new_values.payment_method;
+        if (oldMethod !== newMethod) {
+          const formatPaymentMethod = (method: string) => {
+            switch (method) {
+              case 'momo_pay': return 'Mobile Money';
+              case 'cash': return 'Cash';
+              case 'bank_transfer': return 'Bank Transfer';
+              default: return method;
+            }
+          };
+          details.push(`${formatPaymentMethod(oldMethod)} → ${formatPaymentMethod(newMethod)}`);
         }
       }
     } else if (audit.audit_type === 'deletion') {
@@ -370,12 +519,7 @@ const Sales = () => {
     setEditForm({
       boxes_quantity: sale.boxes_quantity || 0,
       kg_quantity: sale.kg_quantity || 0,
-      payment_status: sale.payment_status || 'pending',
       payment_method: sale.payment_method || '',
-      amount_paid: sale.amount_paid || 0,
-      client_name: sale.client_name || '',
-      email_address: sale.email_address || '',
-      phone: sale.phone || '',
       reason: '', // Reset reason for new edit
     });
     setIsEditModalOpen(true);
@@ -386,6 +530,32 @@ const Sales = () => {
     setDeletingSale(sale);
     setIsDeleteModalOpen(true);
   };
+
+  // Handle view sale details
+  const handleViewSaleDetails = (sale: any) => {
+    setSelectedSale(sale);
+    setIsSaleDetailsPopupOpen(true);
+  };
+
+  // Handle escape key to close popup
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isSaleDetailsPopupOpen) {
+        setIsSaleDetailsPopupOpen(false);
+      }
+    };
+
+    if (isSaleDetailsPopupOpen) {
+      document.addEventListener('keydown', handleEscapeKey);
+      // Prevent body scroll when popup is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isSaleDetailsPopupOpen]);
 
   // State for delete reason
   const [deleteReason, setDeleteReason] = useState('');
@@ -439,10 +609,9 @@ const Sales = () => {
         return;
       }
 
-      // For pending/partial payments, client details are required
-      if ((editForm.payment_status === 'pending' || editForm.payment_status === 'partial') &&
-          !editForm.client_name) {
-        alert('Client name is required for pending/partial payments');
+      // Validate quantities
+      if (editForm.boxes_quantity <= 0 && editForm.kg_quantity <= 0) {
+        alert('At least one quantity (boxes or kg) must be greater than 0');
         return;
       }
 
@@ -450,14 +619,8 @@ const Sales = () => {
       const updateData = {
         boxes_quantity: editForm.boxes_quantity,
         kg_quantity: editForm.kg_quantity,
-        payment_status: editForm.payment_status,
         payment_method: editForm.payment_method as 'momo_pay' | 'cash' | 'bank_transfer',
-        amount_paid: editForm.amount_paid,
         reason: editForm.reason.trim(), // Include reason for audit
-        // Only include client details if they have values
-        ...(editForm.client_name && { client_name: editForm.client_name.trim() }),
-        ...(editForm.email_address && { email_address: editForm.email_address.trim() }),
-        ...(editForm.phone && { phone: editForm.phone.trim() }),
       };
 
       console.log('Sending update data:', updateData); // Debug log
@@ -475,12 +638,7 @@ const Sales = () => {
         setEditForm({
           boxes_quantity: 0,
           kg_quantity: 0,
-          payment_status: 'pending',
           payment_method: '',
-          amount_paid: 0,
-          client_name: '',
-          email_address: '',
-          phone: '',
           reason: '',
         });
       } else {
@@ -541,8 +699,8 @@ const Sales = () => {
                   <Plus className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Create New Sale</h2>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">Add a new fish sales transaction</p>
+                  <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">🐟 Fish Sales (Smart Algorithm)</h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">Customer requests kg, system automatically handles box conversion</p>
                 </div>
               </div>
             </div>
@@ -555,8 +713,8 @@ const Sales = () => {
                     <Fish className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-base text-emerald-900 dark:text-emerald-100">Product Details</CardTitle>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300">Select fish type and configure selling parameters</p>
+                    <CardTitle className="text-base text-emerald-900 dark:text-emerald-100">Product & Quantity</CardTitle>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">Select fish type and enter requested kg amount</p>
                   </div>
                 </div>
               </CardHeader>
@@ -568,7 +726,7 @@ const Sales = () => {
                       <Fish className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                       Fish Product
                     </Label>
-                    <Select value={saleForm.product_id} onValueChange={(value) => setSaleForm({...saleForm, product_id: value})}>
+                    <Select value={fishSaleForm.product_id} onValueChange={(value) => setFishSaleForm({...fishSaleForm, product_id: value})}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select fish type" />
                       </SelectTrigger>
@@ -580,228 +738,193 @@ const Sales = () => {
                         ) : (
                           products.map((product) => (
                             <SelectItem key={product.product_id} value={product.product_id}>
-                              {product.name} - ${product.price_per_kg.toFixed(2)}/kg, ${product.price_per_box.toFixed(2)}/box
+                              {product.name} - {formatCurrency(product.price_per_kg)}/kg
                             </SelectItem>
                           ))
                         )}
                       </SelectContent>
                     </Select>
-                    {selectedProduct && (
+                    {selectedFishProduct && (
                       <div className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded">
                         <div className="grid grid-cols-2 gap-2">
-                          <div>Stock: {selectedProduct.quantity_box} boxes, {selectedProduct.quantity_kg} kg</div>
-                          <div>Box ratio: {selectedProduct.box_to_kg_ratio} kg/box</div>
+                          <div>📦 Stock: {selectedFishProduct.quantity_box} boxes, {selectedFishProduct.quantity_kg} kg</div>
+                          <div>⚖️ Box ratio: {selectedFishProduct.box_to_kg_ratio} kg/box</div>
+                          <div>💰 Price: {formatCurrency(selectedFishProduct.price_per_kg)}/kg</div>
+                          <div>📊 Total available: {(selectedFishProduct.quantity_kg + (selectedFishProduct.quantity_box * selectedFishProduct.box_to_kg_ratio)).toFixed(1)} kg</div>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Quantity Selection - Boxes and Kg */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Boxes Quantity */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <Box className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        Boxes Quantity
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          placeholder="0"
-                          type="number"
-                          min="0"
-                          value={saleForm.boxes_quantity || ''}
-                          onChange={(e) => setSaleForm({...saleForm, boxes_quantity: parseInt(e.target.value) || 0})}
-                          className="pl-3 pr-12 py-2.5"
-                        />
-                        <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
-                          boxes
-                        </div>
+                  {/* Requested Kg Quantity */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Scale className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      Requested Kg Amount
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        placeholder="0.0"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={fishSaleForm.requested_kg || ''}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, requested_kg: parseFloat(e.target.value) || 0})}
+                        className="pl-3 pr-8 py-2.5"
+                      />
+                      <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
+                        kg
                       </div>
-                      {selectedProduct && saleForm.boxes_quantity > 0 && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400">
-                          Available: {selectedProduct.quantity_box} boxes
-                        </div>
-                      )}
                     </div>
-
-                    {/* Kg Quantity */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <Scale className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                        Kg Quantity
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          placeholder="0.0"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={saleForm.kg_quantity || ''}
-                          onChange={(e) => setSaleForm({...saleForm, kg_quantity: parseFloat(e.target.value) || 0})}
-                          className="pl-3 pr-8 py-2.5"
-                        />
-                        <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
-                          kg
+                    {selectedFishProduct && fishSaleForm.requested_kg > 0 && (
+                      <div className="text-xs space-y-1">
+                        <div className="text-green-600 dark:text-green-400">
+                          💰 Total: {formatCurrency(calculateFishSaleTotal())}
                         </div>
+                        {fishSaleForm.requested_kg > (selectedFishProduct.quantity_kg + (selectedFishProduct.quantity_box * selectedFishProduct.box_to_kg_ratio)) && (
+                          <div className="text-red-600 dark:text-red-400">
+                            ⚠️ Insufficient stock! Available: {(selectedFishProduct.quantity_kg + (selectedFishProduct.quantity_box * selectedFishProduct.box_to_kg_ratio)).toFixed(1)} kg
+                          </div>
+                        )}
                       </div>
-                      {selectedProduct && saleForm.kg_quantity > 0 && (
-                        <div className="text-xs text-green-600 dark:text-green-400">
-                          Available: {selectedProduct.quantity_kg} kg
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
 
-                  {/* Pricing Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Box Price */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <DollarSign className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        Price per Box
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          placeholder="0.00"
-                          type="number"
-                          value={saleForm.box_price || ''}
-                          readOnly
-                          className="pl-8 pr-3 py-2.5 bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-                        />
-                        <div className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
-                          $
-                        </div>
+                  {/* Requested Box Quantity */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      Requested Box Amount
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        placeholder="0"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={fishSaleForm.requested_boxes || ''}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, requested_boxes: parseInt(e.target.value) || 0})}
+                        className="pl-3 pr-12 py-2.5"
+                      />
+                      <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
+                        boxes
                       </div>
-                      {selectedProduct && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400">
-                          Suggested: ${selectedProduct.price_per_box}
-                        </div>
-                      )}
                     </div>
-
-                    {/* KG Price */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <DollarSign className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                        Price per KG
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          placeholder="0.00"
-                          type="number"
-                          value={saleForm.kg_price || ''}
-                          readOnly
-                          className="pl-8 pr-3 py-2.5 bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-                        />
-                        <div className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs">
-                          $
+                    {selectedFishProduct && fishSaleForm.requested_boxes > 0 && (
+                      <div className="text-xs space-y-1">
+                        <div className="text-blue-600 dark:text-blue-400">
+                          📦 Equivalent: {(fishSaleForm.requested_boxes * selectedFishProduct.box_to_kg_ratio).toFixed(1)} kg
                         </div>
+                        <div className="text-green-600 dark:text-green-400">
+                          💰 Box Total: {formatCurrency(fishSaleForm.requested_boxes * selectedFishProduct.price_per_box)}
+                        </div>
+                        {fishSaleForm.requested_boxes > selectedFishProduct.quantity_box && (
+                          <div className="text-red-600 dark:text-red-400">
+                            ⚠️ Insufficient box stock! Available: {selectedFishProduct.quantity_box} boxes
+                          </div>
+                        )}
                       </div>
-                      {selectedProduct && (
-                        <div className="text-xs text-green-600 dark:text-green-400">
-                          Suggested: ${selectedProduct.price_per_kg}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
+
                 </div>
-
-                {/* Stock Display and Total Calculation */}
-                {selectedProduct && (
-                  <div className="mt-4 space-y-3">
-                    {/* Current Stock Display */}
-                    <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900 dark:to-indigo-900 rounded-md border border-blue-200 dark:border-blue-700">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <span className="font-medium text-blue-700 dark:text-blue-300 text-sm">Current Stock - {selectedProduct.name}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-blue-600 dark:text-blue-400">Boxes Available:</span>
-                          <span className="font-medium text-blue-700 dark:text-blue-300">{selectedProduct.quantity_box}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-blue-600 dark:text-blue-400">KG Available:</span>
-                          <span className="font-medium text-blue-700 dark:text-blue-300">{selectedProduct.quantity_kg}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sale Preview and Total Calculation */}
-                {selectedProduct && (saleForm.boxes_quantity > 0 || saleForm.kg_quantity > 0) && (
-                  <div className="mt-4 space-y-3">
-                    {/* Price Breakdown */}
-                    <div className="p-3 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 rounded-md border border-gray-200 dark:border-gray-700">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Calculator className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                          <span className="font-medium text-gray-700 dark:text-gray-300 text-sm">Price Breakdown</span>
-                        </div>
-
-                        {saleForm.boxes_quantity > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span>{saleForm.boxes_quantity} boxes × ${saleForm.box_price}</span>
-                            <span className="font-medium">${(saleForm.boxes_quantity * saleForm.box_price).toFixed(2)}</span>
-                          </div>
-                        )}
-
-                        {saleForm.kg_quantity > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span>{saleForm.kg_quantity} kg × ${saleForm.kg_price}</span>
-                            <span className="font-medium">${(saleForm.kg_quantity * saleForm.kg_price).toFixed(2)}</span>
-                          </div>
-                        )}
-
-                        <div className="border-t pt-2 flex justify-between">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Total Amount</span>
-                          <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                            ${calculateTotal().toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stock Validation Display */}
-                    {selectedProduct && (saleForm.boxes_quantity > 0 || saleForm.kg_quantity > 0) && (
-                      <div className={`p-3 rounded-md border ${
-                        (saleForm.boxes_quantity <= selectedProduct.quantity_box && saleForm.kg_quantity <= selectedProduct.quantity_kg)
-                          ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
-                          : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {(saleForm.boxes_quantity <= selectedProduct.quantity_box && saleForm.kg_quantity <= selectedProduct.quantity_kg) ? (
-                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          )}
-                          <span className={`font-medium text-sm ${
-                            (saleForm.boxes_quantity <= selectedProduct.quantity_box && saleForm.kg_quantity <= selectedProduct.quantity_kg)
-                              ? 'text-green-700 dark:text-green-300'
-                              : 'text-red-700 dark:text-red-300'
-                          }`}>
-                            {(saleForm.boxes_quantity <= selectedProduct.quantity_box && saleForm.kg_quantity <= selectedProduct.quantity_kg)
-                              ? 'Stock available for sale'
-                              : 'Insufficient stock'}
-                          </span>
-                        </div>
-
-                        <div className="text-xs space-y-1">
-                          <div>After sale: {selectedProduct.quantity_box - saleForm.boxes_quantity} boxes, {selectedProduct.quantity_kg - saleForm.kg_quantity} kg remaining</div>
-                          {saleForm.boxes_quantity > selectedProduct.quantity_box && (
-                            <div className="text-red-600 dark:text-red-400">• Insufficient boxes: need {saleForm.boxes_quantity}, have {selectedProduct.quantity_box}</div>
-                          )}
-                          {saleForm.kg_quantity > selectedProduct.quantity_kg && (
-                            <div className="text-red-600 dark:text-red-400">• Insufficient kg: need {saleForm.kg_quantity}, have {selectedProduct.quantity_kg}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
+
+            {/* Algorithm Preview Card */}
+            {selectedFishProduct && (fishSaleForm.requested_kg > 0 || fishSaleForm.requested_boxes > 0) && (
+              <Card className="border-0 shadow-md bg-white dark:bg-gray-800">
+                <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-t-lg border-b border-purple-100 dark:border-purple-800 p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-purple-600 dark:bg-purple-500 rounded-md">
+                      <Package className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base text-purple-900 dark:text-purple-100">🧠 Algorithm Preview</CardTitle>
+                      <p className="text-xs text-purple-700 dark:text-purple-300">How the system will fulfill this order</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-2">
+                        {fishSaleForm.requested_kg > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Requested kg:</span>
+                            <span className="font-medium">{fishSaleForm.requested_kg} kg</span>
+                          </div>
+                        )}
+                        {fishSaleForm.requested_boxes > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Requested boxes:</span>
+                            <span className="font-medium">{fishSaleForm.requested_boxes} boxes</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Available loose kg:</span>
+                          <span className="font-medium">{selectedFishProduct.quantity_kg} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Available boxes:</span>
+                          <span className="font-medium">{selectedFishProduct.quantity_box} boxes</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Total available:</span>
+                          <span className="font-medium">{(selectedFishProduct.quantity_kg + (selectedFishProduct.quantity_box * selectedFishProduct.box_to_kg_ratio)).toFixed(1)} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Price per kg:</span>
+                          <span className="font-medium">{formatCurrency(selectedFishProduct.price_per_kg)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Price per box:</span>
+                          <span className="font-medium">{formatCurrency(selectedFishProduct.price_per_box)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-green-600 dark:text-green-400 font-medium">Total amount:</span>
+                          <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(calculateFishSaleTotal())}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Algorithm Steps Preview */}
+                    <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">🔄 Algorithm Steps:</h4>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        {/* Box requests */}
+                        {fishSaleForm.requested_boxes > 0 && (
+                          <div>📦 Use {fishSaleForm.requested_boxes} box(es) directly</div>
+                        )}
+
+                        {/* Kg requests */}
+                        {fishSaleForm.requested_kg > 0 && (
+                          <>
+                            {fishSaleForm.requested_kg <= selectedFishProduct.quantity_kg ? (
+                              <div>⚖️ Use {fishSaleForm.requested_kg}kg from loose stock</div>
+                            ) : (
+                              <>
+                                <div>⚖️ Use {selectedFishProduct.quantity_kg}kg from loose stock</div>
+                                <div>📦➡️⚖️ Convert {Math.ceil((fishSaleForm.requested_kg - selectedFishProduct.quantity_kg) / selectedFishProduct.box_to_kg_ratio)} box(es) to get remaining {(fishSaleForm.requested_kg - selectedFishProduct.quantity_kg).toFixed(1)}kg</div>
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        {/* Show if no requests */}
+                        {fishSaleForm.requested_kg === 0 && fishSaleForm.requested_boxes === 0 && (
+                          <div className="text-gray-400">Enter kg or box quantity to see algorithm steps</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+
 
             {/* Payment Information */}
             <div className={`grid grid-cols-1 ${(saleForm.payment_status === 'pending' || saleForm.payment_status === 'partial') ? 'lg:grid-cols-2' : ''} gap-3`}>
@@ -824,7 +947,7 @@ const Sales = () => {
                       <CreditCard className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
                       Payment Method
                     </Label>
-                    <Select value={saleForm.payment_method} onValueChange={(value) => setSaleForm({...saleForm, payment_method: value as '' | 'momo_pay' | 'cash' | 'bank_transfer'})}>
+                    <Select value={fishSaleForm.payment_method} onValueChange={(value) => setFishSaleForm({...fishSaleForm, payment_method: value as '' | 'momo_pay' | 'cash' | 'bank_transfer'})}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Choose payment method..." />
                       </SelectTrigger>
@@ -842,15 +965,15 @@ const Sales = () => {
                       <CheckCircle className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
                       Payment Status
                     </Label>
-                    <Select value={saleForm.payment_status} onValueChange={(value: 'paid' | 'pending' | 'partial') => {
+                    <Select value={fishSaleForm.payment_status} onValueChange={(value: 'paid' | 'pending' | 'partial') => {
                       // Clear client info when switching to paid (since it's not needed)
-                      const updatedForm = { ...saleForm, payment_status: value };
+                      const updatedForm = { ...fishSaleForm, payment_status: value };
                       if (value === 'paid') {
                         updatedForm.client_name = '';
                         updatedForm.email_address = '';
                         updatedForm.phone = '';
                       }
-                      setSaleForm(updatedForm);
+                      setFishSaleForm(updatedForm);
                     }}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Choose payment status..." />
@@ -874,14 +997,14 @@ const Sales = () => {
                         type="number"
                         min="0"
                         step="0.01"
-                        value={saleForm.amount_paid}
-                        onChange={(e) => setSaleForm({...saleForm, amount_paid: parseFloat(e.target.value) || 0})}
+                        value={fishSaleForm.amount_paid}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, amount_paid: parseFloat(e.target.value) || 0})}
                         placeholder="Enter amount already paid"
                         className="w-full"
                       />
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Total Amount: ${((saleForm.boxes_quantity * saleForm.box_price) + (saleForm.kg_quantity * saleForm.kg_price)).toFixed(2)} |
-                        Remaining: ${Math.max(0, ((saleForm.boxes_quantity * saleForm.box_price) + (saleForm.kg_quantity * saleForm.kg_price)) - saleForm.amount_paid).toFixed(2)}
+                        Total Amount: {formatCurrency(calculateFishSaleTotal())} |
+                        Remaining: {formatCurrency(Math.max(0, calculateFishSaleTotal() - fishSaleForm.amount_paid))}
                       </div>
                     </div>
                   )}
@@ -891,9 +1014,9 @@ const Sales = () => {
                     <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 bg-violet-500 dark:bg-violet-400 rounded-full"></div>
                       <span className="text-xs font-medium text-violet-800 dark:text-violet-200">
-                        {saleForm.payment_status === 'paid'
+                        {fishSaleForm.payment_status === 'paid'
                           ? 'Payment is complete - no client information required'
-                          : saleForm.payment_status === 'partial'
+                          : fishSaleForm.payment_status === 'partial'
                           ? 'Partial payment - client information required for follow-up'
                           : 'Payment pending - client information required for tracking'
                         }
@@ -904,7 +1027,7 @@ const Sales = () => {
               </Card>
 
               {/* Client Information Card - Only show for pending/partial payments, not for paid */}
-              {(saleForm.payment_status === 'pending' || saleForm.payment_status === 'partial') && (
+              {(fishSaleForm.payment_status === 'pending' || fishSaleForm.payment_status === 'partial') && (
                 <Card className="border-0 shadow-md bg-white dark:bg-gray-800">
                   <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950 rounded-t-lg border-b border-orange-100 dark:border-orange-800 p-3">
                     <div className="flex items-center gap-2">
@@ -924,8 +1047,8 @@ const Sales = () => {
                       </Label>
                       <Input
                         placeholder="Enter client name..."
-                        value={saleForm.client_name}
-                        onChange={(e) => setSaleForm({...saleForm, client_name: e.target.value})}
+                        value={fishSaleForm.client_name}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, client_name: e.target.value})}
                         className="w-full"
                         required
                       />
@@ -937,8 +1060,8 @@ const Sales = () => {
                       <Input
                         type="email"
                         placeholder="client@example.com"
-                        value={saleForm.email_address}
-                        onChange={(e) => setSaleForm({...saleForm, email_address: e.target.value})}
+                        value={fishSaleForm.email_address}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, email_address: e.target.value})}
                         className="w-full"
                       />
                     </div>
@@ -948,8 +1071,8 @@ const Sales = () => {
                       </Label>
                       <Input
                         placeholder="+1 (555) 123-4567"
-                        value={saleForm.phone}
-                        onChange={(e) => setSaleForm({...saleForm, phone: e.target.value})}
+                        value={fishSaleForm.phone}
+                        onChange={(e) => setFishSaleForm({...fishSaleForm, phone: e.target.value})}
                         className="w-full"
                       />
                     </div>
@@ -963,26 +1086,24 @@ const Sales = () => {
               <CardContent className="p-3">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
                   <div className="text-left">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">Ready to create this sale?</h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Review all details before confirming</p>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">🐟 Ready to create this fish sale?</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Using smart algorithm - system will handle box conversion automatically</p>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSaleForm({
+                        setFishSaleForm({
                           product_id: '',
-                          boxes_quantity: 0,
-                          kg_quantity: 0,
-                          box_price: 0,
-                          kg_price: 0,
+                          requested_kg: 0,
+                          requested_boxes: 0,
                           amount_paid: 0,
                           client_name: '',
                           email_address: '',
                           phone: '',
                           payment_method: '',
-                          payment_status: 'pending'
+                          payment_status: 'paid'
                         });
                       }}
                       className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 text-sm"
@@ -991,8 +1112,8 @@ const Sales = () => {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={handleSubmitSale}
-                      disabled={isSubmitting || !saleForm.product_id}
+                      onClick={handleSubmitFishSale}
+                      disabled={isSubmitting || !fishSaleForm.product_id || (!fishSaleForm.requested_kg && !fishSaleForm.requested_boxes) || !fishSaleForm.payment_method}
                       className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-500 dark:to-indigo-500 dark:hover:from-blue-600 dark:hover:to-indigo-600 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
@@ -1002,8 +1123,8 @@ const Sales = () => {
                         </>
                       ) : (
                         <>
-                          <Plus className="mr-1.5 h-3.5 w-3.5" />
-                          Create Sale
+                          <Fish className="mr-1.5 h-3.5 w-3.5" />
+                          Create Fish Sale
                         </>
                       )}
                     </Button>
@@ -1051,13 +1172,14 @@ const Sales = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-2 text-sm font-medium">Sale ID</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Product</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Quantity</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Price</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium" title="Total profit for this sale (selling price - cost price) × quantity">Profit</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Total Amount</th>
-                        <th className="text-left py-3 px-2 text-sm font-medium">Payment Status</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium">Status</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Payment Method</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium">Time</th>
                         <th className="text-left py-3 px-2 text-sm font-medium">Performed By</th>
                         <th className="text-right py-3 px-2 text-sm font-medium">Actions</th>
                       </tr>
@@ -1065,7 +1187,7 @@ const Sales = () => {
                     <tbody>
                       {salesLoading ? (
                         <tr>
-                          <td colSpan={9} className="py-8 text-center">
+                          <td colSpan={10} className="py-8 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                               Loading sales...
@@ -1074,23 +1196,28 @@ const Sales = () => {
                         </tr>
                       ) : salesError ? (
                         <tr>
-                          <td colSpan={9} className="py-8 text-center text-red-600">
+                          <td colSpan={10} className="py-8 text-center text-red-600">
                             Error loading sales: {salesError}
                           </td>
                         </tr>
                       ) : sales.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-8 text-center text-gray-500">
+                          <td colSpan={10} className="py-8 text-center text-gray-500">
                             No sales found
                           </td>
                         </tr>
                       ) : (
                         sales.map((sale) => (
                           <tr key={sale.id} className="border-b hover:bg-muted/50">
-                            <td className="py-3 px-2 font-medium">#{sale.id.slice(-8)}</td>
                             <td className="py-3 px-2">
                               <div>
-                                <span className="font-medium">{sale.products?.name || 'Unknown Product'}</span>
+                                <button
+                                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                                  onClick={() => handleViewSaleDetails(sale)}
+                                  title="Click to view sale details"
+                                >
+                                  {sale.products?.name || 'Unknown Product'}
+                                </button>
                                 {sale.products?.product_categories && (
                                   <p className="text-xs text-muted-foreground">
                                     {sale.products.product_categories.name}
@@ -1100,6 +1227,7 @@ const Sales = () => {
                             </td>
                             <td className="py-3 px-2">{formatQuantity(sale)}</td>
                             <td className="py-3 px-2 text-sm">{formatPrice(sale)}</td>
+                            <td className="py-3 px-2 text-sm text-green-600 font-medium">{formatProfit(sale)}</td>
                             <td className="py-3 px-2 font-medium">${sale.total_amount.toFixed(2)}</td>
                             <td className="py-3 px-2">
                               <Badge className={getPaymentStatusColor(sale.payment_status)}>
@@ -1112,11 +1240,23 @@ const Sales = () => {
                               </Badge>
                             </td>
                             <td className="py-3 px-2 text-sm">
+                              {new Date(sale.date_time).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </td>
+                            <td className="py-3 px-2 text-sm">
                               {sale.users?.owner_name || 'Unknown User'}
                             </td>
                             <td className="py-3 px-2">
                               <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" title="View Details">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="View Details"
+                                  onClick={() => handleViewSaleDetails(sale)}
+                                >
                                   <Eye className="h-4 w-4" />
                                 </Button>
                                 <Button
@@ -1222,6 +1362,11 @@ const Sales = () => {
                               <td className="py-3 px-2 text-sm">{formatTimestamp(audit.timestamp)}</td>
                               <td className="py-3 px-2 font-medium">
                                 {audit.product_info?.name || 'Unknown Product'}
+                                {audit.sale_id === null && (
+                                  <span className="ml-2 text-xs text-red-600 bg-red-100 px-1 py-0.5 rounded">
+                                    DELETED
+                                  </span>
+                                )}
                               </td>
                               <td className="py-3 px-2">
                                 <Badge className={getAuditTypeBadgeColor(audit.audit_type)}>
@@ -1365,172 +1510,148 @@ const Sales = () => {
 
         {/* Edit Sale Modal */}
         {isEditModalOpen && editingSale && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Edit Sale #{editingSale.id.slice(-8)}</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Sale</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">#{editingSale.id.slice(-8)}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingSale(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
 
-              {/* Sale Info (Read-only) */}
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h4 className="font-medium mb-2">Sale Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Product:</span>
-                    <span className="ml-2 font-medium">{editingSale.products?.name || 'Unknown Product'}</span>
+              {/* Content */}
+              <div className="p-4 space-y-4">
+                {/* Sale Summary */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {editingSale.products?.name || 'Unknown Product'}
+                    </h4>
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(editingSale.total_amount)}
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Quantity:</span>
-                    <span className="ml-2 font-medium">{formatQuantity(editingSale)}</span>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {formatQuantity(editingSale)} • {new Date(editingSale.date_time).toLocaleDateString()}
                   </div>
+                </div>
+
+                {/* Editable Fields */}
+                <div className="space-y-4">
+                  {/* Quantity Editing */}
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
-                    <span className="ml-2 font-medium">${editingSale.total_amount.toFixed(2)}</span>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Quantities</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Boxes</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editForm.boxes_quantity}
+                          onChange={(e) => setEditForm({...editForm, boxes_quantity: parseInt(e.target.value) || 0})}
+                          className="text-sm"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Kilograms</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editForm.kg_quantity}
+                          onChange={(e) => setEditForm({...editForm, kg_quantity: parseFloat(e.target.value) || 0})}
+                          className="text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
                   </div>
+
+
+
+                  {/* Payment Method */}
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">Date:</span>
-                    <span className="ml-2 font-medium">{new Date(editingSale.date_time).toLocaleDateString()}</span>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Payment Method</label>
+                    <Select value={editForm.payment_method} onValueChange={(value) => setEditForm({...editForm, payment_method: value as any})}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4" />
+                            Cash
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="momo_pay">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            Mobile Money
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="bank_transfer">
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4" />
+                            Bank Transfer
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+
+
+
+
+                  {/* Reason for Edit - Required */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Reason for Edit <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={editForm.reason}
+                      onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
+                      placeholder="Please provide a reason for this edit..."
+                      className="w-full p-3 text-sm border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      rows={2}
+                      required
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Editable Fields */}
-              <div className="space-y-4">
-                {/* Quantity Editing */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Boxes Quantity</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={editForm.boxes_quantity}
-                      onChange={(e) => setEditForm({...editForm, boxes_quantity: parseInt(e.target.value) || 0})}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">KG Quantity</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editForm.kg_quantity}
-                      onChange={(e) => setEditForm({...editForm, kg_quantity: parseFloat(e.target.value) || 0})}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                {/* Payment Status */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Payment Status</label>
-                  <select
-                    value={editForm.payment_status}
-                    onChange={(e) => setEditForm({...editForm, payment_status: e.target.value as any})}
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-600"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="partial">Partial</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </div>
-
-                {/* Payment Method */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Payment Method</label>
-                  <select
-                    value={editForm.payment_method}
-                    onChange={(e) => setEditForm({...editForm, payment_method: e.target.value as any})}
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-600"
-                  >
-                    <option value="">Select Payment Method</option>
-                    <option value="momo_pay">Mobile Money</option>
-                    <option value="cash">Cash</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                  </select>
-                </div>
-
-                {/* Amount Paid - Only show for partial payments */}
-                {editForm.payment_status === 'partial' && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Amount Paid</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editForm.amount_paid}
-                      onChange={(e) => setEditForm({...editForm, amount_paid: parseFloat(e.target.value) || 0})}
-                      placeholder="Enter amount paid"
-                      className="w-full"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Remaining: ${((editForm.boxes_quantity * (editingSale.box_price || 0)) + (editForm.kg_quantity * (editingSale.kg_price || 0)) - editForm.amount_paid).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Client Details - Only show for pending/partial payments */}
-                {(editForm.payment_status === 'pending' || editForm.payment_status === 'partial') && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Client Name *</label>
-                      <Input
-                        value={editForm.client_name}
-                        onChange={(e) => setEditForm({...editForm, client_name: e.target.value})}
-                        placeholder="Enter client name"
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Email Address</label>
-                      <Input
-                        type="email"
-                        value={editForm.email_address}
-                        onChange={(e) => setEditForm({...editForm, email_address: e.target.value})}
-                        placeholder="Enter email address"
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Phone Number</label>
-                      <Input
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                        placeholder="Enter phone number"
-                        className="w-full"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* Reason for Edit - Required */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Reason for Edit *</label>
-                  <textarea
-                    value={editForm.reason}
-                    onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
-                    placeholder="Please provide a reason for this edit..."
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-600"
-                    rows={3}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
+              {/* Footer */}
+              <div className="flex gap-2 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setIsEditModalOpen(false);
                     setEditingSale(null);
                   }}
+                  className="flex-1 text-sm"
+                  size="sm"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={saveEditedSale}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  size="sm"
+                  disabled={!editForm.reason.trim()}
                 >
+                  <Check className="w-4 h-4 mr-1" />
                   Save Changes
                 </Button>
               </div>
@@ -1563,7 +1684,12 @@ const Sales = () => {
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg space-y-2 mb-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Sale ID:</span>
-                    <span className="text-sm font-medium">#{auditAction.audit.sale_id.slice(-8)}</span>
+                    <span className="text-sm font-medium">
+                      {auditAction.audit.sale_id
+                        ? `#${auditAction.audit.sale_id.slice(-8)}`
+                        : 'DELETED SALE'
+                      }
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Action:</span>
@@ -1612,6 +1738,248 @@ const Sales = () => {
                   disabled={!auditAction.reason.trim()}
                 >
                   {auditAction.type === 'approve' ? 'Approve' : 'Reject'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sale Details Popup */}
+        {isSaleDetailsPopupOpen && selectedSale && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsSaleDetailsPopupOpen(false);
+              }
+            }}
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-sm sm:max-w-md w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    Sale Details
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    #{selectedSale.id.slice(-8)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsSaleDetailsPopupOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-3 space-y-3">
+                {/* Product & Sale Summary */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2.5">
+                  <div className="flex items-start justify-between mb-1.5">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {selectedSale.products?.name || 'Unknown Product'}
+                      </h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                        {selectedSale.products?.product_categories?.name || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right ml-2">
+                      <p className="text-base font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(selectedSale.total_amount)}
+                      </p>
+                      <Badge className={`${getPaymentStatusColor(selectedSale.payment_status)} text-xs`}>
+                        {selectedSale.payment_status.charAt(0).toUpperCase() + selectedSale.payment_status.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Qty:</span>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">
+                        {formatQuantity(selectedSale)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Price:</span>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">
+                        {formatPrice(selectedSale)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Profit:</span>
+                      <p className="font-medium text-green-600 dark:text-green-400 text-xs">
+                        {formatProfit(selectedSale)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">
+                        {formatCurrency(selectedSale.total_amount)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profit Breakdown */}
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2.5">
+                  <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5 flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+                    Profit Breakdown
+                  </h4>
+                  <div className="space-y-1 text-xs">
+                    {selectedSale.boxes_quantity > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Boxes ({selectedSale.boxes_quantity} × {formatCurrency(selectedSale.profit_per_box || 0)}):
+                        </span>
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                          {formatCurrency((selectedSale.boxes_quantity * (selectedSale.profit_per_box || 0)))}
+                        </span>
+                      </div>
+                    )}
+                    {selectedSale.kg_quantity > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Kg ({selectedSale.kg_quantity} × {formatCurrency(selectedSale.profit_per_kg || 0)}):
+                        </span>
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                          {formatCurrency((selectedSale.kg_quantity * (selectedSale.profit_per_kg || 0)))}
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t border-green-200 dark:border-green-700 pt-1 mt-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">Total Profit:</span>
+                        <span className="text-green-600 dark:text-green-400 font-bold">
+                          {formatProfit(selectedSale)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Information */}
+                {(selectedSale.remaining_amount > 0 || (selectedSale.amount_paid > 0 && selectedSale.amount_paid !== selectedSale.total_amount)) && (
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2.5">
+                    <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5 flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                      Payment Details
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Paid:</span>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
+                          {formatCurrency(selectedSale.amount_paid || 0)}
+                        </p>
+                      </div>
+                      {selectedSale.remaining_amount > 0 && (
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Remaining:</span>
+                          <p className="font-medium text-orange-600 dark:text-orange-400">
+                            {formatCurrency(selectedSale.remaining_amount)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Method & Client */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                      Payment & Client
+                    </h4>
+                    <Badge className={`${getPaymentMethodColor(selectedSale.payment_method || '')} text-xs`} variant="outline">
+                      {formatPaymentMethod(selectedSale.payment_method || '')}
+                    </Badge>
+                  </div>
+
+                  {(selectedSale.client_name || selectedSale.email_address || selectedSale.phone) && (
+                    <div className="space-y-1 text-xs">
+                      {selectedSale.client_name && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Client:</span>
+                          <span className="text-gray-900 dark:text-gray-100 font-medium">
+                            {selectedSale.client_name}
+                          </span>
+                        </div>
+                      )}
+                      {selectedSale.email_address && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Email:</span>
+                          <span className="text-gray-900 dark:text-gray-100 text-right break-all">
+                            {selectedSale.email_address}
+                          </span>
+                        </div>
+                      )}
+                      {selectedSale.phone && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Phone:</span>
+                          <span className="text-gray-900 dark:text-gray-100">
+                            {selectedSale.phone}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sale Information */}
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2.5">
+                  <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5 flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                    Sale Info
+                  </h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Date & Time:</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium text-right">
+                        {new Date(selectedSale.date_time).toLocaleDateString()} at {new Date(selectedSale.date_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Sold by:</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">
+                        {selectedSale.users?.owner_name || 'Unknown User'}
+                      </span>
+                    </div>
+                    {selectedSale.users?.business_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Business:</span>
+                        <span className="text-gray-900 dark:text-gray-100 text-right">
+                          {selectedSale.users.business_name}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSaleDetailsPopupOpen(false)}
+                  className="flex-1 text-sm"
+                  size="sm"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsSaleDetailsPopupOpen(false);
+                    handleEditSale(selectedSale);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  size="sm"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
                 </Button>
               </div>
             </div>

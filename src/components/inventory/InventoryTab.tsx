@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Fish, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, DollarSign, TrendingUp, Calculator, FolderOpen } from "lucide-react";
+import { Fish, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Calendar, RotateCcw, DollarSign, TrendingUp, Calculator, FolderOpen, X, Plus } from "lucide-react";
 import { useCategories } from "@/hooks/use-categories";
 import { useProducts, Product, CreateProductData } from "@/hooks/use-products";
 import { stockMovementsApi } from "@/lib/api";
@@ -67,6 +67,9 @@ interface InventoryTabProps {
   // Category filtering props
   selectedCategoryId?: string;
   onClearCategoryFilter?: () => void;
+  // Add product props
+  isAddProductOpen: boolean;
+  setIsAddProductOpen: (open: boolean) => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -92,6 +95,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   totals,
   selectedCategoryId,
   onClearCategoryFilter,
+  isAddProductOpen,
+  setIsAddProductOpen,
 }) => {
   // Categories hook
   const { categories } = useCategories();
@@ -101,6 +106,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     products,
     loading: productsLoading,
     error: productsError,
+    fetchProducts,
     getLowStockProducts,
     getExpiringProducts,
     getDamagedProducts,
@@ -139,10 +145,47 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     loss_value: 0,
     damaged_approval: false
   });
+  const [editReason, setEditReason] = useState('');
 
   // State for delete product confirmation dialog
   const [isDeleteProductConfirmOpen, setIsDeleteProductConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+
+
+
+  // State for product details popup
+  const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // State for view transition animation
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [nextView, setNextView] = useState<ViewType | null>(null);
+
+  // Handle viewing product details
+  const handleViewProductDetails = (product: Product) => {
+    setSelectedProduct(product);
+    setIsProductDetailsOpen(true);
+  };
+
+  // Handle animated view transitions
+  const handleViewChange = (newView: ViewType) => {
+    if (newView === currentView) return;
+
+    setIsTransitioning(true);
+    setNextView(newView);
+
+    // Start fade out animation
+    setTimeout(() => {
+      setCurrentView(newView);
+      setNextView(null);
+
+      // Start fade in animation
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 200);
+  };
 
   // Handle opening edit product dialog
   const handleEditProduct = (product: Product) => {
@@ -164,6 +207,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
       loss_value: product.loss_value || 0,
       damaged_approval: product.damaged_approval || false
     });
+    setEditReason(''); // Reset reason field
     setIsEditProductOpen(true);
   };
 
@@ -171,26 +215,35 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   const handleSaveEditProduct = async () => {
     if (!editingProduct) return;
 
+    // Validate required reason field
+    if (!editReason.trim()) {
+      alert('Please provide a reason for the changes.');
+      return;
+    }
+
     try {
       // Only send the editable fields to the backend
       const editableFields = {
         name: editFormData.name,
-        category_id: editFormData.category_id,
         box_to_kg_ratio: editFormData.box_to_kg_ratio,
         cost_per_box: editFormData.cost_per_box,
         cost_per_kg: editFormData.cost_per_kg,
         price_per_box: editFormData.price_per_box,
-        price_per_kg: editFormData.price_per_kg
+        price_per_kg: editFormData.price_per_kg,
+        reason: editReason.trim() // Include the reason for the edit
       };
 
       const success = await updateProduct(editingProduct.product_id, editableFields);
       if (success) {
         setIsEditProductOpen(false);
         setEditingProduct(null);
-        // Show success message (you can replace with toast notification)
-        alert('Product updated successfully!');
+        setEditReason(''); // Reset reason
+        // Show success message indicating pending approval
+        alert('Product edit request submitted successfully! Changes are pending approval.');
+        // Refresh stock movements to show the pending requests
+        loadStockMovements();
       } else {
-        alert('Failed to update product. Please try again.');
+        alert('Failed to submit product edit request. Please try again.');
       }
     } catch (error) {
       console.error('Error updating product:', error);
@@ -201,28 +254,111 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   // Handle opening delete confirmation dialog
   const handleDeleteProductClick = (product: Product) => {
     setProductToDelete(product);
+    setDeleteReason(''); // Reset delete reason
     setIsDeleteProductConfirmOpen(true);
   };
 
-  // Handle confirming product deletion
+  // Handle confirming product deletion request
   const handleConfirmDeleteProduct = async () => {
-    if (!productToDelete) return;
+    if (!productToDelete || !deleteReason.trim()) return;
 
     try {
-      const success = await deleteProduct(productToDelete.product_id);
+      const success = await deleteProduct(productToDelete.product_id, deleteReason.trim());
       if (success) {
         setIsDeleteProductConfirmOpen(false);
         setProductToDelete(null);
-        // Show success message (you can replace with toast notification)
-        alert('Product and all related records deleted successfully!');
+        setDeleteReason(''); // Reset reason
+        // Show success message indicating pending approval
+        alert('Product deletion request submitted successfully! Awaiting approval.');
+        // Refresh stock movements to show the pending delete request
+        loadStockMovements();
       } else {
         // Get the specific error message from the hook
-        const errorMessage = error || 'Failed to delete product. Please try again.';
+        const errorMessage = productsError || 'Failed to submit delete request. Please try again.';
         alert(errorMessage);
       }
     } catch (error) {
-      console.error('Error deleting product:', error);
-      alert('An error occurred while deleting the product.');
+      console.error('Error submitting delete request:', error);
+      alert('An error occurred while submitting the delete request.');
+    }
+  };
+
+  // Handle approving a pending product edit
+  const handleApproveProductEdit = async (movementId: string) => {
+    try {
+      const response = await stockMovementsApi.approveProductEdit(movementId);
+      if (response.success) {
+        alert('Product edit approved and applied successfully!');
+        // Refresh stock movements and products
+        loadStockMovements();
+        fetchProducts();
+      } else {
+        alert(response.error || 'Failed to approve product edit');
+      }
+    } catch (error) {
+      console.error('Error approving product edit:', error);
+      alert('An error occurred while approving the product edit.');
+    }
+  };
+
+  // Handle rejecting a pending product edit
+  const handleRejectProductEdit = async (movementId: string) => {
+    const reason = prompt('Please provide a reason for rejecting this change:');
+    if (!reason) return; // User cancelled
+
+    try {
+      const response = await stockMovementsApi.rejectProductEdit(movementId, reason);
+      if (response.success) {
+        alert('Product edit rejected successfully!');
+        // Refresh stock movements
+        loadStockMovements();
+      } else {
+        alert(response.error || 'Failed to reject product edit');
+      }
+    } catch (error) {
+      console.error('Error rejecting product edit:', error);
+      alert('An error occurred while rejecting the product edit.');
+    }
+  };
+
+  // Handle approving a pending product delete request
+  const handleApproveProductDelete = async (movementId: string) => {
+    const confirmed = confirm('Are you sure you want to approve this product deletion? This action cannot be undone and will permanently delete the product and all related records.');
+    if (!confirmed) return;
+
+    try {
+      const response = await stockMovementsApi.approveProductDelete(movementId);
+      if (response.success) {
+        alert('Product deletion approved and executed successfully!');
+        // Refresh stock movements and products
+        loadStockMovements();
+        fetchProducts();
+      } else {
+        alert(response.error || 'Failed to approve product deletion');
+      }
+    } catch (error) {
+      console.error('Error approving product deletion:', error);
+      alert('An error occurred while approving the product deletion.');
+    }
+  };
+
+  // Handle rejecting a pending product delete request
+  const handleRejectProductDelete = async (movementId: string) => {
+    const reason = prompt('Please provide a reason for rejecting this deletion request:');
+    if (!reason) return; // User cancelled
+
+    try {
+      const response = await stockMovementsApi.rejectProductDelete(movementId, reason);
+      if (response.success) {
+        alert('Product deletion request rejected successfully!');
+        // Refresh stock movements
+        loadStockMovements();
+      } else {
+        alert(response.error || 'Failed to reject product deletion');
+      }
+    } catch (error) {
+      console.error('Error rejecting product deletion:', error);
+      alert('An error occurred while rejecting the product deletion.');
     }
   };
 
@@ -255,6 +391,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     }
   }, [currentView]);
 
+
+
   const loadStockMovements = async (filterType?: string) => {
     setLoadingMovements(true);
     setMovementsError(null);
@@ -280,15 +418,176 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     }
   };
 
-  // Function to get current view title
+  // Function to get current view title and description
+  const getCurrentViewInfo = () => {
+    switch (currentView) {
+      case "low-stock":
+        return {
+          title: "Low Stock Items",
+          description: "Products running low on inventory",
+          icon: AlertTriangle,
+          color: "text-yellow-600"
+        };
+      case "damaged":
+        return {
+          title: "Damaged Products",
+          description: "Products reported as damaged",
+          icon: AlertTriangle,
+          color: "text-red-600"
+        };
+      case "expiry":
+        return {
+          title: "Nearing Expiry",
+          description: "Products approaching expiration",
+          icon: Calendar,
+          color: "text-orange-600"
+        };
+      case "stock-adjustment":
+        return {
+          title: "Editing Stock & Movements",
+          description: "Edit stock and track movements",
+          icon: RotateCcw,
+          color: "text-indigo-600"
+        };
+      default:
+        return {
+          title: "All Products",
+          description: "Complete product inventory overview",
+          icon: Fish,
+          color: "text-blue-600"
+        };
+    }
+  };
+
   const getCurrentViewTitle = () => {
     switch (currentView) {
       case "low-stock": return "Low Stock Items";
       case "damaged": return "Damaged Products";
       case "expiry": return "Products Nearing Expiry";
-      case "stock-adjustment": return "Stock Adjustment History";
+      case "stock-adjustment": return "Editing Stock and Movements";
       default: return "Product Inventory Management";
     }
+  };
+
+
+
+  // Helper function to render products in table format
+  const renderProductsTable = (products: Product[]) => {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-3 px-2 text-sm font-medium">Product Name</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Category</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Boxes</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">KG Stock</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Box Ratio</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Pricing</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Cost</th>
+              <th className="text-left py-3 px-2 text-sm font-medium">Profit</th>
+              <th className="text-right py-3 px-2 text-sm font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.product_id} className="border-b hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
+                {/* Product Name */}
+                <td className="py-3 px-2">
+                  <div className="flex items-center gap-2">
+                    <Fish className="h-4 w-4 text-blue-600" />
+                    <button
+                      onClick={() => handleViewProductDetails(product)}
+                      className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
+                    >
+                      {product.name}
+                    </button>
+                  </div>
+                </td>
+
+                {/* Category */}
+                <td className="py-3 px-2 text-sm text-muted-foreground">
+                  {product.product_categories?.name || 'Uncategorized'}
+                </td>
+
+                {/* Boxes */}
+                <td className="py-3 px-2 text-sm">
+                  <div className="flex items-center gap-1">
+                    <Package className="h-3 w-3 text-blue-600" />
+                    <span className="font-medium">{product.quantity_box}</span>
+                  </div>
+                </td>
+
+                {/* KG Stock */}
+                <td className="py-3 px-2 text-sm">
+                  <div className="flex items-center gap-1">
+                    <Scale className="h-3 w-3 text-green-600" />
+                    <span className="font-medium">{product.quantity_kg} kg</span>
+                  </div>
+                </td>
+
+                {/* Box Ratio */}
+                <td className="py-3 px-2 text-sm text-muted-foreground">
+                  {product.box_to_kg_ratio} kg/box
+                </td>
+
+                {/* Pricing */}
+                <td className="py-3 px-2 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs text-blue-600 font-medium">${product.price_per_box.toFixed(2)}/box</div>
+                    <div className="text-xs text-green-600 font-medium">${product.price_per_kg.toFixed(2)}/kg</div>
+                  </div>
+                </td>
+
+                {/* Cost */}
+                <td className="py-3 px-2 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs text-orange-600">${product.cost_per_box.toFixed(2)}/box</div>
+                    <div className="text-xs text-orange-500">${product.cost_per_kg.toFixed(2)}/kg</div>
+                  </div>
+                </td>
+
+                {/* Profit */}
+                <td className="py-3 px-2 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-xs text-emerald-600 font-medium">
+                      ${(product.price_per_box - product.cost_per_box).toFixed(2)}/box
+                    </div>
+                    <div className="text-xs text-emerald-500 font-medium">
+                      ${(product.price_per_kg - product.cost_per_kg).toFixed(2)}/kg
+                    </div>
+                  </div>
+                </td>
+
+                {/* Actions */}
+                <td className="py-3 px-2">
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleEditProduct(product)}
+                      title="Edit product"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteProductClick(product)}
+                      title="Delete product"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   // Render functions for different views
@@ -327,7 +626,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <div className="text-center py-8">
           <Fish className="h-12 w-12 text-blue-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Products Found</h3>
-          <p className="text-muted-foreground">Start by adding your first fish product to the inventory</p>
+          <p className="text-muted-foreground mb-4">Start by adding your first fish product to the inventory</p>
+          <Button
+            onClick={() => setIsAddProductOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
         </div>
       );
     }
@@ -378,115 +684,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </div>
         )}
 
-        {/* Products Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-2 text-sm font-medium">Product Name</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Category</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Boxes</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">KG Stock</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Box Ratio</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Pricing</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Cost</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Profit</th>
-                <th className="text-right py-3 px-2 text-sm font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.product_id} className="border-b hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
-                  {/* Product Name */}
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-2">
-                      <Fish className="h-4 w-4 text-blue-600" />
-                      <div className="font-medium">{product.name}</div>
-                    </div>
-                  </td>
-
-                  {/* Category */}
-              <td className="py-3 px-2 text-sm text-muted-foreground">
-                {product.product_categories?.name || 'Uncategorized'}
-              </td>
-
-              {/* Boxes */}
-              <td className="py-3 px-2 text-sm">
-                <div className="flex items-center gap-1">
-                  <Package className="h-3 w-3 text-blue-600" />
-                  <span className="font-medium">{product.quantity_box}</span>
-                </div>
-              </td>
-
-              {/* KG Stock */}
-              <td className="py-3 px-2 text-sm">
-                <div className="flex items-center gap-1">
-                  <Scale className="h-3 w-3 text-green-600" />
-                  <span className="font-medium">{product.quantity_kg} kg</span>
-                </div>
-              </td>
-
-              {/* Box Ratio */}
-              <td className="py-3 px-2 text-sm text-muted-foreground">
-                {product.box_to_kg_ratio} kg/box
-              </td>
-
-              {/* Pricing */}
-              <td className="py-3 px-2 text-sm">
-                <div className="space-y-1">
-                  <div className="text-xs text-blue-600 font-medium">${product.price_per_box.toFixed(2)}/box</div>
-                  <div className="text-xs text-green-600 font-medium">${product.price_per_kg.toFixed(2)}/kg</div>
-                </div>
-              </td>
-
-              {/* Cost */}
-              <td className="py-3 px-2 text-sm">
-                <div className="space-y-1">
-                  <div className="text-xs text-orange-600">${product.cost_per_box.toFixed(2)}/box</div>
-                  <div className="text-xs text-orange-500">${product.cost_per_kg.toFixed(2)}/kg</div>
-                </div>
-              </td>
-
-              {/* Profit */}
-              <td className="py-3 px-2 text-sm">
-                <div className="space-y-1">
-                  <div className="text-xs text-emerald-600 font-medium">
-                    ${(product.price_per_box - product.cost_per_box).toFixed(2)}/box
-                  </div>
-                  <div className="text-xs text-emerald-500 font-medium">
-                    ${(product.price_per_kg - product.cost_per_kg).toFixed(2)}/kg
-                  </div>
-                </div>
-              </td>
-
-              {/* Actions */}
-              <td className="py-3 px-2">
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleEditProduct(product)}
-                    title="Edit product"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                    onClick={() => handleDeleteProductClick(product)}
-                    title="Delete product"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        {/* Products Display - Table View */}
+        {renderProductsTable(filteredProducts)}
     </div>
     );
   };
@@ -539,7 +738,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
             <tbody>
               {lowStockProducts.map((product) => (
                 <tr key={product.product_id} className="border-b hover:bg-muted/50">
-                  <td className="py-3 px-2 text-sm font-medium">{product.name}</td>
+                  <td className="py-3 px-2 text-sm">
+                    <button
+                      onClick={() => handleViewProductDetails(product)}
+                      className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
+                    >
+                      {product.name}
+                    </button>
+                  </td>
                   <td className="py-3 px-2 text-sm">{product.product_categories?.name || 'Uncategorized'}</td>
                   <td className="py-3 px-2 text-sm">
                     <div className="space-y-1">
@@ -572,6 +778,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                         size="sm"
                         onClick={() => {
                           setProductToDelete(product);
+                          setDeleteReason(''); // Reset reason
                           setIsDeleteProductConfirmOpen(true);
                         }}
                         className="h-8 px-2 text-red-600 hover:text-red-700"
@@ -629,7 +836,13 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               <tr key={damage.damage_id} className="border-b hover:bg-muted/50">
                 <td className="py-3 px-2">
                   <div>
-                    <div className="font-medium">{damage.products?.name || 'Unknown Product'}</div>
+                    <button
+                      onClick={() => damage.products && handleViewProductDetails(damage.products)}
+                      className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
+                      disabled={!damage.products}
+                    >
+                      {damage.products?.name || 'Unknown Product'}
+                    </button>
                     <div className="text-sm text-muted-foreground">
                       {damage.products?.product_categories?.name || 'No Category'}
                     </div>
@@ -765,7 +978,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
 
                 return (
                   <tr key={product.product_id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-2 text-sm font-medium">{product.name}</td>
+                    <td className="py-3 px-2 text-sm">
+                      <button
+                        onClick={() => handleViewProductDetails(product)}
+                        className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
+                      >
+                        {product.name}
+                      </button>
+                    </td>
                     <td className="py-3 px-2 text-sm">{product.product_categories?.name || 'Uncategorized'}</td>
                     <td className="py-3 px-2 text-sm">
                       <div className="space-y-1">
@@ -807,6 +1027,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                           size="sm"
                           onClick={() => {
                             setProductToDelete(product);
+                            setDeleteReason(''); // Reset reason
                             setIsDeleteProductConfirmOpen(true);
                           }}
                           className="h-8 px-2 text-red-600 hover:text-red-700"
@@ -894,6 +1115,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <SelectItem value="new_stock">New Stock</SelectItem>
                 <SelectItem value="damaged">Damaged</SelectItem>
                 <SelectItem value="stock_correction">Stock Corrections</SelectItem>
+                <SelectItem value="product_edit">Product Info Changes</SelectItem>
+                <SelectItem value="product_delete">Delete Requests</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -915,11 +1138,12 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <th className="text-left py-3 px-2 text-sm font-medium w-20">Date</th>
                 <th className="text-left py-3 px-2 text-sm font-medium w-28">Product</th>
                 <th className="text-left py-3 px-2 text-sm font-medium w-24">Type</th>
-                <th className="text-left py-3 px-2 text-sm font-medium w-24">Stock Before</th>
-                <th className="text-left py-3 px-2 text-sm font-medium w-20">Change</th>
+                <th className="text-left py-3 px-2 text-sm font-medium w-24">Field/Stock</th>
+                <th className="text-left py-3 px-2 text-sm font-medium w-20">Change/Values</th>
                 <th className="text-left py-3 px-2 text-sm font-medium w-36">Reason & Details</th>
                 <th className="text-left py-3 px-2 text-sm font-medium w-24">Performed By</th>
                 <th className="text-left py-3 px-2 text-sm font-medium w-16">Status</th>
+                <th className="text-left py-3 px-2 text-sm font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -935,38 +1159,82 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     <td className="py-3 px-2 text-sm">
                       {new Date(movement.created_at).toLocaleDateString()}
                     </td>
-                    <td className="py-3 px-2 text-sm font-medium">
-                      {movement.products?.name || 'Unknown Product'}
+                    <td className="py-3 px-2 text-sm">
+                      <button
+                        onClick={() => movement.products && handleViewProductDetails(movement.products)}
+                        className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
+                        disabled={!movement.products}
+                      >
+                        {movement.products?.name || 'Unknown Product'}
+                      </button>
                     </td>
                     <td className="py-3 px-2 text-sm">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         movement.movement_type === 'damaged' ? 'bg-red-100 text-red-800' :
                         movement.movement_type === 'new_stock' ? 'bg-green-100 text-green-800' :
                         movement.movement_type === 'stock_correction' ? 'bg-blue-100 text-blue-800' :
+                        movement.movement_type === 'product_edit' ? 'bg-purple-100 text-purple-800' :
+                        movement.movement_type === 'product_delete' ? 'bg-red-100 text-red-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {movement.movement_type.replace('_', ' ').toUpperCase()}
+                        {movement.movement_type === 'product_edit' ? 'PRODUCT EDIT' :
+                         movement.movement_type === 'product_delete' ? 'DELETE REQUEST' :
+                         movement.movement_type.replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-sm">
-                      <div className="space-y-1 text-muted-foreground">
-                        <div>{stockBeforeBoxes} boxes</div>
-                        <div>{stockBeforeKg} kg</div>
-                      </div>
+                      {movement.movement_type === 'product_edit' ? (
+                        <div className="text-muted-foreground">
+                          <div className="font-medium text-sm">{movement.field_changed?.replace('_', ' ')}</div>
+                        </div>
+                      ) : movement.movement_type === 'product_delete' ? (
+                        <div className="text-muted-foreground">
+                          <div className="font-medium text-sm text-red-600">Product Deletion</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1 text-muted-foreground">
+                          <div>{stockBeforeBoxes} boxes</div>
+                          <div>{stockBeforeKg} kg</div>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-2 text-sm">
-                      <div className="space-y-1">
-                        {movement.box_change !== 0 && (
-                          <div className={movement.box_change > 0 ? 'text-green-600' : 'text-red-600'}>
-                            {movement.box_change > 0 ? '+' : ''}{movement.box_change}
+                      {movement.movement_type === 'product_edit' ? (
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">From:</div>
+                          <div className="text-red-600 text-xs">{movement.old_value || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground">To:</div>
+                          <div className="text-green-600 text-xs">{movement.new_value || 'N/A'}</div>
+                        </div>
+                      ) : movement.movement_type === 'product_delete' ? (
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Status:</div>
+                          <div className={`text-xs font-medium ${
+                            movement.status === 'pending' ? 'text-orange-600' :
+                            movement.status === 'completed' ? 'text-red-600' :
+                            movement.status === 'rejected' ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>
+                            {movement.status === 'pending' ? 'AWAITING APPROVAL' :
+                             movement.status === 'completed' ? 'DELETED' :
+                             movement.status === 'rejected' ? 'REJECTED' :
+                             movement.new_value || 'N/A'}
                           </div>
-                        )}
-                        {movement.kg_change !== 0 && (
-                          <div className={movement.kg_change > 0 ? 'text-green-600' : 'text-red-600'}>
-                            {movement.kg_change > 0 ? '+' : ''}{movement.kg_change}
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {movement.box_change !== 0 && (
+                            <div className={movement.box_change > 0 ? 'text-green-600' : 'text-red-600'}>
+                              {movement.box_change > 0 ? '+' : ''}{movement.box_change}
+                            </div>
+                          )}
+                          {movement.kg_change !== 0 && (
+                            <div className={movement.kg_change > 0 ? 'text-green-600' : 'text-red-600'}>
+                              {movement.kg_change > 0 ? '+' : ''}{movement.kg_change}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                   <td className="py-3 px-2 text-sm text-muted-foreground">
                     <div className="max-w-xs">
@@ -985,6 +1253,39 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                           {movement.kg_change !== 0 && `${movement.kg_change > 0 ? '+' : ''}${movement.kg_change} kg`}
                         </div>
                       )}
+                      {movement.movement_type === 'product_edit' && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div className="text-purple-600 font-medium">
+                            Field: {movement.field_changed?.replace('_', ' ') || 'N/A'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded text-xs">
+                              From: {movement.old_value || 'N/A'}
+                            </span>
+                            <span className="text-green-600 bg-green-50 px-1.5 py-0.5 rounded text-xs">
+                              To: {movement.new_value || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {movement.movement_type === 'product_delete' && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div className="text-red-600 font-medium">
+                            ⚠️ DELETE REQUEST
+                          </div>
+                          <div className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded text-xs">
+                            Product: {movement.old_value || 'N/A'}
+                          </div>
+                          <div className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            movement.status === 'pending' ? 'text-orange-600 bg-orange-50' :
+                            movement.status === 'completed' ? 'text-red-600 bg-red-50' :
+                            movement.status === 'rejected' ? 'text-green-600 bg-green-50' :
+                            'text-gray-600 bg-gray-50'
+                          }`}>
+                            Status: {movement.status?.toUpperCase() || 'UNKNOWN'}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-2 text-sm">
@@ -999,6 +1300,53 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                       {movement.status.toUpperCase()}
                     </span>
                   </td>
+                  <td className="py-3 px-2 text-sm">
+                    {movement.movement_type === 'product_edit' && movement.status === 'pending' ? (
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleApproveProductEdit(movement.movement_id)}
+                          title="Approve changes"
+                        >
+                          ✓
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRejectProductEdit(movement.movement_id)}
+                          title="Reject changes"
+                        >
+                          ✗
+                        </Button>
+                      </div>
+                    ) : movement.movement_type === 'product_delete' && movement.status === 'pending' ? (
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleApproveProductDelete(movement.movement_id)}
+                          title="Approve deletion"
+                        >
+                          ✓
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRejectProductDelete(movement.movement_id)}
+                          title="Reject deletion"
+                        >
+                          ✗
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </td>
                 </tr>
                 );
               })}
@@ -1010,6 +1358,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   };
 
   // Categories view removed - now handled by dedicated CategoriesTab component
+
 
 
   // Function to render current view
@@ -1026,47 +1375,186 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle>{getCurrentViewTitle()}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* View Dropdown - centered */}
-          <div className="flex justify-center mb-6">
+        <CardContent className="pt-6">
+          {/* View Controls - Mobile-Friendly Design */}
+          <div className="flex justify-center items-center mb-4">
+            {/* Compact View Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="px-4">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View
-                  <ChevronDown className="h-4 w-4 ml-2" />
+                <Button
+                  variant="outline"
+                  className="px-3 py-2 h-auto bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-700 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-800/30 dark:hover:to-indigo-800/30 transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const viewInfo = getCurrentViewInfo();
+                      const IconComponent = viewInfo.icon;
+                      return (
+                        <>
+                          <IconComponent className={`h-4 w-4 ${viewInfo.color}`} />
+                          <div className="hidden sm:flex sm:flex-col sm:items-start">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {viewInfo.title}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {viewInfo.description}
+                            </span>
+                          </div>
+                          <span className="sm:hidden text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {viewInfo.title}
+                          </span>
+                          <ChevronDown className="h-3 w-3 text-gray-400 ml-1" />
+                        </>
+                      );
+                    })()}
+                  </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-48">
-                <DropdownMenuItem onClick={() => setCurrentView("all")}>
-                  <Fish className="mr-2 h-4 w-4 text-blue-600" />
-                  All Products
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentView("low-stock")}>
-                  <AlertTriangle className="mr-2 h-4 w-4 text-yellow-600" />
-                  Low Stock
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentView("damaged")}>
-                  <AlertTriangle className="mr-2 h-4 w-4 text-red-600" />
-                  Damaged
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentView("expiry")}>
-                  <Calendar className="mr-2 h-4 w-4 text-orange-600" />
-                  Expiry
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentView("stock-adjustment")}>
-                  <RotateCcw className="mr-2 h-4 w-4 text-blue-600" />
-                  Stock Adjustment
-                </DropdownMenuItem>
+              <DropdownMenuContent align="center" className="w-64 sm:w-72 p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-lg">
+                <div className="space-y-0.5">
+                  {/* All Products */}
+                  <DropdownMenuItem
+                    onClick={() => handleViewChange("all")}
+                    className={`p-2.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      currentView === "all"
+                        ? "bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                        <Fish className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">All Products</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Complete inventory overview</div>
+                      </div>
+                      {currentView === "all" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Low Stock */}
+                  <DropdownMenuItem
+                    onClick={() => handleViewChange("low-stock")}
+                    className={`p-2.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      currentView === "low-stock"
+                        ? "bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-full bg-yellow-100 dark:bg-yellow-900/50">
+                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Low Stock Items</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Products running low</div>
+                      </div>
+                      {currentView === "low-stock" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-600"></div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Damaged Products */}
+                  <DropdownMenuItem
+                    onClick={() => handleViewChange("damaged")}
+                    className={`p-2.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      currentView === "damaged"
+                        ? "bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/50">
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Damaged Products</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Products reported as damaged</div>
+                      </div>
+                      {currentView === "damaged" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Expiry */}
+                  <DropdownMenuItem
+                    onClick={() => handleViewChange("expiry")}
+                    className={`p-2.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      currentView === "expiry"
+                        ? "bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-full bg-orange-100 dark:bg-orange-900/50">
+                        <Calendar className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Nearing Expiry</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Products approaching expiration</div>
+                      </div>
+                      {currentView === "expiry" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-600"></div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+
+                  {/* Stock Adjustment */}
+                  <DropdownMenuItem
+                    onClick={() => handleViewChange("stock-adjustment")}
+                    className={`p-2.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      currentView === "stock-adjustment"
+                        ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50">
+                        <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Editing Stock & Movements</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Edit stock and track movements</div>
+                      </div>
+                      {currentView === "stock-adjustment" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-600"></div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+
+
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Dynamic View Content */}
-          {renderCurrentView()}
+          {/* Dynamic View Content with Animation */}
+          <div className="relative">
+            {/* Loading overlay during transition */}
+            {isTransitioning && (
+              <div className="absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Loading...
+                </div>
+              </div>
+            )}
+
+            <div
+              className={`transition-all duration-300 ease-in-out ${
+                isTransitioning
+                  ? 'opacity-30 transform translate-y-1 scale-[0.99]'
+                  : 'opacity-100 transform translate-y-0 scale-100'
+              }`}
+            >
+              {renderCurrentView()}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -1175,169 +1663,372 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         </div>
       </div>
 
-      {/* Edit Product Dialog */}
+      {/* Edit Product Dialog - Smaller and Mobile-Friendly */}
       <Dialog open={isEditProductOpen} onOpenChange={setIsEditProductOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
-            <DialogDescription>
-              Update product name, category, box ratio, and pricing information. Inventory quantities and other fields can be managed separately.
+        <DialogContent className="max-w-sm w-[92vw] max-h-[85vh] overflow-y-auto p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base font-semibold">Edit Product</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Update product information. Changes require approval.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground">Basic Information</h4>
-              <div className="grid grid-cols-1 gap-4">
-                {/* Product Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Product Name</Label>
-                  <Input
-                    id="edit-name"
-                    value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    placeholder="Enter product name"
-                  />
-                </div>
+          <div className="space-y-3">
+            {/* Product Name */}
+            <div className="space-y-1">
+              <Label htmlFor="edit-name" className="text-xs font-medium">Product Name</Label>
+              <Input
+                id="edit-name"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                placeholder="Enter product name"
+                className="h-8 text-sm"
+              />
+            </div>
 
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-category">Category</Label>
-                  <Select
-                    value={editFormData.category_id}
-                    onValueChange={(value) => setEditFormData({ ...editFormData, category_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.category_id} value={category.category_id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Box to KG Ratio */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-box-ratio">Box to KG Ratio</Label>
-                  <Input
-                    id="edit-box-ratio"
-                    type="number"
-                    step="0.1"
-                    value={editFormData.box_to_kg_ratio}
-                    onChange={(e) => setEditFormData({ ...editFormData, box_to_kg_ratio: parseFloat(e.target.value) || 20 })}
-                    placeholder="20.0"
-                  />
-                </div>
-              </div>
+            {/* Box to KG Ratio */}
+            <div className="space-y-1">
+              <Label htmlFor="edit-box-ratio" className="text-xs font-medium">Box to KG Ratio</Label>
+              <Input
+                id="edit-box-ratio"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={editFormData.box_to_kg_ratio || ''}
+                onChange={(e) => {
+                  const inputValue = e.target.value;
+                  if (inputValue === '') {
+                    setEditFormData({ ...editFormData, box_to_kg_ratio: 0 });
+                    return;
+                  }
+                  const value = parseFloat(inputValue);
+                  if (!isNaN(value) && value > 0) {
+                    setEditFormData({ ...editFormData, box_to_kg_ratio: value });
+                  }
+                }}
+                onBlur={(e) => {
+                  // Set default value if empty on blur
+                  if (!e.target.value || parseFloat(e.target.value) <= 0) {
+                    setEditFormData({ ...editFormData, box_to_kg_ratio: 20 });
+                  }
+                }}
+                placeholder="20.0"
+                className="h-8 text-sm"
+              />
             </div>
 
             {/* Cost Pricing */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground">Cost Pricing</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Cost Price per Box */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-cost-box">Cost per Box</Label>
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium text-muted-foreground">Cost Pricing</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-cost-box" className="text-xs">Cost/Box</Label>
                   <Input
                     id="edit-cost-box"
                     type="number"
                     step="0.01"
-                    value={editFormData.cost_per_box}
-                    onChange={(e) => setEditFormData({ ...editFormData, cost_per_box: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    value={editFormData.cost_per_box || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === '') {
+                        setEditFormData({ ...editFormData, cost_per_box: 0 });
+                        return;
+                      }
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value) && value >= 0) {
+                        setEditFormData({ ...editFormData, cost_per_box: value });
+                      }
+                    }}
                     placeholder="0.00"
+                    className="h-7 text-xs"
                   />
                 </div>
-
-                {/* Cost Price per KG */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-cost-kg">Cost per KG</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-cost-kg" className="text-xs">Cost/KG</Label>
                   <Input
                     id="edit-cost-kg"
                     type="number"
                     step="0.01"
-                    value={editFormData.cost_per_kg}
-                    onChange={(e) => setEditFormData({ ...editFormData, cost_per_kg: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    value={editFormData.cost_per_kg || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === '') {
+                        setEditFormData({ ...editFormData, cost_per_kg: 0 });
+                        return;
+                      }
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value) && value >= 0) {
+                        setEditFormData({ ...editFormData, cost_per_kg: value });
+                      }
+                    }}
                     placeholder="0.00"
+                    className="h-7 text-xs"
                   />
                 </div>
               </div>
             </div>
 
             {/* Selling Pricing */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground">Selling Pricing</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Selling Price per Box */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-price-box">Selling per Box</Label>
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium text-muted-foreground">Selling Pricing</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-price-box" className="text-xs">Sell/Box</Label>
                   <Input
                     id="edit-price-box"
                     type="number"
                     step="0.01"
-                    value={editFormData.price_per_box}
-                    onChange={(e) => setEditFormData({ ...editFormData, price_per_box: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    value={editFormData.price_per_box || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === '') {
+                        setEditFormData({ ...editFormData, price_per_box: 0 });
+                        return;
+                      }
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value) && value >= 0) {
+                        setEditFormData({ ...editFormData, price_per_box: value });
+                      }
+                    }}
                     placeholder="0.00"
+                    className="h-7 text-xs"
                   />
                 </div>
-
-                {/* Selling Price per KG */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-price-kg">Selling per KG</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-price-kg" className="text-xs">Sell/KG</Label>
                   <Input
                     id="edit-price-kg"
                     type="number"
                     step="0.01"
-                    value={editFormData.price_per_kg}
-                    onChange={(e) => setEditFormData({ ...editFormData, price_per_kg: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    value={editFormData.price_per_kg || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === '') {
+                        setEditFormData({ ...editFormData, price_per_kg: 0 });
+                        return;
+                      }
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value) && value >= 0) {
+                        setEditFormData({ ...editFormData, price_per_kg: value });
+                      }
+                    }}
                     placeholder="0.00"
+                    className="h-7 text-xs"
                   />
                 </div>
               </div>
             </div>
+
+            {/* Reason for Edit - Required */}
+            <div className="space-y-1">
+              <Label htmlFor="edit-reason" className="text-xs font-medium text-red-600">
+                Reason for Changes (Required) *
+              </Label>
+              <textarea
+                id="edit-reason"
+                className="flex min-h-[50px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="Required: Explain why you're making these changes..."
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Changes require approval and will be recorded for audit purposes.
+              </p>
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditProductOpen(false)}>
+          <DialogFooter className="pt-3 flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditProductOpen(false)}
+              className="h-8 text-xs w-full sm:w-auto"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveEditProduct}>
-              Save Changes
+            <Button
+              onClick={handleSaveEditProduct}
+              disabled={!editReason.trim()}
+              className="h-8 text-xs w-full sm:w-auto"
+            >
+              Submit for Approval
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Product Confirmation Dialog */}
+      {/* Product Details Popup */}
+      {isProductDetailsOpen && selectedProduct && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsProductDetailsOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-xs w-full max-h-[80vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-2.5 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <Fish className="h-4 w-4 text-blue-600" />
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  {selectedProduct.name}
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsProductDetailsOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 flex-shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-2.5 space-y-2.5">
+              {/* Category */}
+              <div className="text-center">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {selectedProduct.product_categories?.name || 'Uncategorized'}
+                </p>
+              </div>
+
+              {/* Stock Information */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md p-2">
+                <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5 text-center">Stock</h4>
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div className="text-center">
+                    <div className="text-gray-600 dark:text-gray-400">Boxes</div>
+                    <div className="font-bold text-blue-600">{selectedProduct.quantity_box}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-600 dark:text-gray-400">Kg</div>
+                    <div className="font-bold text-green-600">{selectedProduct.quantity_kg}</div>
+                  </div>
+                </div>
+                <div className="text-center mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {selectedProduct.box_to_kg_ratio} kg/box
+                  </span>
+                </div>
+              </div>
+
+              {/* Pricing Information */}
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-md p-2">
+                <h4 className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5 text-center">Pricing</h4>
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div className="text-center">
+                    <div className="text-gray-600 dark:text-gray-400">Box Price</div>
+                    <div className="font-bold text-green-600">RWF {selectedProduct.price_per_box?.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Profit: {selectedProduct.profit_per_box?.toLocaleString()}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-gray-600 dark:text-gray-400">Kg Price</div>
+                    <div className="font-bold text-green-600">RWF {selectedProduct.price_per_kg?.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Profit: {selectedProduct.profit_per_kg?.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              {(selectedProduct.expiry_date || selectedProduct.damaged_reason) && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-md p-2">
+                  <div className="text-xs text-center space-y-1">
+                    {selectedProduct.expiry_date && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Expires: </span>
+                        <span className="font-semibold text-orange-600">
+                          {new Date(selectedProduct.expiry_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    {selectedProduct.damaged_reason && (
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Damage: </span>
+                        <span className="font-semibold text-red-600">{selectedProduct.damaged_reason}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-1.5 pt-1">
+                <button
+                  onClick={() => {
+                    setIsProductDetailsOpen(false);
+                    handleEditProduct(selectedProduct);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-2 rounded transition-colors flex items-center justify-center gap-1"
+                >
+                  <Edit className="h-3 w-3" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => setIsProductDetailsOpen(false)}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-xs font-medium py-1.5 px-2 rounded transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Product Request Dialog */}
       <Dialog open={isDeleteProductConfirmOpen} onOpenChange={setIsDeleteProductConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
+            <DialogTitle>Request Product Deletion</DialogTitle>
             <DialogDescription className="space-y-2">
-              <p>Are you sure you want to delete "{productToDelete?.name}"?</p>
-              <p className="text-red-600 font-medium">
-                ⚠️ This will permanently delete the product and ALL related records including:
+              <p>Submit a request to delete "{productToDelete?.name}"?</p>
+              <p className="text-orange-600 font-medium">
+                ⚠️ This will request deletion of the product and ALL related records including:
               </p>
-              <ul className="text-sm text-red-600 ml-4 list-disc">
+              <ul className="text-sm text-orange-600 ml-4 list-disc">
                 <li>Stock movements and history</li>
                 <li>Sales records containing this product</li>
                 <li>Stock additions and corrections</li>
                 <li>All inventory tracking data</li>
               </ul>
-              <p className="text-red-600 font-medium">This action cannot be undone.</p>
+              <p className="text-blue-600 font-medium">
+                📋 This request requires approval before the deletion is executed.
+              </p>
             </DialogDescription>
           </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="delete-reason">Reason for Deletion Request (Required)</Label>
+              <textarea
+                id="delete-reason"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Explain why this product should be deleted (e.g., 'Discontinued product', 'Duplicate entry', 'Product no longer available')"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This reason will be reviewed by management and recorded for audit purposes.
+              </p>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteProductConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDeleteProduct}>
-              Delete Product & All Records
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDeleteProduct}
+              disabled={!deleteReason.trim()}
+            >
+              Submit Delete Request
             </Button>
           </DialogFooter>
         </DialogContent>

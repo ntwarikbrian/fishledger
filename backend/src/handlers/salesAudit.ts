@@ -13,7 +13,7 @@ import {
 // Validation schemas
 const createAuditSchema = z.object({
   sale_id: z.string().uuid('Invalid sale ID'),
-  audit_type: z.enum(['quantity_change', 'payment_update', 'deletion']),
+  audit_type: z.enum(['quantity_change', 'payment_method_change', 'deletion']),
   boxes_change: z.number().int().default(0),
   kg_change: z.number().default(0),
   reason: z.string().min(1, 'Reason is required').max(500, 'Reason too long'),
@@ -25,7 +25,7 @@ const getAuditsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sale_id: z.string().uuid().optional(),
-  audit_type: z.enum(['quantity_change', 'payment_update', 'deletion']).optional(),
+  audit_type: z.enum(['quantity_change', 'payment_method_change', 'deletion']).optional(),
   approval_status: z.enum(['pending', 'approved', 'rejected']).optional(),
 });
 
@@ -211,11 +211,25 @@ export const getAuditsHandler = async (c: HonoContext) => {
         productInfo = product;
       }
 
+      // For deleted sales, get sale info from old_values
+      let saleInfo = null;
+      if (audit.sale_id === null && audit.old_values) {
+        // Sale was deleted, use data from old_values
+        saleInfo = {
+          id: audit.old_values.id || 'DELETED',
+          client_name: audit.old_values.client_name || 'Unknown Client',
+          total_amount: audit.old_values.total_amount || 0,
+          payment_status: audit.old_values.payment_status || 'unknown',
+          deleted: true
+        };
+      }
+
       return {
         ...audit,
         performed_by_user: performedByUser,
         approved_by_user: approvedByUser,
-        product_info: productInfo
+        product_info: productInfo,
+        sale_info: saleInfo
       };
     }));
 
@@ -292,7 +306,7 @@ export const approveAuditHandler = async (c: HonoContext) => {
 
     if (auditRecord.audit_type === 'deletion') {
       executionResult = await executeSaleDeletion(c, auditRecord);
-    } else if (auditRecord.audit_type === 'quantity_change' || auditRecord.audit_type === 'payment_update') {
+    } else if (auditRecord.audit_type === 'quantity_change' || auditRecord.audit_type === 'payment_method_change') {
       executionResult = await executeSaleUpdate(c, auditRecord);
     }
 
@@ -421,7 +435,7 @@ export const rejectAuditHandler = async (c: HonoContext) => {
 export const createAuditRecord = async (
   supabase: any,
   saleId: string,
-  auditType: 'quantity_change' | 'payment_update' | 'deletion',
+  auditType: 'quantity_change' | 'payment_method_change' | 'deletion',
   reason: string,
   performedBy: string,
   options: {
@@ -432,18 +446,44 @@ export const createAuditRecord = async (
   } = {}
 ) => {
   try {
+    // Validate audit data before insertion
+    const boxesChange = options.boxesChange || 0;
+    const kgChange = options.kgChange || 0;
+
+    // For quantity_change audits, ensure at least one quantity changed
+    if (auditType === 'quantity_change' && boxesChange === 0 && kgChange === 0) {
+      console.error('Invalid quantity_change audit: both boxes_change and kg_change are zero');
+      return false;
+    }
+
+    // For payment_method_change audits, ensure no quantity changes
+    if (auditType === 'payment_method_change' && (boxesChange !== 0 || kgChange !== 0)) {
+      console.error('Invalid payment_method_change audit: should not have quantity changes');
+      return false;
+    }
+
+    // For deletion audits, ensure no quantity changes
+    if (auditType === 'deletion' && (boxesChange !== 0 || kgChange !== 0)) {
+      console.error('Invalid deletion audit: should not have quantity changes');
+      return false;
+    }
+
+    const auditData = {
+      sale_id: saleId,
+      audit_type: auditType,
+      boxes_change: boxesChange,
+      kg_change: kgChange,
+      reason,
+      performed_by: performedBy,
+      old_values: options.oldValues,
+      new_values: options.newValues,
+    };
+
+    console.log('Inserting audit record:', auditData);
+
     const { error } = await supabase
       .from('sales_audit')
-      .insert({
-        sale_id: saleId,
-        audit_type: auditType,
-        boxes_change: options.boxesChange || 0,
-        kg_change: options.kgChange || 0,
-        reason,
-        performed_by: performedBy,
-        old_values: options.oldValues,
-        new_values: options.newValues,
-      });
+      .insert(auditData);
 
     if (error) {
       console.error('Failed to create audit record:', error);
@@ -586,15 +626,11 @@ const executeSaleUpdate = async (c: HonoContext, auditRecord: any) => {
       if (stockUpdateError) {
         return { success: false, error: `Failed to update product stock: ${stockUpdateError.message}` };
       }
-    } else if (auditRecord.audit_type === 'payment_update') {
-      // Only payment info changed, recalculate remaining amount
-      const currentAmountPaid = newValues.amount_paid ?? oldValues.amount_paid ?? 0;
-      const newRemainingAmount = (newValues.payment_status === 'paid') ? 0 : oldValues.total_amount - currentAmountPaid;
-
+    } else if (auditRecord.audit_type === 'payment_method_change') {
+      // Only payment method changed, update payment method
       finalUpdateData = {
         ...finalUpdateData,
-        amount_paid: currentAmountPaid,
-        remaining_amount: newRemainingAmount,
+        payment_method: newValues.payment_method ?? oldValues.payment_method,
       };
     }
 

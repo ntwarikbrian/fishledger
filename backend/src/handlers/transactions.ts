@@ -968,3 +968,139 @@ export const createTransactionWithImageHandler = async (c: HonoContext) => {
     return c.json(createErrorResponse('Failed to create transaction', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
+
+/**
+ * Get debtors (customers with unpaid or partially paid sales)
+ */
+export const getDebtorsHandler = async (c: HonoContext) => {
+  try {
+    // Get query parameters for filtering
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '50');
+    const search = c.req.query('search') || '';
+    const sortBy = c.req.query('sortBy') || 'remaining_amount';
+    const sortOrder = c.req.query('sortOrder') || 'desc';
+
+    // Build query for unpaid/partial sales
+    let query = c.get('supabase')
+      .from('sales')
+      .select(`
+        id,
+        client_name,
+        email_address,
+        phone,
+        total_amount,
+        amount_paid,
+        remaining_amount,
+        payment_status,
+        payment_method,
+        date_time,
+        products (
+          product_id,
+          name,
+          category_id,
+          product_categories (
+            category_id,
+            name
+          )
+        ),
+        users (
+          user_id,
+          owner_name,
+          business_name
+        )
+      `)
+      .in('payment_status', ['pending', 'partial'])
+      .gt('remaining_amount', 0);
+
+    // Apply search filter
+    if (search) {
+      query = query.or(`client_name.ilike.%${search}%,email_address.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+
+    // Apply sorting
+    const validSortFields = ['client_name', 'remaining_amount', 'total_amount', 'date_time'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'remaining_amount';
+    const order = sortOrder === 'asc' ? { ascending: true } : { ascending: false };
+    query = query.order(sortField, order);
+
+    // Get total count for pagination
+    const { count: totalCount } = await c.get('supabase')
+      .from('sales')
+      .select('*', { count: 'exact', head: true })
+      .in('payment_status', ['pending', 'partial'])
+      .gt('remaining_amount', 0);
+
+    // Apply pagination
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: sales, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch debtors: ${error.message}`);
+    }
+
+    // Group sales by client to aggregate debts
+    const debtorMap = new Map();
+
+    sales?.forEach(sale => {
+      const clientKey = sale.client_name || 'Unknown Client';
+
+      if (debtorMap.has(clientKey)) {
+        const existing = debtorMap.get(clientKey);
+        existing.totalOwed += sale.remaining_amount || 0;
+        existing.totalAmount += sale.total_amount || 0;
+        existing.totalPaid += sale.amount_paid || 0;
+        existing.salesCount += 1;
+        existing.sales.push(sale);
+        // Update contact info if not available
+        if (!existing.email && sale.email_address) existing.email = sale.email_address;
+        if (!existing.phone && sale.phone) existing.phone = sale.phone;
+        // Keep the most recent sale date
+        if (new Date(sale.date_time) > new Date(existing.lastSaleDate)) {
+          existing.lastSaleDate = sale.date_time;
+        }
+      } else {
+        debtorMap.set(clientKey, {
+          clientName: clientKey,
+          email: sale.email_address || null,
+          phone: sale.phone || null,
+          totalOwed: sale.remaining_amount || 0,
+          totalAmount: sale.total_amount || 0,
+          totalPaid: sale.amount_paid || 0,
+          salesCount: 1,
+          lastSaleDate: sale.date_time,
+          sales: [sale]
+        });
+      }
+    });
+
+    // Convert map to array and sort by total owed
+    const debtors = Array.from(debtorMap.values()).sort((a, b) => b.totalOwed - a.totalOwed);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil((totalCount || 0) / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return c.json({
+      success: true,
+      data: debtors,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
+
+  } catch (error) {
+    console.error('Error fetching debtors:', error);
+    return c.json(createErrorResponse('Failed to fetch debtors', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+  }
+};

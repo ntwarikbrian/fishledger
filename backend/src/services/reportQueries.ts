@@ -108,25 +108,28 @@ export async function fetchSalesReportData(
     paymentStatus?: string;
   }
 ): Promise<SalesReportData[]> {
-  // Build query for sales data
+  // Build query for sales data with joins to get product and user information
   let query = supabase
     .from('sales')
     .select(`
       id,
       date_time,
       client_name,
-      email_address,
-      phone,
       total_amount,
-      amount_paid,
-      remaining_amount,
       payment_method,
       payment_status,
       boxes_quantity,
       kg_quantity,
       box_price,
       kg_price,
-      product_id
+      products!inner(
+        name,
+        cost_per_box,
+        cost_per_kg
+      ),
+      users!inner(
+        owner_name
+      )
     `)
     .order('date_time', { ascending: false });
 
@@ -156,24 +159,59 @@ export async function fetchSalesReportData(
     return [];
   }
 
-  // Transform data
-  return sales.map(sale => ({
-    saleId: sale.id,
-    saleDate: sale.date_time,
-    customerName: sale.client_name || 'Walk-in Customer',
-    totalAmount: sale.total_amount,
-    taxAmount: 0, // No tax field in current schema
-    discountAmount: sale.remaining_amount,
-    paymentMethod: sale.payment_method,
-    paymentStatus: sale.payment_status,
-    items: [{
-      productName: 'Fish Product',
-      sku: `${sale.boxes_quantity}B/${sale.kg_quantity}KG`,
-      quantity: sale.boxes_quantity + (sale.kg_quantity / 20),
-      unitPrice: sale.boxes_quantity > 0 ? sale.box_price : sale.kg_price,
-      totalPrice: sale.total_amount,
-    }],
-  }));
+  // Transform data with new structure
+  return sales.map(sale => {
+    // Calculate profit for this sale
+    const product = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+    const user = Array.isArray(sale.users) ? sale.users[0] : sale.users;
+    const boxProfit = sale.boxes_quantity * (sale.box_price - (product?.cost_per_box || 0));
+    const kgProfit = sale.kg_quantity * (sale.kg_price - (product?.cost_per_kg || 0));
+    const totalProfit = boxProfit + kgProfit;
+
+    // Format quantity sold display
+    const quantityParts = [];
+    if (sale.boxes_quantity > 0) {
+      quantityParts.push(`${sale.boxes_quantity} boxes`);
+    }
+    if (sale.kg_quantity > 0) {
+      quantityParts.push(`${sale.kg_quantity} kg`);
+    }
+    const quantitySold = quantityParts.join(', ') || '0';
+
+    // Format unit price display (cost price from products table)
+    const costPriceParts = [];
+    if (sale.boxes_quantity > 0) {
+      costPriceParts.push(`$${(product?.cost_per_box || 0).toFixed(2)}/box`);
+    }
+    if (sale.kg_quantity > 0) {
+      costPriceParts.push(`$${(product?.cost_per_kg || 0).toFixed(2)}/kg`);
+    }
+    const unitPrice = costPriceParts.join(', ') || '$0.00';
+
+    // Format selling price display (actual selling prices)
+    const sellingPriceParts = [];
+    if (sale.boxes_quantity > 0) {
+      sellingPriceParts.push(`$${sale.box_price.toFixed(2)}/box`);
+    }
+    if (sale.kg_quantity > 0) {
+      sellingPriceParts.push(`$${sale.kg_price.toFixed(2)}/kg`);
+    }
+    const sellingPrice = sellingPriceParts.join(', ') || '$0.00';
+
+    return {
+      productName: product?.name || 'Unknown Product',
+      quantitySold,
+      clientName: sale.client_name || 'Walk-in Customer',
+      unitPrice, // Now shows cost price
+      sellingPrice, // Now shows actual selling price
+      profit: totalProfit,
+      total: sale.total_amount,
+      seller: user?.owner_name || 'Unknown Seller',
+      paymentStatus: sale.payment_status,
+      saleDate: sale.date_time,
+      paymentMethod: sale.payment_method,
+    };
+  });
 }
 
 /**

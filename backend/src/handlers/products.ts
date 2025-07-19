@@ -366,6 +366,74 @@ export const createProductHandler = async (c: HonoContext) => {
 };
 
 /**
+ * Helper function to create pending product edit requests
+ */
+const createPendingProductEditRequests = async (
+  supabase: any,
+  productId: string,
+  oldProduct: any,
+  newData: any,
+  userId: string,
+  reason?: string
+) => {
+  const pendingRequests: Promise<any>[] = [];
+
+  // Define trackable fields with their display names
+  const trackableFields = {
+    name: 'Product Name',
+    box_to_kg_ratio: 'Box to KG Ratio',
+    cost_per_box: 'Cost per Box',
+    cost_per_kg: 'Cost per KG',
+    price_per_box: 'Price per Box',
+    price_per_kg: 'Price per KG',
+    boxed_low_stock_threshold: 'Low Stock Threshold',
+    expiry_date: 'Expiry Date'
+  };
+
+  // Compare old and new values for each trackable field
+  for (const [field, displayName] of Object.entries(trackableFields)) {
+    if (newData.hasOwnProperty(field)) {
+      const oldValue = oldProduct[field];
+      const newValue = newData[field];
+
+      // Only create pending request if value actually changed
+      if (oldValue !== newValue) {
+        const pendingRequest = supabase
+          .from('stock_movements')
+          .insert({
+            product_id: productId,
+            movement_type: 'product_edit',
+            box_change: 0,
+            kg_change: 0,
+            field_changed: field,
+            old_value: oldValue?.toString() || '',
+            new_value: newValue?.toString() || '',
+            reason: reason || `${displayName} update request`,
+            performed_by: userId,
+            status: 'pending' // Set status to pending for approval
+          });
+
+        pendingRequests.push(pendingRequest);
+      }
+    }
+  }
+
+  // Execute all pending request insertions
+  if (pendingRequests.length > 0) {
+    try {
+      await Promise.all(pendingRequests);
+      console.log(`Created ${pendingRequests.length} pending product edit requests for product ${productId}`);
+      return pendingRequests.length;
+    } catch (error) {
+      console.error('Failed to create pending product edit requests:', error);
+      throw error;
+    }
+  }
+
+  return 0;
+};
+
+/**
  * Update product handler
  */
 export const updateProductHandler = async (c: HonoContext) => {
@@ -401,9 +469,14 @@ export const updateProductHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Check if product exists
-    const exists = await recordExists(c.get('supabase'), 'products', productId, 'product_id');
-    if (!exists) {
+    // Get current product data for audit trail
+    const { data: currentProduct, error: fetchError } = await c.get('supabase')
+      .from('products')
+      .select('*')
+      .eq('product_id', productId)
+      .single();
+
+    if (fetchError || !currentProduct) {
       return c.json({
         success: false,
         error: 'Product not found',
@@ -412,22 +485,34 @@ export const updateProductHandler = async (c: HonoContext) => {
       }, 404);
     }
 
-    // Update product
-    const { data: updatedProduct, error } = await c.get('supabase')
-      .from('products')
-      .update(validation.data)
-      .eq('product_id', productId)
-      .select()
-      .single();
+    // Create pending edit requests instead of applying changes immediately
+    const pendingRequestsCount = await createPendingProductEditRequests(
+      c.get('supabase'),
+      productId,
+      currentProduct,
+      validation.data,
+      c.get('user')?.id,
+      body.reason // Optional reason from request body
+    );
 
-    if (error) {
-      throw new Error(`Failed to update product: ${error.message}`);
+    if (pendingRequestsCount === 0) {
+      return c.json({
+        success: true,
+        message: 'No changes detected',
+        data: currentProduct,
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      });
     }
 
     return c.json({
       success: true,
-      message: 'Product updated successfully',
-      data: updatedProduct,
+      message: `Product edit request submitted successfully. ${pendingRequestsCount} change(s) pending approval.`,
+      data: {
+        product_id: productId,
+        pending_changes: pendingRequestsCount,
+        status: 'pending_approval'
+      },
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
     });
@@ -452,6 +537,11 @@ export const updateProductHandler = async (c: HonoContext) => {
   }
 };
 
+// Validation schema for delete product request
+const deleteProductSchema = z.object({
+  reason: z.string().min(1, 'Reason for deletion is required'),
+});
+
 /**
  * Delete product handler with cascading delete
  * This will automatically delete all related records when a product is deleted
@@ -469,9 +559,35 @@ export const deleteProductHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Check if product exists
-    const exists = await recordExists(c.get('supabase'), 'products', productId, 'product_id');
-    if (!exists) {
+    // Parse and validate request body for deletion reason
+    const body = await c.req.json().catch(() => ({}));
+    const validation = deleteProductSchema.safeParse(body);
+
+    if (!validation.success) {
+      const errors = validation.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: errors,
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+
+    const { reason } = validation.data;
+
+    // Get product details before deletion for audit trail
+    const { data: product, error: fetchError } = await c.get('supabase')
+      .from('products')
+      .select('*')
+      .eq('product_id', productId)
+      .single();
+
+    if (fetchError || !product) {
       return c.json({
         success: false,
         error: 'Product not found',
@@ -480,69 +596,31 @@ export const deleteProductHandler = async (c: HonoContext) => {
       }, 404);
     }
 
-    console.log(`Cascading delete for product ${productId} - removing all related records`);
-
-    // Delete all related records in the correct order to avoid foreign key constraints
-
-    // 1. Delete stock movements (these reference the product)
-    const { error: stockMovementsError } = await c.get('supabase')
+    // Create pending delete request instead of immediately deleting
+    const { error: insertError } = await c.get('supabase')
       .from('stock_movements')
-      .delete()
-      .eq('product_id', productId);
+      .insert({
+        product_id: productId,
+        movement_type: 'product_delete',
+        box_change: 0,
+        kg_change: 0,
+        field_changed: 'product_deletion',
+        old_value: `Product: ${product.name} (ID: ${product.product_id})`,
+        new_value: 'PENDING_DELETION',
+        reason: `Product deletion request: ${reason}`,
+        performed_by: c.get('user')?.id,
+        status: 'pending' // Set status to pending for approval
+      });
 
-    if (stockMovementsError) {
-      console.error('Error deleting stock movements:', stockMovementsError);
-      // Continue with deletion - don't fail the entire operation
+    if (insertError) {
+      throw new Error(`Failed to create delete request: ${insertError.message}`);
     }
 
-    // 2. Delete sale items (these reference the product)
-    const { error: saleItemsError } = await c.get('supabase')
-      .from('sale_items')
-      .delete()
-      .eq('product_id', productId);
-
-    if (saleItemsError) {
-      console.error('Error deleting sale items:', saleItemsError);
-      // Continue with deletion - don't fail the entire operation
-    }
-
-    // 3. Delete stock additions (these reference the product)
-    const { error: stockAdditionsError } = await c.get('supabase')
-      .from('stock_additions')
-      .delete()
-      .eq('product_id', productId);
-
-    if (stockAdditionsError) {
-      console.error('Error deleting stock additions:', stockAdditionsError);
-      // Continue with deletion - don't fail the entire operation
-    }
-
-    // 4. Delete stock corrections (these reference the product)
-    const { error: stockCorrectionsError } = await c.get('supabase')
-      .from('stock_corrections')
-      .delete()
-      .eq('product_id', productId);
-
-    if (stockCorrectionsError) {
-      console.error('Error deleting stock corrections:', stockCorrectionsError);
-      // Continue with deletion - don't fail the entire operation
-    }
-
-    // 5. Finally, delete the product itself
-    const { error: productError } = await c.get('supabase')
-      .from('products')
-      .delete()
-      .eq('product_id', productId);
-
-    if (productError) {
-      throw new Error(`Failed to delete product: ${productError.message}`);
-    }
-
-    console.log(`Successfully deleted product ${productId} and all related records`);
+    console.log(`Created pending delete request for product ${productId}`);
 
     return c.json({
       success: true,
-      message: 'Product and all related records deleted successfully',
+      message: 'Product deletion request submitted successfully! Awaiting approval.',
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
     });

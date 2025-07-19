@@ -152,11 +152,11 @@ export const useProducts = () => {
   /**
    * Delete a product (with cascading delete of all related records)
    */
-  const deleteProduct = async (id: string): Promise<boolean> => {
+  const deleteProduct = async (id: string, reason?: string): Promise<boolean> => {
     try {
       setError(null);
 
-      const response = await productsApi.delete(id);
+      const response = await productsApi.delete(id, reason);
 
       if (response.success) {
         // Refresh the products list

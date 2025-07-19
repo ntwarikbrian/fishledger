@@ -127,19 +127,33 @@ export const changeLanguage = (lng: string) => {
 // Helper function to get available languages
 export const getAvailableLanguages = () => languages;
 
-// Helper function to format currency
+// Helper function to format currency (deprecated - use useCurrency hook instead)
+// This function is kept for backward compatibility but should be replaced with useCurrency
 export const formatCurrency = (amount: number, lng?: string) => {
-  const language = lng || i18n.language;
-  if (language === 'rw') {
-    return new Intl.NumberFormat('rw-RW', {
+  // Try to get currency from localStorage first
+  const savedCurrency = localStorage.getItem('currency') as 'USD' | 'RWF' | null;
+  const currency = savedCurrency || 'USD';
+
+  try {
+    const options: Intl.NumberFormatOptions = {
       style: 'currency',
-      currency: 'RWF'
-    }).format(amount);
-  } else {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+      currency: currency,
+      minimumFractionDigits: currency === 'RWF' ? 0 : 2,
+      maximumFractionDigits: currency === 'RWF' ? 0 : 2,
+    };
+
+    const locale = currency === 'RWF' ? 'rw-RW' : 'en-US';
+    return new Intl.NumberFormat(locale, options).format(amount);
+  } catch (error) {
+    // Fallback formatting
+    const symbol = currency === 'RWF' ? 'RWF' : '$';
+    const formattedAmount = currency === 'RWF'
+      ? Math.round(amount).toLocaleString()
+      : amount.toFixed(2);
+
+    return currency === 'USD'
+      ? `${symbol}${formattedAmount}`
+      : `${formattedAmount} ${symbol}`;
   }
 };
 

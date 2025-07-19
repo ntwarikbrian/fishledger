@@ -302,7 +302,7 @@ export const deleteFolderHandler = async (c: HonoContext) => {
     // Check if folder exists and belongs to user
     const { data: folder, error: checkError } = await c.get('supabase')
       .from('folders')
-      .select('folder_id, file_count')
+      .select('folder_id, file_count, is_permanent')
       .eq('folder_id', id)
       .eq('created_by', user.id)
       .single();

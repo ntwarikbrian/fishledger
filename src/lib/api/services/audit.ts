@@ -13,8 +13,8 @@ import type { ApiResponse } from '../types';
 export interface AuditRecord {
   audit_id: string;
   timestamp: string;
-  sale_id: string;
-  audit_type: 'quantity_change' | 'payment_update' | 'deletion';
+  sale_id: string | null; // Can be null for deleted sales
+  audit_type: 'quantity_change' | 'payment_method_change' | 'deletion';
   boxes_change: number;
   kg_change: number;
   reason: string;
@@ -56,19 +56,26 @@ export interface AuditRecord {
     product_id: string;
     name: string;
   };
+  sale_info?: {
+    id: string;
+    client_name: string;
+    total_amount: number;
+    payment_status: string;
+    deleted: boolean;
+  };
 }
 
 export interface AuditFilters {
   page?: number;
   limit?: number;
   sale_id?: string;
-  audit_type?: 'quantity_change' | 'payment_update' | 'deletion';
+  audit_type?: 'quantity_change' | 'payment_method_change' | 'deletion';
   approval_status?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface CreateAuditRequest {
   sale_id: string;
-  audit_type: 'quantity_change' | 'payment_update' | 'deletion';
+  audit_type: 'quantity_change' | 'payment_method_change' | 'deletion';
   boxes_change?: number;
   kg_change?: number;
   reason: string;

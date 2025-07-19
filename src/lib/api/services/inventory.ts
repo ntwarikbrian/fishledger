@@ -43,6 +43,66 @@ export interface SaleRequest {
   phone?: string;
 }
 
+// New interface for the fish sales algorithm
+export interface FishSaleRequest {
+  product_id: string;
+  requested_kg: number; // Customer requests kg, system handles box conversion
+  requested_boxes?: number; // Optional: Customer can also request specific number of boxes
+  payment_method: 'momo_pay' | 'cash' | 'bank_transfer';
+  payment_status?: 'paid' | 'pending' | 'partial';
+  amount_paid?: number;
+  client_id?: string;
+  client_name?: string;
+  email_address?: string;
+  phone?: string;
+}
+
+// Fish sale API response interface (extends ApiResponse with additional properties)
+export interface FishSaleApiResponse {
+  success: boolean;
+  data?: any;
+  message?: string;
+  error?: string;
+  timestamp?: Date;
+  algorithm?: {
+    name: string;
+    description: string;
+    steps: string[];
+    result: {
+      sold_kg: number;
+      sold_boxes?: number;
+      used_boxes: number;
+      total_amount: number;
+    };
+  };
+  stockInfo?: {
+    before: { boxes: number; kg: number };
+    after: { boxes: number; kg: number };
+  };
+}
+
+export interface FishSaleResult {
+  success: boolean;
+  data?: any;
+  message?: string;
+  algorithm?: {
+    name: string;
+    description: string;
+    steps: string[];
+    result: {
+      sold_kg: number;
+      sold_boxes?: number;
+      used_boxes: number;
+      total_amount: number;
+    };
+  };
+  stockInfo?: {
+    before: { boxes: number; kg: number };
+    after: { boxes: number; kg: number };
+  };
+  error?: string;
+}
+
 export interface SaleResult {
   success: boolean;
   id?: string;
@@ -78,6 +138,8 @@ export interface Sale {
   kg_quantity: number;
   box_price: number;
   kg_price: number;
+  profit_per_box: number;
+  profit_per_kg: number;
   total_amount: number;
   amount_paid?: number;
   remaining_amount?: number;
@@ -108,7 +170,7 @@ export interface Sale {
 export interface StockMovement {
   movement_id: string;
   product_id: string;
-  movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'sale' | 'unboxing';
+  movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'product_edit' | 'sale' | 'unboxing';
   box_change: number;
   kg_change: number;
   damaged_id?: string;
@@ -119,6 +181,10 @@ export interface StockMovement {
   status: 'pending' | 'completed' | 'cancelled';
   performed_by: string;
   created_at: string;
+  // Product edit specific fields
+  field_changed?: string;
+  old_value?: string;
+  new_value?: string;
   products?: {
     product_id: string;
     name: string;
@@ -157,7 +223,7 @@ export interface StockMovement {
 class InventoryService {
   
   /**
-   * Create a new sale
+   * Create a new sale (legacy method)
    */
   async createSale(saleRequest: SaleRequest): Promise<SaleResult> {
     try {
@@ -186,6 +252,46 @@ class InventoryService {
       return {
         success: false,
         error: error.message || 'Failed to create sale',
+      };
+    }
+  }
+
+  /**
+   * Create a fish sale using the new algorithm
+   * Customer requests kg, system automatically handles box conversion
+   */
+  async createFishSale(fishSaleRequest: FishSaleRequest): Promise<FishSaleResult> {
+    try {
+      console.log('🐟 Creating fish sale with request:', JSON.stringify(fishSaleRequest, null, 2));
+      const response = await apiClient.post('/api/sales/fish', fishSaleRequest) as FishSaleApiResponse;
+
+      console.log('🐟 Fish sale API response:', response);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Fish sale creation failed');
+      }
+
+      return {
+        success: true,
+        data: response.data,
+        message: response.message,
+        algorithm: response.algorithm,
+        stockInfo: response.stockInfo
+      };
+    } catch (error: any) {
+      console.error('Error creating fish sale:', error);
+
+      // Handle ApiClientError specifically
+      if (error.name === 'ApiClientError') {
+        return {
+          success: false,
+          error: error.message || 'Failed to create fish sale',
+        };
+      }
+
+      return {
+        success: false,
+        error: error.message || 'Failed to create fish sale',
       };
     }
   }
@@ -435,13 +541,16 @@ class InventoryService {
    */
   async createStockMovement(data: {
     product_id: string;
-    movement_type: 'damaged' | 'new_stock' | 'stock_correction';
-    box_change: number;
-    kg_change: number;
+    movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'product_edit' | 'product_delete';
+    box_change?: number;
+    kg_change?: number;
     reason?: string;
     damaged_id?: string;
     stock_addition_id?: string;
     correction_id?: string;
+    field_changed?: string;
+    old_value?: string;
+    new_value?: string;
   }): Promise<StockMovement> {
     try {
       const response = await apiClient.post('/api/stock-movements', data);
@@ -531,6 +640,73 @@ class InventoryService {
   }
 
   /**
+   * Validate fish sale request
+   */
+  validateFishSaleRequest(fishSaleRequest: FishSaleRequest): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!fishSaleRequest.product_id) {
+      errors.push('Product ID is required');
+    }
+
+    // At least one quantity (kg or boxes) must be specified
+    if ((!fishSaleRequest.requested_kg || fishSaleRequest.requested_kg <= 0) &&
+        (!fishSaleRequest.requested_boxes || fishSaleRequest.requested_boxes <= 0)) {
+      errors.push('Either requested kg or requested boxes must be greater than 0');
+    }
+
+    // Validate kg if specified
+    if (fishSaleRequest.requested_kg && fishSaleRequest.requested_kg > 0) {
+      if (fishSaleRequest.requested_kg < 0.1) {
+        errors.push('Requested kg must be at least 0.1');
+      }
+      if (fishSaleRequest.requested_kg > 10000) {
+        errors.push('Requested kg cannot exceed 10,000');
+      }
+    }
+
+    // Validate boxes if specified
+    if (fishSaleRequest.requested_boxes && fishSaleRequest.requested_boxes > 0) {
+      if (fishSaleRequest.requested_boxes < 1) {
+        errors.push('Requested boxes must be at least 1');
+      }
+      if (fishSaleRequest.requested_boxes > 1000) {
+        errors.push('Requested boxes cannot exceed 1,000');
+      }
+    }
+
+    if (!fishSaleRequest.payment_method) {
+      errors.push('Payment method is required');
+    }
+
+    if (!['momo_pay', 'cash', 'bank_transfer'].includes(fishSaleRequest.payment_method)) {
+      errors.push('Invalid payment method');
+    }
+
+    if (fishSaleRequest.payment_status && !['paid', 'pending', 'partial'].includes(fishSaleRequest.payment_status)) {
+      errors.push('Invalid payment status');
+    }
+
+    if (fishSaleRequest.amount_paid && fishSaleRequest.amount_paid < 0) {
+      errors.push('Amount paid cannot be negative');
+    }
+
+    // Client name is required for pending or partial payments
+    if ((fishSaleRequest.payment_status === 'pending' || fishSaleRequest.payment_status === 'partial') && !fishSaleRequest.client_name?.trim()) {
+      errors.push('Client name is required for pending or partial payments');
+    }
+
+    if (fishSaleRequest.email_address && !this.isValidEmail(fishSaleRequest.email_address)) {
+      errors.push('Invalid email format');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
    * Helper method to validate email format
    */
   private isValidEmail(email: string): boolean {
@@ -539,13 +715,34 @@ class InventoryService {
   }
 
   /**
-   * Format currency for display
+   * Format currency for display (deprecated - use useCurrency hook instead)
    */
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    // Try to get currency from localStorage first
+    const savedCurrency = localStorage.getItem('currency') as 'USD' | 'RWF' | null;
+    const currency = savedCurrency || 'USD';
+
+    try {
+      const options: Intl.NumberFormatOptions = {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: currency === 'RWF' ? 0 : 2,
+        maximumFractionDigits: currency === 'RWF' ? 0 : 2,
+      };
+
+      const locale = currency === 'RWF' ? 'rw-RW' : 'en-US';
+      return new Intl.NumberFormat(locale, options).format(amount);
+    } catch (error) {
+      // Fallback formatting
+      const symbol = currency === 'RWF' ? 'RWF' : '$';
+      const formattedAmount = currency === 'RWF'
+        ? Math.round(amount).toLocaleString()
+        : amount.toFixed(2);
+
+      return currency === 'USD'
+        ? `${symbol}${formattedAmount}`
+        : `${formattedAmount} ${symbol}`;
+    }
   }
 
   /**

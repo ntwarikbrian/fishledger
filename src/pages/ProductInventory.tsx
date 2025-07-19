@@ -27,7 +27,7 @@ const ProductInventory = () => {
   const [currentView, setCurrentView] = useState<ViewType>("all");
 
   // Active tab state for dynamic header content
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState("categories");
 
   // Category filtering state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
@@ -251,46 +251,23 @@ const ProductInventory = () => {
         {/* Product Management Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="inventory">
-              <Package className="mr-2 h-4 w-4" />
-              {t("inventory.tabs.inventory")}
+            <TabsTrigger value="categories">
+              <FolderOpen className="mr-2 h-4 w-4" />
+              {t("inventory.tabs.categories")}
             </TabsTrigger>
             <TabsTrigger value="add">
               <Plus className="mr-2 h-4 w-4" />
               {t("inventory.tabs.addProduct")}
             </TabsTrigger>
-            <TabsTrigger value="categories">
-              <FolderOpen className="mr-2 h-4 w-4" />
-              {t("inventory.tabs.categories")}
+            <TabsTrigger value="inventory">
+              <Package className="mr-2 h-4 w-4" />
+              {t("inventory.tabs.inventory")}
             </TabsTrigger>
           </TabsList>
 
-          {/* Inventory Tab Content */}
-          <TabsContent value="inventory" className="space-y-4">
-            <InventoryTab
-              currentView={getInventoryView(currentView)}
-              setCurrentView={handleInventoryViewChange}
-              isAddCategoryOpen={isAddCategoryOpen}
-              setIsAddCategoryOpen={setIsAddCategoryOpen}
-              categoryForm={categoryForm}
-              setCategoryForm={setCategoryForm}
-              handleCreateCategory={handleCreateCategory}
-              isEditCategoryOpen={isEditCategoryOpen}
-              setIsEditCategoryOpen={setIsEditCategoryOpen}
-              editingCategory={editingCategory}
-              setEditingCategory={setEditingCategory}
-              editCategoryForm={editCategoryForm}
-              setEditCategoryForm={setEditCategoryForm}
-              handleEditCategory={handleEditCategory}
-              handleDeleteCategory={handleDeleteCategory}
-              isDeleteConfirmOpen={isDeleteConfirmOpen}
-              setIsDeleteConfirmOpen={setIsDeleteConfirmOpen}
-              categoryToDelete={categoryToDelete}
-              setCategoryToDelete={setCategoryToDelete}
-              totals={totals}
-              selectedCategoryId={selectedCategoryId}
-              onClearCategoryFilter={handleClearCategoryFilter}
-            />
+          {/* Categories Tab Content */}
+          <TabsContent value="categories" className="space-y-6">
+            <CategoriesTab onCategoryClick={handleCategoryClick} />
           </TabsContent>
 
           {/* Add Product Tab Content */}
@@ -317,9 +294,34 @@ const ProductInventory = () => {
             />
           </TabsContent>
 
-          {/* Categories Tab Content */}
-          <TabsContent value="categories" className="space-y-6">
-            <CategoriesTab onCategoryClick={handleCategoryClick} />
+          {/* Inventory Tab Content */}
+          <TabsContent value="inventory" className="space-y-4">
+            <InventoryTab
+              currentView={getInventoryView(currentView)}
+              setCurrentView={handleInventoryViewChange}
+              isAddCategoryOpen={isAddCategoryOpen}
+              setIsAddCategoryOpen={setIsAddCategoryOpen}
+              categoryForm={categoryForm}
+              setCategoryForm={setCategoryForm}
+              handleCreateCategory={handleCreateCategory}
+              isEditCategoryOpen={isEditCategoryOpen}
+              setIsEditCategoryOpen={setIsEditCategoryOpen}
+              editingCategory={editingCategory}
+              setEditingCategory={setEditingCategory}
+              editCategoryForm={editCategoryForm}
+              setEditCategoryForm={setEditCategoryForm}
+              handleEditCategory={handleEditCategory}
+              handleDeleteCategory={handleDeleteCategory}
+              isDeleteConfirmOpen={isDeleteConfirmOpen}
+              setIsDeleteConfirmOpen={setIsDeleteConfirmOpen}
+              categoryToDelete={categoryToDelete}
+              setCategoryToDelete={setCategoryToDelete}
+              totals={totals}
+              selectedCategoryId={selectedCategoryId}
+              onClearCategoryFilter={handleClearCategoryFilter}
+              isAddProductOpen={isAddProductOpen}
+              setIsAddProductOpen={setIsAddProductOpen}
+            />
           </TabsContent>
 
         </Tabs>

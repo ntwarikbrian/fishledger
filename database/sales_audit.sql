@@ -4,8 +4,8 @@
 CREATE TABLE IF NOT EXISTS sales_audit (
     audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-    audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_update', 'deletion')),
+    sale_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+    audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_method_change', 'deletion')),
     boxes_change INTEGER DEFAULT 0,
     kg_change DECIMAL(10,2) DEFAULT 0.00,
     reason TEXT NOT NULL,
@@ -45,7 +45,7 @@ COMMENT ON TABLE sales_audit IS 'Audit trail for all sales-related changes';
 COMMENT ON COLUMN sales_audit.audit_id IS 'Unique identifier for each audit record';
 COMMENT ON COLUMN sales_audit.timestamp IS 'When the audit event occurred';
 COMMENT ON COLUMN sales_audit.sale_id IS 'Reference to the sales record that was modified';
-COMMENT ON COLUMN sales_audit.audit_type IS 'Type of change: quantity_change, payment_update, or deletion';
+COMMENT ON COLUMN sales_audit.audit_type IS 'Type of change: quantity_change, payment_method_change, or deletion';
 COMMENT ON COLUMN sales_audit.boxes_change IS 'Change in box quantity (can be negative)';
 COMMENT ON COLUMN sales_audit.kg_change IS 'Change in kg quantity (can be negative)';
 COMMENT ON COLUMN sales_audit.reason IS 'Description of why the change was made';

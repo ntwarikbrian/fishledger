@@ -12,6 +12,8 @@ import type {
   ProductReportData,
   CustomerReportData,
   GeneralReportData,
+  TopSellingReportData,
+  DebtorCreditReportData,
   ReportType,
 } from '../types';
 
@@ -258,42 +260,80 @@ export async function generateSalesReportPdf(
 
     // Calculate summary statistics
     const totalSales = data.length;
-    const totalRevenue = data.reduce((sum, sale) => sum + sale.totalAmount, 0);
-    const totalTax = data.reduce((sum, sale) => sum + sale.taxAmount, 0);
-    const totalDiscount = data.reduce((sum, sale) => sum + sale.discountAmount, 0);
-    const averageSale = totalSales > 0 ? totalRevenue / totalSales : 0;
+    const totalRevenue = data.reduce((sum, sale) => sum + sale.total, 0);
+    const totalProfit = data.reduce((sum, sale) => sum + sale.profit, 0);
 
-    // Add summary section
+    // Calculate payment method amounts (handle database payment method values)
+    const paymentMethods = data.reduce((acc, sale) => {
+      const method = sale.paymentMethod.toLowerCase();
+      if (!acc[method]) {
+        acc[method] = 0;
+      }
+      acc[method] += sale.total;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Map database payment method values to display amounts
+    const momoAmount = paymentMethods['momo_pay'] || paymentMethods['momo'] || 0;
+    const cashAmount = paymentMethods['cash'] || 0;
+    const bankTransferAmount = paymentMethods['bank_transfer'] || paymentMethods['bank transfer'] || 0;
+
+    // Add summary section with payment method amounts instead of averages
     currentY = addPDFSummary(doc, 'Sales Summary', [
       { label: 'Total Sales', value: totalSales.toString() },
       { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}` },
-      { label: 'Total Tax', value: `$${totalTax.toFixed(2)}` },
-      { label: 'Total Discount', value: `$${totalDiscount.toFixed(2)}` },
-      { label: 'Average Sale', value: `$${averageSale.toFixed(2)}` }
+      { label: 'Total Profit', value: `$${totalProfit.toFixed(2)}` },
+      { label: 'Momo Amount', value: `$${momoAmount.toFixed(2)}` },
+      { label: 'Cash Amount', value: `$${cashAmount.toFixed(2)}` },
+      { label: 'Bank Transfer Amount', value: `$${bankTransferAmount.toFixed(2)}` }
     ], currentY);
 
-    // Prepare table data
+    // Handle empty data case
+    if (data.length === 0) {
+      // Add a message for empty data using jsPDF API
+      doc.setFontSize(14);
+      doc.setTextColor(102, 102, 102); // #666666
+      doc.text('No sales data found for the selected date range.', 105, currentY + 40, { align: 'center' });
+
+      doc.setFontSize(12);
+      doc.text('Try selecting a different date range or check if there are any sales recorded.', 105, currentY + 60, { align: 'center' });
+
+      // Add footer and return early
+      addPDFFooter(doc);
+      return;
+    }
+
+    // Prepare table data with shortened column headers to reduce space
     const headers = [
-      'Sale ID',
-      'Date',
-      'Customer',
-      'Amount',
-      'Payment',
-      'Status'
+      'Product',
+      'Quantity',
+      'Client',
+      'Unit Price',
+      'Selling',
+      'Profit',
+      'Total',
+      'Seller',
+      'Status',
+      'Method'
     ];
 
     const rows = data.map(sale => [
-      sale.saleId.substring(0, 8),
-      new Date(sale.saleDate).toLocaleDateString(),
-      (sale.customerName || 'Walk-in').substring(0, 15),
-      `$${sale.totalAmount.toFixed(0)}`,
-      sale.paymentMethod.toUpperCase().substring(0, 8),
-      sale.paymentStatus.toUpperCase().substring(0, 8)
+      sale.productName.substring(0, 20), // Increased space to show full product names
+      sale.quantitySold.substring(0, 15), // Increased space for quantity display
+      sale.clientName.substring(0, 15), // Increased space for client names
+      sale.unitPrice.substring(0, 20), // Increased space for unit prices
+      sale.sellingPrice.substring(0, 20), // Increased space for selling prices
+      `$${sale.profit.toFixed(2)}`,
+      `$${sale.total.toFixed(2)}`,
+      sale.seller.substring(0, 15), // Increased space for seller names
+      sale.paymentStatus.toUpperCase().substring(0, 10), // Increased space for status
+      sale.paymentMethod.toUpperCase().substring(0, 12) // Increased space for payment method
     ]);
 
-    // Add table
+    // Add table with much wider column widths to prevent truncation
     addPDFTable(doc, headers, rows, {
-      columnWidths: [25, 25, 35, 25, 25, 25],
+      columnWidths: [25, 20, 18, 25, 25, 18, 18, 18, 15, 18], // Total: 200 (much wider columns)
+      startX: 10, // Reduced left margin to accommodate wider table
       startY: currentY
     });
 
@@ -325,11 +365,11 @@ export async function generateFinancialReportPdf(
 
     // Top Selling Products section
     if (data.topSellingProducts && data.topSellingProducts.length > 0) {
-      doc.fontSize(14)
-         .fillColor('#374151')
-         .text('Top Selling Products');
+      doc.setFontSize(14);
+      doc.setTextColor(55, 65, 81); // #374151
+      doc.text('Top Selling Products', 20, doc.y || 100);
 
-      doc.moveDown(0.5);
+      doc.y = (doc.y || 100) + 10;
 
       const productHeaders = ['Product Name', 'Quantity Sold', 'Revenue'];
       const productRows = data.topSellingProducts.map(product => [
@@ -346,11 +386,11 @@ export async function generateFinancialReportPdf(
 
     // Payment Methods section
     if (data.salesByPaymentMethod && data.salesByPaymentMethod.length > 0) {
-      doc.fontSize(14)
-         .fillColor('#374151')
-         .text('Sales by Payment Method');
+      doc.setFontSize(14);
+      doc.setTextColor(55, 65, 81); // #374151
+      doc.text('Sales by Payment Method', 20, doc.y || 120);
 
-      doc.moveDown(0.5);
+      doc.y = (doc.y || 120) + 10;
 
       const paymentHeaders = ['Payment Method', 'Transaction Count', 'Total Amount'];
       const paymentRows = data.salesByPaymentMethod.map(method => [
@@ -591,49 +631,36 @@ export async function generateGeneralReportPdf(
  * Generate Top Selling Report PDF
  */
 export async function generateTopSellingReportPdf(
-  data: ProductReportData[],
+  data: TopSellingReportData[],
   period?: { from: string; to: string }
 ): Promise<ArrayBuffer> {
   return createPDFDocument((doc) => {
     // Add header
     addPDFHeader(doc, 'Top Selling Products Report', period);
 
-    // Sort products by sales performance and take top items
-    const topSellingData = data
-      .sort((a, b) => b.totalSold - a.totalSold)
-      .slice(0, 20); // Top 20 selling products
-
-    // Add summary
-    addPDFSummary(doc, 'Top Selling Products Summary', [
-      { label: 'Total Products Analyzed', value: data.length.toString() },
-      { label: 'Top Products Shown', value: topSellingData.length.toString() }
-    ], 60);
-
-    // Prepare table data
+    // Prepare table data with the requested columns only
     const headers = [
-      'Rank',
-      'Product Name',
-      'Units Sold',
-      'Revenue',
-      'Profit Margin',
-      'Profit Amount'
+      'Product',
+      'Total Sold',
+      'Total Revenue',
+      'Damaged Rate'
     ];
 
-    const rows = topSellingData.map((product, index) => {
-      const profit = product.totalRevenue * (product.profitMargin / 100);
+    const rows = data.map((product) => {
       return [
-        (index + 1).toString(),
-        product.name,
-        product.totalSold.toString(),
-        `$${product.totalRevenue.toFixed(2)}`,
-        `${product.profitMargin.toFixed(1)}%`,
-        `$${profit.toFixed(2)}`
+        product.product || 'N/A',
+        product.totalSold?.toString() || '0',
+        `$${(product.totalRevenue || 0).toFixed(2)}`,
+        `${(product.damageRate || 0).toFixed(2)}%`
       ];
     });
 
-    // Add table
+    // Add table directly after header with properly centered and sized columns
+    // A4 page width is ~210mm, with 20mm margins on each side = 170mm usable width
+    // Center the table by using startX and balanced column widths
     addPDFTable(doc, headers, rows, {
-      columnWidths: [40, 120, 80, 80, 80, 80],
+      columnWidths: [60, 35, 50, 35], // Total: 180 units - fits well within 170mm usable width
+      startX: 25, // Start further from left edge to center the table
       startY: doc.y
     });
 
@@ -646,56 +673,43 @@ export async function generateTopSellingReportPdf(
  * Generate Debtor/Credit Report PDF
  */
 export async function generateDebtorCreditReportPdf(
-  data: SalesReportData[],
+  data: DebtorCreditReportData[],
   period?: { from: string; to: string }
 ): Promise<ArrayBuffer> {
   return createPDFDocument((doc) => {
     // Add header
-    addPDFHeader(doc, 'Debtor/Credit Report', period);
+    let currentY = addPDFHeader(doc, 'Debtor/Credit Report', period);
 
-    // Filter for unpaid and failed sales
-    const debtorData = data.filter(sale =>
-      sale.paymentStatus === 'pending' || sale.paymentStatus === 'failed'
-    );
-
-    const totalOutstanding = debtorData.reduce((sum, sale) => sum + sale.totalAmount, 0);
-
-    // Add summary
-    addPDFSummary(doc, 'Outstanding Payments Summary', [
-      { label: 'Total Sales Analyzed', value: data.length.toString() },
-      { label: 'Outstanding Sales', value: debtorData.length.toString() },
-      { label: 'Total Outstanding Amount', value: `$${totalOutstanding.toFixed(2)}` }
-    ], 60);
-
-    if (debtorData.length > 0) {
-      // Prepare table data
+    if (data.length > 0) {
+      // Prepare table data with the requested columns (email after phone)
       const headers = [
-        'Sale ID',
-        'Date',
-        'Customer',
-        'Amount',
-        'Status',
-        'Payment Method'
+        'Client Name',
+        'Amount Owed',
+        'Amount Paid',
+        'Phone Number',
+        'Email'
       ];
 
-      const rows = debtorData.map(sale => [
-        sale.saleId.substring(0, 8) + '...',
-        new Date(sale.saleDate).toLocaleDateString(),
-        sale.customerName || 'Walk-in Customer',
-        `$${sale.totalAmount.toFixed(2)}`,
-        sale.paymentStatus.toUpperCase(),
-        sale.paymentMethod.toUpperCase()
+      const rows = data.map(debtor => [
+        debtor.clientName,
+        `$${debtor.amountOwed.toFixed(2)}`,
+        `$${debtor.amountPaid.toFixed(2)}`,
+        debtor.phoneNumber,
+        debtor.email
       ]);
 
-      // Add table
+      // Add table with properly sized columns that don't touch page edges
+      // A4 page width is ~210mm, with generous margins to prevent cutoff
+      // Total width must be much smaller to ensure email column is fully visible
       addPDFTable(doc, headers, rows, {
-        columnWidths: [80, 80, 100, 80, 70, 90],
-        startY: doc.y
+        columnWidths: [35, 30, 30, 35, 40], // Total: 170 units - significantly reduced
+        startX: 25, // More left margin to center the table
+        startY: currentY + 10
       });
     } else {
-      doc.fontSize(12)
-         .fillColor('#059669')
-         .text('No outstanding payments found!', { align: 'center' });
+      doc.setFontSize(12);
+      doc.setTextColor(5, 150, 105); // #059669
+      doc.text('No outstanding payments found!', 105, currentY + 20, { align: 'center' });
     }
 
     // Add footer
@@ -712,59 +726,16 @@ export async function generateProfitLossReportPdf(
 ): Promise<ArrayBuffer> {
   return createPDFDocument((doc) => {
     // Add header
-    addPDFHeader(doc, 'Profit and Loss Report', period);
+    let currentY = addPDFHeader(doc, 'Profit and Loss Report', period);
 
-    // Add financial summary
-    let currentY = addPDFSummary(doc, 'Financial Overview', [
-      { label: 'Total Sales', value: `$${data.totalSales.toFixed(2)}` },
+    // Add profit and loss items in list format as requested
+    currentY = addPDFSummary(doc, 'Profit and Loss Statement', [
+      { label: 'Total Revenue', value: `$${data.totalSales.toFixed(2)}` },
+      { label: 'Cost of Stock', value: `$${(data.costOfStock || 0).toFixed(2)}` },
+      { label: 'Damaged Value', value: `$${(data.damagedValue || 0).toFixed(2)}` },
       { label: 'Total Expenses', value: `$${data.totalExpenses.toFixed(2)}` },
-      { label: 'Total Deposits', value: `$${data.totalDeposits.toFixed(2)}` },
-      { label: 'Net Profit', value: `$${data.netProfit.toFixed(2)}` },
-      { label: 'Sales Count', value: data.salesCount.toString() },
-      { label: 'Average Sale Amount', value: `$${data.averageSaleAmount.toFixed(2)}` }
-    ], 60);
-
-    // Top Selling Products section
-    if (data.topSellingProducts && data.topSellingProducts.length > 0) {
-      doc.fontSize(14)
-         .fillColor('#374151')
-         .text('Top Selling Products');
-
-      doc.moveDown(0.5);
-
-      const productHeaders = ['Product Name', 'Quantity Sold', 'Revenue'];
-      const productRows = data.topSellingProducts.map(product => [
-        product.productName,
-        product.quantitySold.toString(),
-        `$${product.totalRevenue.toFixed(2)}`
-      ]);
-
-      addPDFTable(doc, productHeaders, productRows, {
-        columnWidths: [200, 100, 100],
-        startY: doc.y
-      });
-    }
-
-    // Payment Methods section
-    if (data.salesByPaymentMethod && data.salesByPaymentMethod.length > 0) {
-      doc.fontSize(14)
-         .fillColor('#374151')
-         .text('Sales by Payment Method');
-
-      doc.moveDown(0.5);
-
-      const paymentHeaders = ['Payment Method', 'Transaction Count', 'Total Amount'];
-      const paymentRows = data.salesByPaymentMethod.map(method => [
-        method.paymentMethod.toUpperCase(),
-        method.transactionCount.toString(),
-        `$${method.totalAmount.toFixed(2)}`
-      ]);
-
-      addPDFTable(doc, paymentHeaders, paymentRows, {
-        columnWidths: [150, 125, 125],
-        startY: doc.y
-      });
-    }
+      { label: 'Total Profit', value: `$${data.netProfit.toFixed(2)}` }
+    ], currentY);
 
     // Add footer
     addPDFFooter(doc);

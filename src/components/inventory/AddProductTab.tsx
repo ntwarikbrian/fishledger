@@ -13,10 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Fish, AlertTriangle, Plus, Package, Save, Camera, Scan, Upload, X, Calculator, FolderOpen } from "lucide-react";
+import { Fish, AlertTriangle, Plus, Package, Save, Camera, Scan, Upload, X, Calculator } from "lucide-react";
 import { categoriesApi, productsApi, stockAdditions, stockCorrections } from "@/lib/api";
 import { useProducts } from "@/hooks/use-products";
-import { useCategories } from "@/hooks/use-categories";
 import { toast } from "sonner";
 
 // Types for the product form
@@ -93,41 +92,8 @@ const AddProductTab: React.FC<AddProductTabProps> = ({
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
-  // Add Category state
-  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [categoryForm, setCategoryForm] = useState({
-    name: '',
-    description: ''
-  });
-
   // Products hook for refreshing the list after adding a product
   const { products, fetchProducts } = useProducts();
-
-  // Categories hook for category management
-  const { createCategory } = useCategories();
-
-  // Handle create category
-  const handleCreateCategory = async () => {
-    if (!categoryForm.name.trim()) {
-      toast.error('Category name is required');
-      return;
-    }
-
-    const success = await createCategory({
-      name: categoryForm.name.trim(),
-      description: categoryForm.description.trim() || undefined
-    });
-
-    if (success) {
-      setCategoryForm({ name: '', description: '' });
-      setIsAddCategoryOpen(false);
-      toast.success('Category created successfully!');
-      // Refresh categories list
-      loadCategories();
-    } else {
-      toast.error('Failed to create category');
-    }
-  };
 
   // State for damaged product form
   const [damagedFormData, setDamagedFormData] = useState({
@@ -1199,65 +1165,7 @@ const AddProductTab: React.FC<AddProductTabProps> = ({
           </CardContent>
         </Card>
 
-        {/* Add Category Square */}
-        <Card className="hover-card aspect-square">
-          <CardContent className="p-4 h-full flex flex-col items-center justify-center text-center space-y-3">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-              <FolderOpen className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold">Add Product Category</h3>
-              <p className="text-xs text-muted-foreground">
-                Create new product categories to organize your fish inventory for better management and classification
-              </p>
-            </div>
-            <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add Category
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add New Category</DialogTitle>
-                  <DialogDescription>
-                    Create a new product category to organize your fish inventory.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="categoryName">Category Name *</Label>
-                    <Input
-                      id="categoryName"
-                      placeholder="e.g., Premium Fish, Fresh Water Fish"
-                      value={categoryForm.name}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="categoryDescription">Description</Label>
-                    <Textarea
-                      id="categoryDescription"
-                      placeholder="Brief description of this category..."
-                      value={categoryForm.description}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddCategoryOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateCategory} className="bg-blue-600 hover:bg-blue-700">
-                    Create Category
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );

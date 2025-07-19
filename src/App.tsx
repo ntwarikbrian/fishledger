@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import Dashboard from "./pages/Index";
 import ProductInventory from "./pages/ProductInventory";
 import Sales from "./pages/Sales";
@@ -30,7 +31,8 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <TooltipProvider>
+      <CurrencyProvider>
+        <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -47,6 +49,7 @@ const App = () => (
             <Route path="/customers" element={<AuthGuard><Customers /></AuthGuard>} />
             <Route path="/transactions" element={<AuthGuard><Transactions /></AuthGuard>} />
             <Route path="/transactions/deposits" element={<AuthGuard><Transactions /></AuthGuard>} />
+            <Route path="/transactions/debtors" element={<AuthGuard><Transactions /></AuthGuard>} />
             <Route path="/staff" element={<AuthGuard><Staff /></AuthGuard>} />
             <Route path="/expenses" element={<AuthGuard><Expenses /></AuthGuard>} />
             <Route path="/expenses/add-expenses" element={<AuthGuard><Expenses /></AuthGuard>} />
@@ -58,7 +61,8 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </TooltipProvider>
+        </TooltipProvider>
+      </CurrencyProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

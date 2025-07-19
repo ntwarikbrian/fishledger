@@ -83,6 +83,10 @@ export interface ApiConfig {
       'debtor-credit': string;
       'profit-loss': string;
     };
+    settings: {
+      get: string;
+      update: string;
+    };
   };
 }
 
@@ -154,6 +158,7 @@ export const createApiConfig = (): ApiConfig => {
       sales: {
         list: '/api/sales',
         create: '/api/sales',
+        createFish: '/api/sales/fish', // New fish sales algorithm endpoint
         get: (id: string) => `/api/sales/${id}`,
         update: (id: string) => `/api/sales/${id}`,
         delete: (id: string) => `/api/sales/${id}`,
@@ -204,6 +209,10 @@ export const createApiConfig = (): ApiConfig => {
         'top-selling': '/api/reports/top-selling/pdf',
         'debtor-credit': '/api/reports/debtor-credit/pdf',
         'profit-loss': '/api/reports/profit-loss/pdf',
+      },
+      settings: {
+        get: '/api/settings',
+        update: '/api/settings',
       },
     },
   };

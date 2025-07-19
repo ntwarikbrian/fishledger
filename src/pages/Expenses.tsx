@@ -53,6 +53,7 @@ import {
 import { useExpenseCategories } from "@/hooks/use-expense-categories";
 import { useExpenses } from "@/hooks/use-expenses";
 import { toast } from "sonner";
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 // Types for expenses
 interface ExpenseCategory {
@@ -80,6 +81,7 @@ interface Expense {
 const Expenses = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { formatCurrency } = useCurrency();
 
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -922,9 +924,9 @@ const Expenses = () => {
 
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span className="font-medium text-green-600">Spent: ${category.spent.toFixed(2)}</span>
+                                <span className="font-medium text-green-600">Spent: {formatCurrency(category.spent)}</span>
                                 {category.totalBudget && (
-                                  <span className="text-muted-foreground">Budget: ${category.totalBudget.toFixed(2)}</span>
+                                  <span className="text-muted-foreground">Budget: {formatCurrency(category.totalBudget)}</span>
                                 )}
                               </div>
 
@@ -949,12 +951,12 @@ const Expenses = () => {
                                       {budgetUsed.toFixed(1)}% used
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                      ${(category.totalBudget - category.spent).toFixed(2)} remaining
+                                      {formatCurrency(category.totalBudget - category.spent)} remaining
                                     </p>
                                   </div>
                                   {budgetUsed > 100 && (
                                     <p className="text-xs text-red-600 font-medium">
-                                      ⚠️ Over budget by ${(category.spent - category.totalBudget).toFixed(2)}
+                                      ⚠️ Over budget by {formatCurrency(category.spent - category.totalBudget)}
                                     </p>
                                   )}
                                 </>
@@ -987,7 +989,7 @@ const Expenses = () => {
                       </div>
                       <div>
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Expenses</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">${totalExpenses.toFixed(2)}</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(totalExpenses)}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -1007,7 +1009,7 @@ const Expenses = () => {
                       </div>
                       <div>
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Monthly Budget</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">${monthlyBudget.toFixed(2)}</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(monthlyBudget)}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -1030,7 +1032,7 @@ const Expenses = () => {
                       <div>
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Budget Remaining</p>
                         <p className="text-lg font-bold text-gray-900 dark:text-white">
-                          ${monthlyBudget > 0 ? (monthlyBudget - totalExpenses).toFixed(2) : '0.00'}
+                          {formatCurrency(monthlyBudget > 0 ? (monthlyBudget - totalExpenses) : 0)}
                         </p>
                       </div>
                     </div>
@@ -1203,7 +1205,7 @@ const Expenses = () => {
                               )}
                             </td>
                             <td className="py-3 px-2">
-                              <span className="font-medium">${expense.amount.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(expense.amount)}</span>
                             </td>
                             <td className="py-3 px-2">
                               <div className="flex items-center text-sm">

@@ -9,6 +9,7 @@ import {
   getSalesHandler,
   getSaleHandler,
   createSaleHandler,
+  createFishSaleHandler,
   updateSaleHandler,
   deleteSaleHandler,
 } from '../handlers/sales';
@@ -33,8 +34,11 @@ sales.get('/', getSalesHandler);
 // GET /sales/:id - Get specific sale by ID
 sales.get('/:id', getSaleHandler);
 
-// POST /sales - Create new sale
+// POST /sales - Create new sale (legacy endpoint)
 sales.post('/', createSaleHandler);
+
+// POST /sales/fish - Create fish sale using the new algorithm (recommended)
+sales.post('/fish', createFishSaleHandler);
 
 // PUT /sales/:id - Update existing sale
 sales.put('/:id', updateSaleHandler);

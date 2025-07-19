@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS sales (
     box_price DECIMAL(8,2) NOT NULL, -- Price per box at time of sale
     kg_price DECIMAL(8,2) NOT NULL, -- Price per kg at time of sale
 
+    -- Profit tracking
+    profit_per_box DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Profit per box (selling price - cost price)
+    profit_per_kg DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Profit per kg (selling price - cost price)
+
     -- Total amount for this sale
     total_amount DECIMAL(10,2) NOT NULL, -- Total amount calculated
 
@@ -48,6 +52,8 @@ COMMENT ON COLUMN sales.boxes_quantity IS 'Number of boxes sold';
 COMMENT ON COLUMN sales.kg_quantity IS 'Kg sold (loose weight)';
 COMMENT ON COLUMN sales.box_price IS 'Price per box at time of sale';
 COMMENT ON COLUMN sales.kg_price IS 'Price per kg at time of sale';
+COMMENT ON COLUMN sales.profit_per_box IS 'Profit per box (selling price - cost price)';
+COMMENT ON COLUMN sales.profit_per_kg IS 'Profit per kg (selling price - cost price)';
 COMMENT ON COLUMN sales.total_amount IS 'Total amount for this sale';
 COMMENT ON COLUMN sales.amount_paid IS 'Amount already paid (for partial payments)';
 COMMENT ON COLUMN sales.remaining_amount IS 'Outstanding balance (total_amount - amount_paid)';
@@ -67,6 +73,8 @@ CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
 CREATE INDEX IF NOT EXISTS idx_sales_performed_by ON sales(performed_by);
 CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
 CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
+CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
+CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
@@ -108,6 +116,11 @@ BEGIN
     -- Ensure pricing fields are not negative
     IF NEW.box_price < 0 OR NEW.kg_price < 0 THEN
         RAISE EXCEPTION 'Prices cannot be negative';
+    END IF;
+
+    -- Ensure profit fields are not null (can be negative for losses)
+    IF NEW.profit_per_box IS NULL OR NEW.profit_per_kg IS NULL THEN
+        RAISE EXCEPTION 'Profit fields cannot be null';
     END IF;
 
     -- Ensure client_name is provided

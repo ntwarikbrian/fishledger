@@ -15,6 +15,8 @@ import type {
   ProductReportData,
   CustomerReportData,
   GeneralReportData,
+  TopSellingReportData,
+  DebtorCreditReportData,
   ReportResponse,
   ApiResponse
 } from '../types';
@@ -366,25 +368,28 @@ export async function generateSalesReport(c: Context<{ Bindings: Env; Variables:
     const paymentMethod = c.req.query('paymentMethod');
     const paymentStatus = c.req.query('paymentStatus');
 
-    // Build query for sales data
+    // Build query for sales data with joins to get product and user information
     let query = supabase
       .from('sales')
       .select(`
         id,
         date_time,
         client_name,
-        email_address,
-        phone,
         total_amount,
-        amount_paid,
-        remaining_amount,
         payment_method,
         payment_status,
         boxes_quantity,
         kg_quantity,
         box_price,
         kg_price,
-        product_id
+        products!inner(
+          name,
+          cost_per_box,
+          cost_per_kg
+        ),
+        users!inner(
+          owner_name
+        )
       `)
       .order('date_time', { ascending: false });
 
@@ -412,38 +417,96 @@ export async function generateSalesReport(c: Context<{ Bindings: Env; Variables:
     }
 
     if (!sales || sales.length === 0) {
-      return c.json(createHandlerErrorResponse('No sales data found', requestId), 404);
+      // Generate an empty report with a message indicating no data was found
+      const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
+      const emptyPdfBuffer = await generateSalesReportPdf([], period);
+
+      // Return PDF response with appropriate headers
+      return new Response(emptyPdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="sales-report-${new Date().toISOString().split('T')[0]}.pdf"`,
+          'Cache-Control': 'no-cache',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      });
     }
 
-    // Transform data for PDF generation
-    const salesData: SalesReportData[] = sales.map(sale => ({
-      saleId: sale.id,
-      saleDate: sale.date_time,
-      customerName: sale.client_name || 'Walk-in Customer',
-      totalAmount: sale.total_amount,
-      taxAmount: 0, // No tax field in current schema
-      discountAmount: sale.remaining_amount, // Use remaining amount as discount equivalent
-      paymentMethod: sale.payment_method,
-      paymentStatus: sale.payment_status,
-      items: [{
-        productName: 'Fish Product', // Simplified product name
-        sku: `${sale.boxes_quantity}B/${sale.kg_quantity}KG`,
-        quantity: sale.boxes_quantity + (sale.kg_quantity / 20), // Convert to unified quantity
-        unitPrice: sale.boxes_quantity > 0 ? sale.box_price : sale.kg_price,
-        totalPrice: sale.total_amount,
-      }],
-    }));
+    // Transform data for PDF generation with new structure
+    const salesData: SalesReportData[] = sales.map(sale => {
+      // Calculate profit for this sale
+      const product = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+      const user = Array.isArray(sale.users) ? sale.users[0] : sale.users;
+      const boxProfit = sale.boxes_quantity * (sale.box_price - (product?.cost_per_box || 0));
+      const kgProfit = sale.kg_quantity * (sale.kg_price - (product?.cost_per_kg || 0));
+      const totalProfit = boxProfit + kgProfit;
+
+      // Format quantity sold display
+      const quantityParts = [];
+      if (sale.boxes_quantity > 0) {
+        quantityParts.push(`${sale.boxes_quantity} boxes`);
+      }
+      if (sale.kg_quantity > 0) {
+        quantityParts.push(`${sale.kg_quantity} kg`);
+      }
+      const quantitySold = quantityParts.join(', ') || '0';
+
+      // Format unit price display (cost price from products table)
+      const costPriceParts = [];
+      if (sale.boxes_quantity > 0) {
+        costPriceParts.push(`$${(product?.cost_per_box || 0).toFixed(2)}/box`);
+      }
+      if (sale.kg_quantity > 0) {
+        costPriceParts.push(`$${(product?.cost_per_kg || 0).toFixed(2)}/kg`);
+      }
+      const unitPrice = costPriceParts.join(', ') || '$0.00';
+
+      // Format selling price display (actual selling prices)
+      const sellingPriceParts = [];
+      if (sale.boxes_quantity > 0) {
+        sellingPriceParts.push(`$${sale.box_price.toFixed(2)}/box`);
+      }
+      if (sale.kg_quantity > 0) {
+        sellingPriceParts.push(`$${sale.kg_price.toFixed(2)}/kg`);
+      }
+      const sellingPrice = sellingPriceParts.join(', ') || '$0.00';
+
+      return {
+        productName: product?.name || 'Unknown Product',
+        quantitySold,
+        clientName: sale.client_name || 'Walk-in Customer',
+        unitPrice, // Now shows cost price
+        sellingPrice, // Now shows actual selling price
+        profit: totalProfit,
+        total: sale.total_amount,
+        seller: user?.owner_name || 'Unknown Seller',
+        paymentStatus: sale.payment_status,
+        saleDate: sale.date_time,
+        paymentMethod: sale.payment_method,
+      };
+    });
 
     // Generate PDF
     const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
     const pdfBuffer = await generateSalesReportPdf(salesData, period);
 
-    // Return PDF response
+    // Check if this is for inline viewing or download
+    const download = c.req.query('download') === 'true';
+    const filename = `sales-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Return PDF response with appropriate headers
     return new Response(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="sales-report-${new Date().toISOString().split('T')[0]}.pdf"`,
+        'Content-Disposition': download
+          ? `attachment; filename="${filename}"`
+          : `inline; filename="${filename}"`,
         'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
 
@@ -997,14 +1060,15 @@ export async function generateTopSellingReport(c: Context<{ Bindings: Env; Varia
     const dateTo = c.req.query('dateTo');
     const categoryId = c.req.query('categoryId');
 
-    // Reuse the product report logic but focus on top selling
-    let query = supabase
+    // Fetch all products with category information
+    let productsQuery = supabase
       .from('products')
       .select(`
         product_id,
         name,
         quantity_box,
         quantity_kg,
+        box_to_kg_ratio,
         price_per_box,
         price_per_kg,
         cost_per_box,
@@ -1015,23 +1079,23 @@ export async function generateTopSellingReport(c: Context<{ Bindings: Env; Varia
 
     // Apply category filter
     if (categoryId) {
-      query = query.eq('category_id', categoryId);
+      productsQuery = productsQuery.eq('category_id', categoryId);
     }
 
-    const { data: products, error } = await query;
+    const { data: products, error: productsError } = await productsQuery;
 
-    if (error) {
-      throw new Error(`Failed to fetch products: ${error.message}`);
+    if (productsError) {
+      throw new Error(`Failed to fetch products: ${productsError.message}`);
     }
 
-    if (!products) {
+    if (!products || products.length === 0) {
       throw new Error('No products found');
     }
 
-    // Calculate sales data for each product
-    const productData: ProductReportData[] = await Promise.all(
+    // Calculate top selling data for each product
+    const topSellingData: TopSellingReportData[] = await Promise.all(
       products.map(async (product) => {
-        // Get sales data for this product
+        // Get sales data for this product within the date range
         let salesQuery = supabase
           .from('sales')
           .select('boxes_quantity, kg_quantity, total_amount, date_time')
@@ -1048,40 +1112,76 @@ export async function generateTopSellingReport(c: Context<{ Bindings: Env; Varia
 
         const { data: sales } = await salesQuery;
 
-        const totalSales = sales?.reduce((sum, sale) => sum + sale.boxes_quantity + (sale.kg_quantity / 20), 0) || 0;
+        // Get damaged products data for this product within the date range
+        let damagedQuery = supabase
+          .from('damaged_products')
+          .select('damaged_boxes, damaged_kg, damaged_date')
+          .eq('product_id', product.product_id)
+          .eq('damaged_approval', true);
+
+        // Apply date filters for damaged products
+        if (dateFrom) {
+          damagedQuery = damagedQuery.gte('damaged_date', dateFrom);
+        }
+        if (dateTo) {
+          damagedQuery = damagedQuery.lte('damaged_date', dateTo);
+        }
+
+        const { data: damagedProducts } = await damagedQuery;
+
+        // Calculate total sold (convert kg to boxes using ratio for consistency)
+        const boxToKgRatio = product.box_to_kg_ratio || 20; // Default to 20kg per box
+        const totalSoldBoxes = sales?.reduce((sum, sale) => sum + sale.boxes_quantity, 0) || 0;
+        const totalSoldKg = sales?.reduce((sum, sale) => sum + sale.kg_quantity, 0) || 0;
+        const totalSold = totalSoldBoxes + (totalSoldKg / boxToKgRatio);
+
+        // Calculate total revenue
         const totalRevenue = sales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
-        const totalProfit = sales?.reduce((sum, sale) => {
-          const boxProfit = sale.boxes_quantity * (product.price_per_box - product.cost_per_box);
-          const kgProfit = sale.kg_quantity * (product.price_per_kg - product.cost_per_kg);
-          return sum + boxProfit + kgProfit;
-        }, 0) || 0;
+
+        // Calculate total damaged quantity
+        const totalDamagedBoxes = damagedProducts?.reduce((sum, damaged) => sum + damaged.damaged_boxes, 0) || 0;
+        const totalDamagedKg = damagedProducts?.reduce((sum, damaged) => sum + damaged.damaged_kg, 0) || 0;
+        const totalDamaged = totalDamagedBoxes + (totalDamagedKg / boxToKgRatio);
+
+        // Calculate damage rate as percentage
+        // Damage rate = (damaged quantity / (sold quantity + damaged quantity)) * 100
+        const totalHandled = totalSold + totalDamaged;
+        const damageRate = totalHandled > 0 ? (totalDamaged / totalHandled) * 100 : 0;
 
         return {
-          productId: product.product_id,
-          name: product.name,
-          sku: `${product.product_id.slice(0, 8)}`,
-          category: 'Fish Products',
-          price: product.price_per_box,
-          cost: product.cost_per_box,
-          currentStock: product.quantity_box + (product.quantity_kg / 20),
-          totalSold: totalSales,
-          totalRevenue,
-          profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
-          createdAt: product.created_at,
+          product: product.name,
+          totalSold: parseFloat(totalSold.toFixed(2)),
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          damageRate: parseFloat(damageRate.toFixed(2))
         };
       })
     );
 
+    // Filter out products with no sales and sort by total sold
+    const filteredData = topSellingData
+      .filter(item => item.totalSold > 0)
+      .sort((a, b) => b.totalSold - a.totalSold)
+      .slice(0, 20); // Top 20 selling products
+
     // Generate PDF
     const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
-    const pdfBuffer = await generateTopSellingReportPdf(productData, period);
+    const pdfBuffer = await generateTopSellingReportPdf(filteredData, period);
 
-    // Return PDF response
+    // Check if this is for inline viewing or download
+    const download = c.req.query('download') === 'true';
+    const filename = `top-selling-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Return PDF response with appropriate headers
     return new Response(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="top-selling-report-${new Date().toISOString().split('T')[0]}.pdf"`,
+        'Content-Disposition': download
+          ? `attachment; filename="${filename}"`
+          : `inline; filename="${filename}"`,
         'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
 
@@ -1110,28 +1210,51 @@ export async function generateDebtorCreditReport(c: Context<{ Bindings: Env; Var
     const dateFrom = c.req.query('dateFrom');
     const dateTo = c.req.query('dateTo');
 
-    // Build query for unpaid/partial sales
+    // First, let's check if there are any sales records at all
+    const { data: allSales, error: allSalesError } = await supabase
+      .from('sales')
+      .select('id, payment_status, remaining_amount')
+      .limit(5);
+
+    console.log(`🔍 Total sales check: found ${allSales?.length || 0} sales records`);
+    if (allSales && allSales.length > 0) {
+      console.log('📋 Sample sales data:', allSales.map(s => ({
+        id: s.id.slice(0, 8),
+        status: s.payment_status,
+        remaining: s.remaining_amount
+      })));
+    }
+
+    // Build query for unpaid/partial sales with client contact information
+    // Try multiple approaches to find outstanding payments
     let query = supabase
       .from('sales')
       .select(`
         id,
         date_time,
         client_name,
-        email_address,
-        phone,
         total_amount,
         amount_paid,
         remaining_amount,
         payment_method,
         payment_status,
-        boxes_quantity,
-        kg_quantity,
-        box_price,
-        kg_price,
-        product_id
-      `)
-      .in('payment_status', ['pending', 'partial'])
-      .order('date_time', { ascending: false });
+        phone,
+        email_address
+      `);
+
+    // Apply filters - try different approaches
+    // First try: payment status based
+    query = query.in('payment_status', ['pending', 'partial']);
+
+    // If no date filters, don't apply them to get all records
+    if (dateFrom) {
+      query = query.gte('date_time', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('date_time', dateTo);
+    }
+
+    query = query.order('date_time', { ascending: false });
 
     // Apply date filters
     if (dateFrom) {
@@ -1144,35 +1267,118 @@ export async function generateDebtorCreditReport(c: Context<{ Bindings: Env; Var
     const { data: sales, error } = await query;
 
     if (error) {
+      console.error('❌ Error fetching sales data for debtor report:', error);
       throw new Error(`Failed to fetch sales data: ${error.message}`);
     }
 
-    if (!sales) {
-      throw new Error('No sales data found');
+    console.log(`📊 Found ${sales?.length || 0} sales records for debtor report`);
+
+    // If no results with payment status filter, try with remaining_amount filter
+    if (!sales || sales.length === 0) {
+      console.log('🔄 No results with payment status filter, trying remaining_amount > 0...');
+
+      const { data: salesByAmount, error: amountError } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          date_time,
+          client_name,
+          total_amount,
+          amount_paid,
+          remaining_amount,
+          payment_method,
+          payment_status,
+          phone,
+          email_address
+        `)
+        .gt('remaining_amount', 0)
+        .order('date_time', { ascending: false });
+
+      if (amountError) {
+        console.error('❌ Error with remaining_amount query:', amountError);
+      } else {
+        console.log(`💰 Found ${salesByAmount?.length || 0} sales with remaining_amount > 0`);
+        // Use this data if we found any
+        if (salesByAmount && salesByAmount.length > 0) {
+          const debtorData: DebtorCreditReportData[] = salesByAmount.map(sale => ({
+            clientName: sale.client_name || 'Walk-in Customer',
+            amountOwed: sale.remaining_amount || 0,
+            amountPaid: sale.amount_paid || 0,
+            phoneNumber: sale.phone || 'N/A',
+            email: sale.email_address || 'N/A',
+          }));
+
+          const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
+          const pdfBuffer = await generateDebtorCreditReportPdf(debtorData, period);
+
+          const download = c.req.query('download') === 'true';
+          const filename = `debtor-credit-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+          return new Response(pdfBuffer, {
+            headers: {
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': download
+                ? `attachment; filename="${filename}"`
+                : `inline; filename="${filename}"`,
+              'Cache-Control': 'no-cache',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type',
+            },
+          });
+        }
+      }
     }
 
-    // Transform data for PDF generation
-    const salesData: SalesReportData[] = sales.map(sale => ({
-      saleId: sale.id,
-      saleDate: sale.date_time,
-      customerName: sale.client_name || 'Walk-in Customer',
-      totalAmount: sale.total_amount,
-      taxAmount: 0,
-      discountAmount: sale.remaining_amount,
-      paymentMethod: sale.payment_method,
-      paymentStatus: sale.payment_status,
-      items: [{
-        productName: 'Fish Product',
-        sku: `${sale.boxes_quantity}B/${sale.kg_quantity}KG`,
-        quantity: sale.boxes_quantity + (sale.kg_quantity / 20),
-        unitPrice: sale.boxes_quantity > 0 ? sale.box_price : sale.kg_price,
-        totalPrice: sale.total_amount,
-      }],
-    }));
+    if (!sales || sales.length === 0) {
+      console.log('⚠️ No sales data found for debtor report');
+      // Return empty data instead of throwing error to show "No outstanding payments found" message
+      const emptyData: DebtorCreditReportData[] = [];
+      const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
+      const pdfBuffer = await generateDebtorCreditReportPdf(emptyData, period);
+
+      const download = c.req.query('download') === 'true';
+      const filename = `debtor-credit-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+      return new Response(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': download
+            ? `attachment; filename="${filename}"`
+            : `inline; filename="${filename}"`,
+          'Cache-Control': 'no-cache',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      });
+    }
+
+    // Transform data for debtor/credit report with new structure
+    const debtorData: DebtorCreditReportData[] = sales
+      .filter(sale => {
+        // Additional filter to ensure we only include records with actual outstanding amounts
+        const hasOutstanding = (sale.remaining_amount && sale.remaining_amount > 0) ||
+                              sale.payment_status === 'pending' ||
+                              sale.payment_status === 'partial';
+        console.log(`🔍 Sale ${sale.id}: status=${sale.payment_status}, remaining=${sale.remaining_amount}, hasOutstanding=${hasOutstanding}`);
+        return hasOutstanding;
+      })
+      .map(sale => {
+        return {
+          clientName: sale.client_name || 'Walk-in Customer',
+          amountOwed: sale.remaining_amount || 0, // Outstanding balance
+          amountPaid: sale.amount_paid || 0, // Amount already paid
+          phoneNumber: sale.phone || 'N/A', // Client phone number
+          email: sale.email_address || 'N/A', // Client email address
+        };
+      });
+
+    console.log(`💰 Filtered to ${debtorData.length} records with outstanding payments`);
 
     // Generate PDF
     const period = dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined;
-    const pdfBuffer = await generateDebtorCreditReportPdf(salesData, period);
+    const pdfBuffer = await generateDebtorCreditReportPdf(debtorData, period);
 
     // Check if this is for inline viewing or download
     const download = c.req.query('download') === 'true';
@@ -1222,10 +1428,23 @@ export async function generateProfitLossReport(c: Context<{ Bindings: Env; Varia
     }
 
     // Reuse the financial report logic
-    // Get sales data
+    // Get sales data with product cost information for accurate cost calculation
     let salesQuery = supabase
       .from('sales')
-      .select('total_amount, payment_status, date_time')
+      .select(`
+        total_amount,
+        payment_status,
+        date_time,
+        boxes_quantity,
+        kg_quantity,
+        box_price,
+        kg_price,
+        product_id,
+        products!inner(
+          cost_per_box,
+          cost_per_kg
+        )
+      `)
       .eq('payment_status', 'paid')
       .gte('date_time', dateFrom)
       .lte('date_time', dateTo);
@@ -1260,21 +1479,48 @@ export async function generateProfitLossReport(c: Context<{ Bindings: Env; Varia
     const totalSales = sales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
     const totalExpenses = expenses?.reduce((sum, expense) => sum + expense.total_amount, 0) || 0;
     const totalDeposits = deposits?.reduce((sum, deposit) => sum + deposit.total_amount, 0) || 0;
-    const netProfit = totalSales + totalDeposits - totalExpenses;
 
-    // Create financial report data
+    // Calculate cost of stock (cost of goods sold) using actual product costs
+    const costOfStock = sales?.reduce((sum, sale) => {
+      // Get actual cost from products table
+      const product = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+      const boxCost = product?.cost_per_box || 0;
+      const kgCost = product?.cost_per_kg || 0;
+
+      // Calculate total cost for this sale
+      const totalCost = (sale.boxes_quantity * boxCost) + (sale.kg_quantity * kgCost);
+      return sum + totalCost;
+    }, 0) || 0;
+
+    // Get damaged products value for the period
+    const { data: damagedProducts } = await supabase
+      .from('damaged_products')
+      .select('loss_value, damaged_date')
+      .eq('damaged_approval', true)
+      .gte('damaged_date', dateFrom)
+      .lte('damaged_date', dateTo);
+
+    const damagedValue = damagedProducts?.reduce((sum, damaged) => sum + damaged.loss_value, 0) || 0;
+
+    // Calculate total profit (revenue - cost of stock - damaged value - expenses)
+    const totalProfit = totalSales - costOfStock - damagedValue - totalExpenses;
+
+    // Create financial report data with new structure
     const financialData: FinancialReportData = {
       period: `${dateFrom} to ${dateTo}`,
-      totalSales,
+      totalSales, // This will be "Total Revenue"
       totalExpenses,
       totalDeposits,
-      netProfit,
+      netProfit: totalProfit, // This will be "Total Profit"
       salesCount: sales?.length || 0,
       expenseCount: expenses?.length || 0,
       depositCount: deposits?.length || 0,
       averageSaleAmount: sales && sales.length > 0 ? totalSales / sales.length : 0,
       topSellingProducts: [],
       salesByPaymentMethod: [],
+      // Add new fields for profit and loss report
+      costOfStock,
+      damagedValue,
     };
 
     // Generate PDF

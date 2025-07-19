@@ -23,10 +23,8 @@ import {
 // Validation schemas
 const createSaleSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
-  boxes_quantity: z.number().int().min(0, 'Boxes quantity must be non-negative').default(0),
-  kg_quantity: z.number().min(0, 'KG quantity must be non-negative').default(0),
-  box_price: z.number().min(0, 'Box price must be non-negative'),
-  kg_price: z.number().min(0, 'KG price must be non-negative'),
+  // Updated to support the new fish sales algorithm - customer requests kg, system handles conversion
+  requested_kg: z.number().min(0.1, 'Requested kg must be at least 0.1').max(10000, 'Requested kg too large'),
   payment_method: z.enum(['momo_pay', 'cash', 'bank_transfer']),
   payment_status: z.enum(['paid', 'pending', 'partial']).default('pending'),
   amount_paid: z.number().min(0, 'Amount paid must be non-negative').default(0),
@@ -35,12 +33,6 @@ const createSaleSchema = z.object({
   email_address: z.string().email('Invalid email format').max(150, 'Email too long').optional(),
   phone: z.string().max(15, 'Phone number too long').optional(),
 }).refine(
-  (data) => data.boxes_quantity > 0 || data.kg_quantity > 0,
-  {
-    message: 'At least one of boxes_quantity or kg_quantity must be greater than 0',
-    path: ['boxes_quantity'],
-  }
-).refine(
   (data) => {
     // If payment status is pending or partial, client info is required (not needed for paid)
     if (data.payment_status === 'pending' || data.payment_status === 'partial') {
@@ -68,14 +60,7 @@ const createSaleSchema = z.object({
 const updateSaleSchema = z.object({
   boxes_quantity: z.number().int().min(0, 'Boxes quantity must be non-negative').optional(),
   kg_quantity: z.number().min(0, 'KG quantity must be non-negative').optional(),
-  payment_status: z.enum(['paid', 'pending', 'partial']).optional(),
   payment_method: z.enum(['momo_pay', 'cash', 'bank_transfer']).optional(),
-  amount_paid: z.number().min(0, 'Amount paid must be non-negative').optional(),
-  total_amount: z.number().min(0, 'Total amount must be non-negative').optional(),
-  remaining_amount: z.number().min(0, 'Remaining amount must be non-negative').optional(),
-  client_name: z.string().min(1, 'Client name is required').max(100, 'Client name too long').optional(),
-  email_address: z.string().email('Invalid email format').max(150, 'Email too long').optional(),
-  phone: z.string().max(15, 'Phone number too long').optional(),
 });
 
 const getSalesQuerySchema = z.object({
@@ -121,6 +106,8 @@ export const getSalesHandler = async (c: HonoContext) => {
         kg_quantity,
         box_price,
         kg_price,
+        profit_per_box,
+        profit_per_kg,
         total_amount,
         amount_paid,
         remaining_amount,
@@ -236,6 +223,8 @@ export const getSaleHandler = async (c: HonoContext) => {
         kg_quantity,
         box_price,
         kg_price,
+        profit_per_box,
+        profit_per_kg,
         total_amount,
         amount_paid,
         remaining_amount,
@@ -288,7 +277,8 @@ export const getSaleHandler = async (c: HonoContext) => {
 };
 
 /**
- * Create a new sale
+ * Create a new sale using the fish sales algorithm
+ * Customer buys in kg, system automatically converts boxes when needed
  */
 export const createSaleHandler = async (c: HonoContext) => {
   try {
@@ -303,148 +293,130 @@ export const createSaleHandler = async (c: HonoContext) => {
       return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
     }
 
-    const saleData = validation.data;
+    const { product_id, requested_kg, payment_method, payment_status, amount_paid, client_id, client_name, email_address, phone } = validation.data;
 
-    // Validate product exists and get current stock with box-to-kg ratio
+    // Fetch product with current stock and pricing information
     const { data: product, error: productError } = await c.get('supabase')
       .from('products')
-      .select('product_id, name, quantity_box, quantity_kg, box_to_kg_ratio, price_per_box, price_per_kg')
-      .eq('product_id', saleData.product_id)
+      .select('product_id, name, quantity_box, quantity_kg, box_to_kg_ratio, price_per_box, price_per_kg, cost_per_box, cost_per_kg')
+      .eq('product_id', product_id)
       .single();
 
     if (productError || !product) {
       return c.json(createErrorResponse('Product not found', 404, { error: 'The specified product does not exist' }, c.get('requestId')), 404);
     }
 
-    // Smart inventory deduction logic with detailed tracking
-    // Calculate total kg needed (convert boxes to kg + direct kg)
-    const totalKgNeeded = (saleData.boxes_quantity * product.box_to_kg_ratio) + saleData.kg_quantity;
+    // 🎯 Fish Sales Algorithm Implementation
+    // Customer requests kg, system prioritizes kg stock first, then converts boxes if needed
 
-    // Calculate total available kg (loose kg + boxes converted to kg)
-    const totalAvailableKg = product.quantity_kg + (product.quantity_box * product.box_to_kg_ratio);
+    let availableKg = parseFloat(product.quantity_kg.toString());
+    let availableBoxes = parseInt(product.quantity_box.toString());
+    const boxToKgRatio = parseFloat(product.box_to_kg_ratio.toString()); // 1 box = X kg (e.g., 10kg)
 
-    // Check if we have enough total stock
-    if (totalAvailableKg < totalKgNeeded) {
-      return c.json(createErrorResponse(
-        `Insufficient stock: need ${totalKgNeeded}kg, have ${totalAvailableKg}kg available`,
-        400,
-        {
-          needed: totalKgNeeded,
-          available: totalAvailableKg,
-          shortage: totalKgNeeded - totalAvailableKg,
-          currentStock: {
-            boxes: product.quantity_box,
-            kg: product.quantity_kg,
-            boxToKgRatio: product.box_to_kg_ratio
-          }
-        },
-        c.get('requestId')
-      ), 400);
-    }
-
-    // Initialize deduction tracking
-    let actualKgDeducted = 0;
-    let actualBoxesDeducted = 0;
-    let boxesUnboxed = 0; // Track how many boxes were converted to kg
-    let kgFromUnboxing = 0; // Track kg gained from unboxing
-    let remainingKgFromUnboxing = 0; // Track leftover kg after unboxing
+    let neededKg = parseFloat(requested_kg.toString());
+    let usedKg = 0;
+    let usedBoxes = 0;
     const deductionDetails = [];
 
-    // First, handle direct kg sales with smart deduction
-    if (saleData.kg_quantity > 0) {
-      const kgNeeded = saleData.kg_quantity;
-
-      if (product.quantity_kg >= kgNeeded) {
-        // We have enough loose kg - simple deduction
-        actualKgDeducted = kgNeeded;
-        deductionDetails.push(`Used ${kgNeeded}kg from loose stock`);
-      } else {
-        // Need to convert boxes to kg
-        const availableLooseKg = product.quantity_kg;
-        const remainingKgNeeded = kgNeeded - availableLooseKg;
-        const boxesNeededForKg = Math.ceil(remainingKgNeeded / product.box_to_kg_ratio);
-
-        if (product.quantity_box >= boxesNeededForKg) {
-          // Use all available loose kg first
-          actualKgDeducted = availableLooseKg;
-          if (availableLooseKg > 0) {
-            deductionDetails.push(`Used ${availableLooseKg}kg from loose stock`);
-          }
-
-          // Convert boxes to fulfill remaining kg requirement
-          actualBoxesDeducted += boxesNeededForKg;
-          boxesUnboxed = boxesNeededForKg;
-          kgFromUnboxing = boxesNeededForKg * product.box_to_kg_ratio;
-          remainingKgFromUnboxing = kgFromUnboxing - remainingKgNeeded;
-
-          deductionDetails.push(`Unboxed ${boxesUnboxed} box(es) to get ${kgFromUnboxing}kg`);
-          deductionDetails.push(`Used ${remainingKgNeeded}kg from unboxed stock`);
-          if (remainingKgFromUnboxing > 0) {
-            deductionDetails.push(`${remainingKgFromUnboxing}kg remaining from unboxing added to loose stock`);
-          }
-        } else {
-          return c.json(createErrorResponse(
-            `Insufficient stock for kg requirement: need ${boxesNeededForKg} box(es) to convert, have ${product.quantity_box} box(es)`,
-            400,
-            {
-              kgNeeded: kgNeeded,
-              availableLooseKg: availableLooseKg,
-              remainingKgNeeded: remainingKgNeeded,
-              boxesNeededForConversion: boxesNeededForKg,
-              availableBoxes: product.quantity_box
-            },
-            c.get('requestId')
-          ), 400);
-        }
+    // Step 1: First use from available kg stock
+    if (availableKg >= neededKg) {
+      // We have enough kg stock - simple deduction
+      usedKg = neededKg;
+      availableKg -= neededKg;
+      neededKg = 0;
+      deductionDetails.push(`Used ${usedKg}kg from loose stock`);
+    } else {
+      // Use all available kg stock first
+      usedKg = availableKg;
+      neededKg -= availableKg;
+      availableKg = 0;
+      if (usedKg > 0) {
+        deductionDetails.push(`Used ${usedKg}kg from loose stock`);
       }
     }
 
-    // Then handle box sales
-    if (saleData.boxes_quantity > 0) {
-      const remainingBoxes = product.quantity_box - actualBoxesDeducted;
-      if (remainingBoxes >= saleData.boxes_quantity) {
-        actualBoxesDeducted += saleData.boxes_quantity;
-        deductionDetails.push(`Used ${saleData.boxes_quantity} box(es) from stock`);
+    // Step 2: Convert boxes to kg if needed
+    if (neededKg > 0) {
+      const boxesNeeded = Math.ceil(neededKg / boxToKgRatio);
+
+      if (availableBoxes >= boxesNeeded) {
+        // Convert boxes to fulfill remaining kg requirement
+        usedBoxes = boxesNeeded;
+        availableBoxes -= boxesNeeded;
+
+        // Add the kg from converted boxes to our used kg total
+        const kgFromBoxes = boxesNeeded * boxToKgRatio;
+        usedKg += kgFromBoxes;
+
+        // If we converted more kg than needed, add the excess back to loose stock
+        const excessKg = kgFromBoxes - neededKg;
+        if (excessKg > 0) {
+          availableKg += excessKg;
+          deductionDetails.push(`Converted ${boxesNeeded} box(es) to ${kgFromBoxes}kg, used ${neededKg}kg, added ${excessKg}kg back to loose stock`);
+        } else {
+          deductionDetails.push(`Converted ${boxesNeeded} box(es) to ${kgFromBoxes}kg`);
+        }
+
+        neededKg = 0; // All requirements fulfilled
       } else {
+        // Not enough stock available
+        const totalAvailableKg = availableKg + (availableBoxes * boxToKgRatio);
         return c.json(createErrorResponse(
-          `Insufficient box stock: need ${saleData.boxes_quantity} box(es), have ${remainingBoxes} box(es) remaining after kg conversion`,
+          'Not enough stock available',
           400,
           {
-            boxesNeeded: saleData.boxes_quantity,
-            boxesAvailable: remainingBoxes,
-            boxesUsedForKgConversion: actualBoxesDeducted - saleData.boxes_quantity
+            requested: requested_kg,
+            available: totalAvailableKg,
+            shortage: requested_kg - totalAvailableKg,
+            currentStock: {
+              boxes: product.quantity_box,
+              kg: product.quantity_kg,
+              boxToKgRatio: boxToKgRatio
+            }
           },
           c.get('requestId')
         ), 400);
       }
     }
 
-    // Calculate total amount
-    const totalAmount = (saleData.boxes_quantity * saleData.box_price) + (saleData.kg_quantity * saleData.kg_price);
+    // Calculate pricing and totals
+    const totalKgSold = parseFloat(requested_kg.toString()); // What the customer actually bought
+    const finalBoxQty = usedBoxes; // Boxes used in the conversion
+    const kg_price = parseFloat(product.price_per_kg.toString());
+    const box_price = parseFloat(product.price_per_box.toString());
+
+    // Total amount is based on what customer requested (all in kg pricing)
+    const total_amount = totalKgSold * kg_price;
 
     // Calculate remaining amount for partial payments
-    const amountPaid = saleData.amount_paid || 0;
-    const remainingAmount = saleData.payment_status === 'paid' ? 0 : totalAmount - amountPaid;
+    const amountPaid = amount_paid || 0;
+    const remainingAmount = payment_status === 'paid' ? 0 : total_amount - amountPaid;
 
-    // Create sale transaction
+    // Calculate profit per unit (selling price - cost price)
+    const profitPerBox = box_price - (product.cost_per_box || 0);
+    const profitPerKg = kg_price - (product.cost_per_kg || 0);
+
+    // Record the sale in the database
     const { data: newSale, error: saleError } = await c.get('supabase')
       .from('sales')
       .insert({
-        product_id: saleData.product_id,
-        boxes_quantity: saleData.boxes_quantity,
-        kg_quantity: saleData.kg_quantity,
-        box_price: saleData.box_price,
-        kg_price: saleData.kg_price,
-        total_amount: totalAmount,
+        product_id: product_id,
+        boxes_quantity: finalBoxQty, // Boxes used in conversion (for audit trail)
+        kg_quantity: totalKgSold, // Total kg sold to customer
+        box_price: box_price, // Price per box at time of sale
+        kg_price: kg_price, // Price per kg at time of sale
+        profit_per_box: profitPerBox,
+        profit_per_kg: profitPerKg,
+        total_amount: total_amount,
         amount_paid: amountPaid,
         remaining_amount: remainingAmount,
-        payment_method: saleData.payment_method,
-        payment_status: saleData.payment_status,
+        payment_status: payment_status,
+        payment_method: payment_method,
         performed_by: c.get('user')?.id || 'system', // Get from authenticated user
-        client_id: saleData.client_id,
-        client_name: saleData.client_name,
-        email_address: saleData.email_address,
-        phone: saleData.phone,
+        client_id: client_id,
+        client_name: client_name,
+        email_address: email_address,
+        phone: phone,
         date_time: new Date().toISOString(),
       })
       .select()
@@ -454,48 +426,44 @@ export const createSaleHandler = async (c: HonoContext) => {
       throw new Error(`Failed to create sale: ${saleError.message}`);
     }
 
-    // Update product stock using smart deduction with unboxing logic
-    const newBoxQuantity = product.quantity_box - actualBoxesDeducted;
-    // Calculate new kg quantity: subtract used kg, add remaining kg from unboxing
-    const newKgQuantity = Math.max(0, product.quantity_kg - actualKgDeducted + remainingKgFromUnboxing);
-
+    // Update product stock with new quantities
     const { error: stockUpdateError } = await c.get('supabase')
       .from('products')
       .update({
-        quantity_box: newBoxQuantity,
-        quantity_kg: newKgQuantity,
+        quantity_box: availableBoxes, // Updated box quantity after conversion
+        quantity_kg: availableKg, // Updated kg quantity (includes any excess from box conversion)
         updated_at: new Date().toISOString(),
       })
-      .eq('product_id', saleData.product_id);
+      .eq('product_id', product_id);
 
     if (stockUpdateError) {
       throw new Error(`Failed to update product stock: ${stockUpdateError.message}`);
     }
 
-    // Create detailed success message with deduction information
-    let successMessage = 'Sale created successfully';
-    if (deductionDetails.length > 0) {
-      successMessage += `. Stock deduction: ${deductionDetails.join(', ')}`;
-    }
-
-    // Add final stock status
-    const finalStockMessage = `After sale: ${newBoxQuantity} boxes, ${newKgQuantity}kg remaining`;
+    // Create detailed success response with algorithm information
+    const successMessage = `Fish sale completed successfully: ${totalKgSold}kg sold for ${total_amount.toFixed(2)}`;
+    const finalStockMessage = `After sale: ${availableBoxes} boxes, ${availableKg.toFixed(2)}kg remaining`;
 
     return c.json({
       success: true,
       data: newSale,
       message: successMessage,
+      saleInfo: {
+        sold_kg: totalKgSold,
+        used_boxes: finalBoxQty,
+        total_amount: total_amount,
+        deductionDetails: deductionDetails,
+        algorithm: 'fish_sales_kg_priority'
+      },
       stockInfo: {
-        deductionDetails,
         finalStock: {
-          boxes: newBoxQuantity,
-          kg: newKgQuantity
+          boxes: availableBoxes,
+          kg: parseFloat(availableKg.toFixed(2))
         },
-        unboxingInfo: boxesUnboxed > 0 ? {
-          boxesUnboxed,
-          kgFromUnboxing,
-          remainingKgFromUnboxing
-        } : null
+        originalStock: {
+          boxes: product.quantity_box,
+          kg: product.quantity_kg
+        }
       },
       finalStockMessage,
       timestamp: new Date().toISOString(),
@@ -503,8 +471,281 @@ export const createSaleHandler = async (c: HonoContext) => {
     }, 201);
 
   } catch (error) {
-    console.error('Create sale error:', error);
-    return c.json(createErrorResponse('Failed to create sale', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+    console.error('Fish sale creation error:', error);
+    return c.json(createErrorResponse('Failed to create fish sale', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+  }
+};
+
+/**
+ * Create a fish sale using the new algorithm (dedicated endpoint)
+ * This is the main endpoint for the fish sales system
+ */
+export const createFishSaleHandler = async (c: HonoContext) => {
+  try {
+    console.log('🐟 Fish sale handler called');
+    console.log('🐟 User from context:', c.get('user'));
+    const body = await c.req.json();
+    console.log('🐟 Fish sale request body:', JSON.stringify(body, null, 2));
+
+    // Validate the fish sale request
+    const fishSaleSchema = z.object({
+      product_id: z.string().uuid('Invalid product ID'),
+      requested_kg: z.coerce.number().min(0, 'Requested kg must be non-negative').max(10000, 'Requested kg too large').default(0),
+      requested_boxes: z.coerce.number().min(0, 'Requested boxes must be non-negative').max(1000, 'Requested boxes too large').default(0).optional(),
+      payment_method: z.enum(['momo_pay', 'cash', 'bank_transfer']),
+      payment_status: z.enum(['paid', 'pending', 'partial']).default('paid'),
+      amount_paid: z.coerce.number().min(0, 'Amount paid must be non-negative').default(0),
+      client_id: z.string().uuid('Invalid client ID').optional(),
+      client_name: z.string().optional().or(z.literal('')),
+      email_address: z.string().max(150, 'Email too long').optional().refine(
+        (val) => !val || val === '' || z.string().email().safeParse(val).success,
+        { message: 'Invalid email format' }
+      ),
+      phone: z.string().max(15, 'Phone number too long').optional().or(z.literal('')),
+    }).refine(
+      (data) => {
+        // At least one quantity (kg or boxes) must be specified
+        const kg = data.requested_kg || 0;
+        const boxes = data.requested_boxes || 0;
+        if (kg <= 0 && boxes <= 0) {
+          return false;
+        }
+        return true;
+      },
+      {
+        message: 'Either requested kg or requested boxes must be greater than 0',
+        path: ['requested_kg', 'requested_boxes']
+      }
+    ).refine(
+      (data) => {
+        // If payment status is pending or partial, client info is required
+        if (data.payment_status === 'pending' || data.payment_status === 'partial') {
+          return data.client_name && data.client_name.trim().length > 0;
+        }
+        return true;
+      },
+      {
+        message: 'Client name is required for pending or partial payments',
+        path: ['client_name']
+      }
+    );
+
+    const validation = fishSaleSchema.safeParse(body);
+    if (!validation.success) {
+      console.log('🐟 Fish sale validation failed:', JSON.stringify(validation.error.errors, null, 2));
+      const errors = validation.error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      console.log('🐟 Formatted validation errors:', JSON.stringify(errors, null, 2));
+      return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
+    }
+
+    const { product_id, requested_kg, requested_boxes = 0, payment_method, payment_status, amount_paid, client_id, client_name, email_address, phone } = validation.data;
+
+    // Fetch product information
+    const { data: product, error: productError } = await c.get('supabase')
+      .from('products')
+      .select('product_id, name, quantity_box, quantity_kg, box_to_kg_ratio, price_per_box, price_per_kg, cost_per_box, cost_per_kg')
+      .eq('product_id', product_id)
+      .single();
+
+    if (productError || !product) {
+      return c.json(createErrorResponse('Product not found', 404, { error: 'The specified product does not exist' }, c.get('requestId')), 404);
+    }
+
+    // 🐟 Enhanced Fish Sales Algorithm Implementation
+    let availableKg = parseFloat(product.quantity_kg.toString());
+    let availableBoxes = parseInt(product.quantity_box.toString());
+    const boxToKgRatio = parseFloat(product.box_to_kg_ratio.toString());
+
+    let neededKg = parseFloat(requested_kg.toString()) || 0;
+    let neededBoxes = parseInt(requested_boxes.toString()) || 0;
+    let usedKgFromLooseStock = 0;  // Track kg actually consumed from loose stock
+    let usedBoxes = 0;
+    const algorithmSteps = [];
+
+    // Calculate total needed kg (including boxes converted to kg)
+    const totalNeededKg = neededKg + (neededBoxes * boxToKgRatio);
+
+    // Check if we have enough total stock
+    const totalAvailable = availableKg + (availableBoxes * boxToKgRatio);
+    if (totalNeededKg > totalAvailable) {
+      return c.json(createErrorResponse(
+        'Not enough stock available',
+        400,
+        {
+          requested_kg: requested_kg,
+          requested_boxes: requested_boxes,
+          total_needed_kg: totalNeededKg,
+          available: totalAvailable,
+          shortage: totalNeededKg - totalAvailable,
+          currentStock: { boxes: product.quantity_box, kg: product.quantity_kg, boxToKgRatio }
+        },
+        c.get('requestId')
+      ), 400);
+    }
+
+    // Step 1: Handle direct box requests first (if any)
+    if (neededBoxes > 0) {
+      if (availableBoxes >= neededBoxes) {
+        usedBoxes += neededBoxes;
+        availableBoxes -= neededBoxes;
+        algorithmSteps.push(`📦 Used ${neededBoxes} box(es) directly`);
+      } else {
+        return c.json(createErrorResponse(
+          'Not enough box stock available',
+          400,
+          {
+            requested_boxes: requested_boxes,
+            available_boxes: availableBoxes,
+            shortage: requested_boxes - availableBoxes
+          },
+          c.get('requestId')
+        ), 400);
+      }
+    }
+
+    // Step 2: Handle kg requests
+    if (neededKg > 0) {
+      // First, use available loose kg
+      if (availableKg >= neededKg) {
+        // We have enough loose kg to fulfill the entire request
+        usedKgFromLooseStock = neededKg;
+        availableKg -= neededKg;
+        neededKg = 0;
+        algorithmSteps.push(`⚖️ Used ${usedKgFromLooseStock}kg from loose stock`);
+      } else {
+        // Use all available loose kg first
+        usedKgFromLooseStock = availableKg;
+        neededKg -= availableKg;
+        availableKg = 0;
+        if (usedKgFromLooseStock > 0) {
+          algorithmSteps.push(`⚖️ Used ${usedKgFromLooseStock}kg from loose stock`);
+        }
+
+        // Convert boxes to kg for remaining needed kg
+        if (neededKg > 0) {
+          const boxesNeeded = Math.ceil(neededKg / boxToKgRatio);
+
+          if (availableBoxes >= boxesNeeded) {
+            usedBoxes += boxesNeeded;
+            availableBoxes -= boxesNeeded;
+            const kgFromBoxes = boxesNeeded * boxToKgRatio;
+
+            // Add ALL converted kg to loose stock first
+            availableKg += kgFromBoxes;
+
+            // Then subtract only what the customer actually needs
+            availableKg -= neededKg;
+            usedKgFromLooseStock += neededKg;  // Track total kg consumed by customer
+
+            const excessKg = kgFromBoxes - neededKg;
+            algorithmSteps.push(`📦➡️⚖️ Converted ${boxesNeeded} box(es) to ${kgFromBoxes}kg, used ${neededKg}kg from conversion, ${excessKg.toFixed(2)}kg remains in loose stock`);
+
+            neededKg = 0; // Request fulfilled
+          }
+        }
+      }
+    }
+
+    // Calculate pricing
+    const kg_price = parseFloat(product.price_per_kg.toString());
+    const box_price = parseFloat(product.price_per_box.toString());
+
+    // Calculate total amount based on what was actually requested
+    let total_amount = 0;
+    if (requested_kg > 0) {
+      total_amount += parseFloat(requested_kg.toString()) * kg_price;
+    }
+    if (requested_boxes > 0) {
+      total_amount += parseInt(requested_boxes.toString()) * box_price;
+    }
+
+    const amountPaid = amount_paid || 0;
+    const remainingAmount = payment_status === 'paid' ? 0 : total_amount - amountPaid;
+
+    // Calculate profit per unit (selling price - cost price)
+    const profitPerBox = box_price - (product.cost_per_box || 0);
+    const profitPerKg = kg_price - (product.cost_per_kg || 0);
+
+    // Record the sale
+    const { data: newSale, error: saleError } = await c.get('supabase')
+      .from('sales')
+      .insert({
+        product_id,
+        boxes_quantity: parseInt(requested_boxes.toString()) || 0, // Record the originally requested boxes
+        kg_quantity: parseFloat(requested_kg.toString()) || 0, // Record the originally requested kg
+        box_price,
+        kg_price,
+        profit_per_box: profitPerBox,
+        profit_per_kg: profitPerKg,
+        total_amount,
+        amount_paid: amountPaid,
+        remaining_amount: remainingAmount,
+        payment_status,
+        payment_method,
+        performed_by: c.get('user')?.id || 'system',
+        client_id,
+        client_name,
+        email_address,
+        phone,
+        date_time: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (saleError) {
+      throw new Error(`Failed to create sale: ${saleError.message}`);
+    }
+
+    // Update product stock
+    const { error: stockUpdateError } = await c.get('supabase')
+      .from('products')
+      .update({
+        quantity_box: availableBoxes,
+        quantity_kg: parseFloat(availableKg.toFixed(2)),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('product_id', product_id);
+
+    if (stockUpdateError) {
+      throw new Error(`Failed to update product stock: ${stockUpdateError.message}`);
+    }
+
+    // Create descriptive message
+    let saleDescription = '🐟 Fish sale completed: ';
+    const saleItems = [];
+    if (requested_kg > 0) saleItems.push(`${requested_kg}kg`);
+    if (requested_boxes > 0) saleItems.push(`${requested_boxes} box(es)`);
+    saleDescription += saleItems.join(' + ') + ` sold for ${total_amount.toFixed(2)}`;
+
+    return c.json({
+      success: true,
+      data: newSale,
+      message: saleDescription,
+      algorithm: {
+        name: 'Enhanced Fish Sales Algorithm',
+        description: 'Handles both kg and box requests with intelligent stock management',
+        steps: algorithmSteps,
+        result: {
+          sold_kg: parseFloat(requested_kg.toString()) || 0,
+          sold_boxes: parseInt(requested_boxes.toString()) || 0,
+          used_boxes: usedBoxes, // Total boxes used (including conversions)
+          total_amount: parseFloat(total_amount.toFixed(2))
+        }
+      },
+      stockInfo: {
+        before: { boxes: product.quantity_box, kg: product.quantity_kg },
+        after: { boxes: availableBoxes, kg: parseFloat(availableKg.toFixed(2)) }
+      },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 201);
+
+  } catch (error) {
+    console.error('Fish sale creation error:', error);
+    return c.json(createErrorResponse('Failed to create fish sale', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };
 
@@ -592,14 +833,39 @@ export const updateSaleHandler = async (c: HonoContext) => {
     }
 
     // Determine audit type based on what's being changed
-    let auditType: 'quantity_change' | 'payment_update' = 'payment_update';
+    let auditType: 'quantity_change' | 'payment_method_change' = 'payment_method_change';
     let boxesChange = 0;
     let kgChange = 0;
 
-    if (updateData.boxes_quantity !== undefined || updateData.kg_quantity !== undefined) {
+    // Calculate quantity changes first
+    const newBoxesQuantity = updateData.boxes_quantity ?? originalSale.boxes_quantity;
+    const newKgQuantity = updateData.kg_quantity ?? originalSale.kg_quantity;
+    boxesChange = newBoxesQuantity - originalSale.boxes_quantity;
+    kgChange = newKgQuantity - originalSale.kg_quantity;
+
+    // Check if quantities are actually being changed (not just provided)
+    const quantityChanged = boxesChange !== 0 || kgChange !== 0;
+    const paymentMethodChanged = updateData.payment_method !== undefined && updateData.payment_method !== originalSale.payment_method;
+
+    // Determine audit type based on actual changes
+    if (quantityChanged && paymentMethodChanged) {
+      // Both quantities and payment method changed - prioritize quantity change
       auditType = 'quantity_change';
-      boxesChange = (updateData.boxes_quantity ?? originalSale.boxes_quantity) - originalSale.boxes_quantity;
-      kgChange = (updateData.kg_quantity ?? originalSale.kg_quantity) - originalSale.kg_quantity;
+    } else if (quantityChanged) {
+      auditType = 'quantity_change';
+    } else if (paymentMethodChanged) {
+      auditType = 'payment_method_change';
+      // Reset quantity changes for payment method only changes
+      boxesChange = 0;
+      kgChange = 0;
+    } else {
+      // No meaningful changes detected
+      return c.json(createErrorResponse(
+        'No changes detected. Please modify quantities or payment method.',
+        400,
+        undefined,
+        c.get('requestId')
+      ), 400);
     }
 
     // Get user ID for audit record
@@ -607,6 +873,24 @@ export const updateSaleHandler = async (c: HonoContext) => {
     if (!userId) {
       return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
     }
+
+    // Log audit details for debugging
+    console.log('Creating audit record:', {
+      saleId: id,
+      auditType,
+      boxesChange,
+      kgChange,
+      quantityChanged,
+      paymentMethodChanged,
+      originalQuantities: {
+        boxes: originalSale.boxes_quantity,
+        kg: originalSale.kg_quantity
+      },
+      newQuantities: {
+        boxes: newBoxesQuantity,
+        kg: newKgQuantity
+      }
+    });
 
     // Create audit record instead of direct update
     const auditResult = await createAuditRecord(
@@ -699,9 +983,9 @@ export const deleteSaleHandler = async (c: HonoContext) => {
       reason,
       userId,
       {
-        boxesChange: sale.boxes_quantity, // Will be restored when approved
-        kgChange: sale.kg_quantity,
-        oldValues: sale,
+        boxesChange: 0, // Deletion audits should not have quantity changes
+        kgChange: 0,    // Deletion audits should not have quantity changes
+        oldValues: sale, // Store original sale data for restoration when approved
       }
     );
 

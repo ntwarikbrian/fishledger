@@ -486,6 +486,10 @@ CREATE TABLE IF NOT EXISTS sales (
     box_price DECIMAL(8,2) NOT NULL, -- Price per box at time of sale
     kg_price DECIMAL(8,2) NOT NULL, -- Price per kg at time of sale
 
+    -- Profit tracking
+    profit_per_box DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Profit per box (selling price - cost price)
+    profit_per_kg DECIMAL(8,2) DEFAULT 0 NOT NULL, -- Profit per kg (selling price - cost price)
+
     -- Total amount for this sale
     total_amount DECIMAL(10,2) NOT NULL, -- Total amount calculated
 
@@ -583,11 +587,16 @@ CREATE TABLE IF NOT EXISTS stock_additions (
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(product_id),
-    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction')),
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete')),
 
     -- Changes in box and kg quantities
     box_change INTEGER DEFAULT 0, -- Box quantity change (positive for increase, negative for decrease)
     kg_change DECIMAL(10,2) DEFAULT 0, -- Kg change (positive for increase, negative for decrease)
+
+    -- Product edit tracking fields (for movement_type = 'product_edit')
+    field_changed TEXT, -- Name of the field that was changed (e.g., 'name', 'cost_per_box', 'price_per_kg')
+    old_value TEXT, -- Previous value of the field (stored as text for flexibility)
+    new_value TEXT, -- New value of the field (stored as text for flexibility)
 
     -- Reference IDs for tracking specific records based on movement type
     damaged_id UUID REFERENCES damaged_products(damage_id), -- Reference to damaged product record
@@ -596,20 +605,44 @@ CREATE TABLE IF NOT EXISTS stock_movements (
 
     -- Movement details
     reason TEXT, -- Reason from the referenced record or manual entry
-    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled', 'rejected')),
 
     -- Audit trail
     performed_by UUID NOT NULL REFERENCES users(user_id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
-    CONSTRAINT chk_stock_movement_quantities CHECK (box_change != 0 OR kg_change != 0),
+    CONSTRAINT chk_stock_movement_quantities CHECK (
+        (movement_type NOT IN ('product_edit', 'product_delete') AND (box_change != 0 OR kg_change != 0)) OR
+        (movement_type = 'product_edit' AND field_changed IS NOT NULL) OR
+        (movement_type = 'product_delete' AND field_changed IS NOT NULL)
+    ),
     CONSTRAINT chk_movement_references CHECK (
         (movement_type = 'damaged' AND damaged_id IS NOT NULL) OR
         (movement_type = 'new_stock' AND stock_addition_id IS NOT NULL) OR
-        (movement_type = 'stock_correction' AND correction_id IS NOT NULL)
+        (movement_type = 'stock_correction' AND correction_id IS NOT NULL) OR
+        (movement_type = 'product_edit') OR
+        (movement_type = 'product_delete')
     )
 );
+
+-- Comments for stock_movements table documentation
+COMMENT ON TABLE stock_movements IS 'Tracks inventory changes from irregular events (damaged, new stock, corrections, product edits)';
+COMMENT ON COLUMN stock_movements.movement_id IS 'Unique identifier for each movement';
+COMMENT ON COLUMN stock_movements.product_id IS 'Reference to the product being moved';
+COMMENT ON COLUMN stock_movements.movement_type IS 'Type of movement: damaged, new_stock, stock_correction, product_edit';
+COMMENT ON COLUMN stock_movements.box_change IS 'Change in box quantity - positive for increase, negative for decrease';
+COMMENT ON COLUMN stock_movements.kg_change IS 'Change in kg quantity - positive for increase, negative for decrease';
+COMMENT ON COLUMN stock_movements.field_changed IS 'Name of the field that was changed (for product_edit movements)';
+COMMENT ON COLUMN stock_movements.old_value IS 'Previous value of the changed field (for product_edit movements)';
+COMMENT ON COLUMN stock_movements.new_value IS 'New value of the changed field (for product_edit movements)';
+COMMENT ON COLUMN stock_movements.damaged_id IS 'Reference to damaged_products record for damaged movements';
+COMMENT ON COLUMN stock_movements.stock_addition_id IS 'Reference to stock addition record for new stock movements';
+COMMENT ON COLUMN stock_movements.correction_id IS 'Reference to stock correction record for correction movements';
+COMMENT ON COLUMN stock_movements.reason IS 'Reason for the movement, derived from source record or manual entry';
+COMMENT ON COLUMN stock_movements.status IS 'Status of the movement: pending, completed, cancelled';
+COMMENT ON COLUMN stock_movements.performed_by IS 'User who performed the movement';
+COMMENT ON COLUMN stock_movements.created_at IS 'Timestamp when movement was recorded';
 
 -- =====================================================
 -- 15. WORKER PERMISSIONS TABLE
@@ -779,12 +812,16 @@ CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
 CREATE INDEX IF NOT EXISTS idx_sales_performed_by ON sales(performed_by);
 CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
 CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
+CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
+CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
 
 -- Stock movements table indexes
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product_id ON stock_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_performed_by ON stock_movements(performed_by);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_field_changed ON stock_movements(field_changed);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product_edit ON stock_movements(movement_type) WHERE movement_type = 'product_edit';
 -- Index for related_sale_id removed as column no longer exists
 
 -- =====================================================
@@ -812,8 +849,8 @@ CREATE TRIGGER validate_file_data_trigger
 CREATE TABLE IF NOT EXISTS sales_audit (
     audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-    audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_update', 'deletion')),
+    sale_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+    audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_method_change', 'deletion')),
     boxes_change INTEGER DEFAULT 0,
     kg_change DECIMAL(10,2) DEFAULT 0.00,
     reason TEXT NOT NULL,
@@ -861,7 +898,7 @@ COMMENT ON TABLE sales_audit IS 'Audit trail for all sales-related changes with 
 COMMENT ON COLUMN sales_audit.audit_id IS 'Unique identifier for each audit record';
 COMMENT ON COLUMN sales_audit.timestamp IS 'When the audit event occurred';
 COMMENT ON COLUMN sales_audit.sale_id IS 'Reference to the sales record that was modified';
-COMMENT ON COLUMN sales_audit.audit_type IS 'Type of change: quantity_change, payment_update, or deletion';
+COMMENT ON COLUMN sales_audit.audit_type IS 'Type of change: quantity_change, payment_method_change, or deletion';
 COMMENT ON COLUMN sales_audit.boxes_change IS 'Change in box quantity (can be negative)';
 COMMENT ON COLUMN sales_audit.kg_change IS 'Change in kg quantity (can be negative)';
 COMMENT ON COLUMN sales_audit.reason IS 'Description of why the change was made';
@@ -1125,6 +1162,86 @@ COMMENT ON COLUMN deposits.updated_at IS 'Timestamp when record was last updated
 COMMENT ON COLUMN deposits.updated_by IS 'User who last updated the deposit record';
 
 -- =====================================================
+-- USER SETTINGS TABLE
+-- Stores user preferences and application settings
+-- =====================================================
+
+-- User settings table for storing user preferences
+CREATE TABLE IF NOT EXISTS user_settings (
+    setting_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Owner of these settings
+
+    -- Currency Settings
+    currency VARCHAR(3) DEFAULT 'USD' CHECK (currency IN ('USD', 'RWF')), -- User's preferred currency
+
+    -- Language & Localization Settings
+    language VARCHAR(5) DEFAULT 'en' CHECK (language IN ('en', 'rw')), -- User's preferred language
+    timezone VARCHAR(50) DEFAULT 'UTC', -- User's timezone
+    date_format VARCHAR(20) DEFAULT 'MM/DD/YYYY', -- Preferred date format
+
+    -- Theme & Display Settings
+    theme VARCHAR(10) DEFAULT 'light' CHECK (theme IN ('light', 'dark', 'system')), -- UI theme preference
+
+    -- Notification Settings
+    email_notifications BOOLEAN DEFAULT TRUE, -- Enable email notifications
+    sms_notifications BOOLEAN DEFAULT FALSE, -- Enable SMS notifications
+    low_stock_alerts BOOLEAN DEFAULT TRUE, -- Enable low stock alerts
+    daily_reports BOOLEAN DEFAULT TRUE, -- Enable daily reports
+    weekly_reports BOOLEAN DEFAULT TRUE, -- Enable weekly reports
+    monthly_reports BOOLEAN DEFAULT FALSE, -- Enable monthly reports
+    auto_reporting BOOLEAN DEFAULT TRUE, -- Enable automatic reporting
+
+    -- Business Settings
+    business_hours_start TIME DEFAULT '08:00:00', -- Business start time
+    business_hours_end TIME DEFAULT '18:00:00', -- Business end time
+    working_days INTEGER[] DEFAULT ARRAY[1,2,3,4,5], -- Working days (1=Monday, 7=Sunday)
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create unique index to ensure one settings record per user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
+
+-- Create index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_user_settings_currency ON user_settings(currency);
+CREATE INDEX IF NOT EXISTS idx_user_settings_language ON user_settings(language);
+
+-- Create trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_user_settings_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_user_settings_updated_at
+    BEFORE UPDATE ON user_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_user_settings_updated_at();
+
+-- Comments for documentation
+COMMENT ON TABLE user_settings IS 'Stores user preferences and application settings';
+COMMENT ON COLUMN user_settings.setting_id IS 'Unique identifier for each setting record';
+COMMENT ON COLUMN user_settings.user_id IS 'User who owns these settings';
+COMMENT ON COLUMN user_settings.currency IS 'User preferred currency (USD or RWF)';
+COMMENT ON COLUMN user_settings.language IS 'User preferred language (en or rw)';
+COMMENT ON COLUMN user_settings.timezone IS 'User timezone for date/time display';
+COMMENT ON COLUMN user_settings.theme IS 'UI theme preference (light, dark, or system)';
+COMMENT ON COLUMN user_settings.email_notifications IS 'Enable/disable email notifications';
+COMMENT ON COLUMN user_settings.sms_notifications IS 'Enable/disable SMS notifications';
+COMMENT ON COLUMN user_settings.low_stock_alerts IS 'Enable/disable low stock alerts';
+COMMENT ON COLUMN user_settings.daily_reports IS 'Enable/disable daily reports';
+COMMENT ON COLUMN user_settings.weekly_reports IS 'Enable/disable weekly reports';
+COMMENT ON COLUMN user_settings.monthly_reports IS 'Enable/disable monthly reports';
+COMMENT ON COLUMN user_settings.auto_reporting IS 'Enable/disable automatic reporting';
+COMMENT ON COLUMN user_settings.business_hours_start IS 'Business operating start time';
+COMMENT ON COLUMN user_settings.business_hours_end IS 'Business operating end time';
+COMMENT ON COLUMN user_settings.working_days IS 'Array of working days (1=Monday, 7=Sunday)';
+
+-- =====================================================
 -- FOLDERS TABLE FUNCTIONS
 -- =====================================================
 
@@ -1151,5 +1268,5 @@ $$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- END OF SCHEMA DEFINITION
--- Fish Selling Management System - 20 Tables Complete
+-- Fish Selling Management System - 21 Tables Complete
 -- =====================================================

@@ -446,6 +446,72 @@ export interface Database {
           updated_by?: string | null;
         };
       };
+      // User settings table - user preferences and application settings
+      user_settings: {
+        Row: {
+          setting_id: string;
+          user_id: string;
+          currency: 'USD' | 'RWF';
+          language: 'en' | 'rw';
+          timezone: string;
+          date_format: string;
+          theme: 'light' | 'dark' | 'system';
+          email_notifications: boolean;
+          sms_notifications: boolean;
+          low_stock_alerts: boolean;
+          daily_reports: boolean;
+          weekly_reports: boolean;
+          monthly_reports: boolean;
+          auto_reporting: boolean;
+          business_hours_start: string;
+          business_hours_end: string;
+          working_days: number[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          setting_id?: string;
+          user_id: string;
+          currency?: 'USD' | 'RWF';
+          language?: 'en' | 'rw';
+          timezone?: string;
+          date_format?: string;
+          theme?: 'light' | 'dark' | 'system';
+          email_notifications?: boolean;
+          sms_notifications?: boolean;
+          low_stock_alerts?: boolean;
+          daily_reports?: boolean;
+          weekly_reports?: boolean;
+          monthly_reports?: boolean;
+          auto_reporting?: boolean;
+          business_hours_start?: string;
+          business_hours_end?: string;
+          working_days?: number[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          setting_id?: string;
+          user_id?: string;
+          currency?: 'USD' | 'RWF';
+          language?: 'en' | 'rw';
+          timezone?: string;
+          date_format?: string;
+          theme?: 'light' | 'dark' | 'system';
+          email_notifications?: boolean;
+          sms_notifications?: boolean;
+          low_stock_alerts?: boolean;
+          daily_reports?: boolean;
+          weekly_reports?: boolean;
+          monthly_reports?: boolean;
+          auto_reporting?: boolean;
+          business_hours_start?: string;
+          business_hours_end?: string;
+          working_days?: number[];
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

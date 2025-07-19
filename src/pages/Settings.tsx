@@ -37,6 +37,7 @@ import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { toast } from "sonner";
+import { useCurrency, CURRENCIES, type Currency } from '@/contexts/CurrencyContext';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -45,6 +46,9 @@ const Settings: React.FC = () => {
   // Fetch user profile data from database using custom hook
   // This hook automatically fetches data on mount (read-only, no editing)
   const { profile, isLoading: profileLoading, error: profileError } = useUserProfile();
+
+  // Currency context
+  const { currency, updateCurrency, isLoading: currencyLoading } = useCurrency();
 
   // Local state for editing user details
   const [userDetails, setUserDetails] = useState({
@@ -69,6 +73,7 @@ const Settings: React.FC = () => {
   // Settings state
   const [settings, setSettings] = useState({
     language: i18n.language,
+    currency: currency,
     theme: localStorage.getItem('theme') || 'light',
     autoReporting: true,
     emailNotifications: true,
@@ -78,6 +83,14 @@ const Settings: React.FC = () => {
     weeklyReports: true,
     monthlyReports: false
   });
+
+  // Update settings when currency changes from context
+  useEffect(() => {
+    setSettings(prev => ({
+      ...prev,
+      currency: currency
+    }));
+  }, [currency]);
 
   // Payment status state
   const [paymentStatus, setPaymentStatus] = useState({
@@ -92,7 +105,7 @@ const Settings: React.FC = () => {
   // const [isSaving, setIsSaving] = useState(false);
 
   // Handle settings change (keeping only settings functionality)
-  const handleSettingsChange = (field: string, value: string | boolean) => {
+  const handleSettingsChange = async (field: string, value: string | boolean) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
@@ -108,6 +121,19 @@ const Settings: React.FC = () => {
       localStorage.setItem('theme', value as string);
       // Apply theme change logic here
       document.documentElement.classList.toggle('dark', value === 'dark');
+    }
+
+    if (field === 'currency') {
+      try {
+        await updateCurrency(value as Currency);
+      } catch (error) {
+        console.error('Failed to update currency:', error);
+        // Revert the state change if API call fails
+        setSettings(prev => ({
+          ...prev,
+          currency: currency // revert to previous currency
+        }));
+      }
     }
   };
 
@@ -416,19 +442,19 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Language & Theme Section */}
+        {/* Language, Currency & Theme Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              Language & Theme
+              Language, Currency & Theme
             </CardTitle>
             <CardDescription>
-              Customize your language and appearance preferences
+              Customize your language, currency, and appearance preferences
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-3">
                 <Label className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
@@ -446,6 +472,32 @@ const Settings: React.FC = () => {
                     <SelectItem value="rw">🇷🇼 Kinyarwanda</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Currency
+                </Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) => handleSettingsChange('currency', value)}
+                  disabled={currencyLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">💵 {CURRENCIES.USD.name} ({CURRENCIES.USD.symbol})</SelectItem>
+                    <SelectItem value="RWF">🇷🇼 {CURRENCIES.RWF.name} ({CURRENCIES.RWF.symbol})</SelectItem>
+                  </SelectContent>
+                </Select>
+                {currencyLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating currency...
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">

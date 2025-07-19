@@ -197,6 +197,43 @@ export const DEPOSIT_TYPES = [
   { value: 'boss', label: 'Boss' },
 ] as const;
 
+// Debtor interface for customers with outstanding payments
+export interface Debtor {
+  clientName: string;
+  email: string | null;
+  phone: string | null;
+  totalOwed: number;
+  totalAmount: number;
+  totalPaid: number;
+  salesCount: number;
+  lastSaleDate: string;
+  sales: Array<{
+    id: string;
+    total_amount: number;
+    amount_paid: number;
+    remaining_amount: number;
+    payment_status: 'pending' | 'partial';
+    payment_method: string | null;
+    date_time: string;
+    products?: {
+      name: string;
+      category_id: string;
+      product_categories?: {
+        name: string;
+      };
+    };
+  }>;
+}
+
+// Debtor filters interface
+export interface DebtorFilters {
+  search?: string;
+  sortBy?: 'client_name' | 'remaining_amount' | 'total_amount' | 'date_time';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
 // Utility type for payment method values
 export type PaymentMethod = typeof PAYMENT_METHODS[number]['value'];
 

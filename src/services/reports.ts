@@ -12,8 +12,8 @@ export interface ReportFilters {
   dateTo?: string;
   categoryId?: string;
   lowStockOnly?: boolean;
-  paymentMethod?: 'cash' | 'card' | 'transfer' | 'other';
-  paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
+  paymentMethod?: 'momo_pay' | 'cash' | 'bank_transfer';
+  paymentStatus?: 'paid' | 'pending' | 'partial';
   type?: 'sale' | 'expense' | 'deposit';
 }
 

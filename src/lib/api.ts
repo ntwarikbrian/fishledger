@@ -210,9 +210,10 @@ export const productsApi = {
   /**
    * Delete a product (with cascading delete of all related records)
    */
-  delete: (id: string) =>
+  delete: (id: string, reason?: string) =>
     apiRequest(`/api/products/${id}`, {
       method: 'DELETE',
+      body: reason ? JSON.stringify({ reason }) : undefined,
     }),
 
   /**
@@ -277,17 +278,54 @@ export const stockMovementsApi = {
    */
   create: (data: {
     product_id: string;
-    movement_type: 'damaged' | 'new_stock' | 'stock_correction';
-    box_change: number;
-    kg_change: number;
+    movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'product_edit' | 'product_delete';
+    box_change?: number;
+    kg_change?: number;
     reason?: string;
     damaged_id?: string;
     stock_addition_id?: string;
     correction_id?: string;
+    field_changed?: string;
+    old_value?: string;
+    new_value?: string;
   }) =>
     apiRequest(`/api/stock-movements`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  /**
+   * Approve a pending product edit request
+   */
+  approveProductEdit: (movementId: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/approve`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Reject a pending product edit request
+   */
+  rejectProductEdit: (movementId: string, reason?: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/reject`, {
+      method: 'POST',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    }),
+
+  /**
+   * Approve a pending product delete request
+   */
+  approveProductDelete: (movementId: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/approve-delete`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Reject a pending product delete request
+   */
+  rejectProductDelete: (movementId: string, reason?: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/reject-delete`, {
+      method: 'POST',
+      body: reason ? JSON.stringify({ reason }) : undefined,
     }),
 };
 

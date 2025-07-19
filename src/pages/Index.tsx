@@ -15,6 +15,7 @@ import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useUser, getUserDisplayName } from "@/hooks/use-user";
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useDashboardStats, useRevenueChart, useFinancialOverview } from "@/hooks/use-dashboard-data";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine, PieChart, Pie, Cell } from "recharts";
@@ -84,10 +85,11 @@ const FinancialOverviewSkeleton = () => (
  * Revenue Chart Component
  * Displays profit and investment data over time with area chart
  */
-const RevenueChart = ({ data, loading, error }: {
+const RevenueChart = ({ data, loading, error, formatCurrency }: {
   data: any[] | null;
   loading: boolean;
   error: string | null;
+  formatCurrency: (amount: number) => string;
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -159,7 +161,7 @@ const RevenueChart = ({ data, loading, error }: {
             fontSize="10"
             fontWeight="500"
           >
-            ${(value / 1000).toFixed(0)}K
+            {(value / 1000).toFixed(0)}K
           </text>
         </g>
       );
@@ -244,7 +246,7 @@ const RevenueChart = ({ data, loading, error }: {
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 10, fill: '#6b7280' }}
-            tickFormatter={(value) => `${value / 1000}K`}
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
             className="text-gray-500"
             width={30}
           />
@@ -253,7 +255,7 @@ const RevenueChart = ({ data, loading, error }: {
             content={
               <ChartTooltipContent
                 formatter={(value, name) => [
-                  `$${(value as number).toLocaleString()}`,
+                  formatCurrency(value as number),
                   name === 'profit' ? 'Profit' : 'Invest'
                 ]}
                 labelFormatter={(label) => `Month: ${label}`}
@@ -300,10 +302,11 @@ const RevenueChart = ({ data, loading, error }: {
  * Financial Overview Component
  * Displays revenue, profit, expense, and damaged values with beautiful donut chart
  */
-const FinancialOverviewChart = ({ data, loading, error }: {
+const FinancialOverviewChart = ({ data, loading, error, formatCurrency }: {
   data: any[] | null;
   loading: boolean;
   error: string | null;
+  formatCurrency: (amount: number) => string;
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -422,7 +425,7 @@ const FinancialOverviewChart = ({ data, loading, error }: {
                             <span className="font-medium text-gray-900 dark:text-gray-100">{data.name}</span>
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Amount: <span className="font-bold text-gray-900 dark:text-gray-100">${data.amount.toLocaleString()}</span>
+                            Amount: <span className="font-bold text-gray-900 dark:text-gray-100">{formatCurrency(data.amount)}</span>
                           </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             Percentage: <span className="font-bold text-gray-900 dark:text-gray-100">{data.value}%</span>
@@ -439,7 +442,7 @@ const FinancialOverviewChart = ({ data, loading, error }: {
             {/* Center Text */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
-                ${(totalAmount / 1000).toFixed(0)}K
+                {formatCurrency(totalAmount / 1000)}{totalAmount >= 1000 ? 'K' : ''}
               </span>
               <span className="text-[10px] md:text-xs text-gray-600 dark:text-gray-400 text-center">
                 {t('dashboard.totalValue', 'Total Value')}
@@ -461,7 +464,7 @@ const FinancialOverviewChart = ({ data, loading, error }: {
                       {item.name}
                     </span>
                     <span className="text-[10px] text-gray-600 dark:text-gray-400">
-                      ${(item.amount / 1000).toFixed(1)}K
+                      {formatCurrency(item.amount / 1000)}{item.amount >= 1000 ? 'K' : ''}
                     </span>
                   </div>
                 </div>
@@ -477,13 +480,13 @@ const FinancialOverviewChart = ({ data, loading, error }: {
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <div className="text-sm font-bold text-green-600 dark:text-green-400">
-                  ${((financialData[0].amount + financialData[1].amount) / 1000).toFixed(1)}K
+                  {formatCurrency((financialData[0].amount + financialData[1].amount) / 1000)}K
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">{t('dashboard.netPositive', 'Net Positive')}</div>
               </div>
               <div>
                 <div className="text-sm font-bold text-red-600 dark:text-red-400">
-                  ${((financialData[2].amount + financialData[3].amount) / 1000).toFixed(1)}K
+                  {formatCurrency((financialData[2].amount + financialData[3].amount) / 1000)}K
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">{t('dashboard.totalCosts', 'Total Costs')}</div>
               </div>
@@ -500,6 +503,7 @@ const Dashboard = () => {
   const { t } = useTranslation();
   usePageTitle('navigation.dashboard', 'Dashboard');
   const userInfo = useUser();
+  const { formatCurrency } = useCurrency();
 
   // Revenue chart period state
   const [revenueChartPeriod, setRevenueChartPeriod] = useState<'week' | 'month' | '6months'>('month');
@@ -631,7 +635,7 @@ const Dashboard = () => {
                       ) : stats.error ? (
                         <span className="text-red-500 text-lg">Error</span>
                       ) : (
-                        `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                        formatCurrency(stats.data?.totalRevenue || 0)
                       )}
                     </div>
 
@@ -968,7 +972,7 @@ const Dashboard = () => {
                     ) : stats.error ? (
                       <span className="text-red-500 text-lg">Error</span>
                     ) : (
-                      `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                      formatCurrency(stats.data?.totalRevenue || 0)
                     )}
                   </div>
 
@@ -1179,7 +1183,7 @@ const Dashboard = () => {
                           ) : stats.error ? (
                             <span className="text-red-500">Error</span>
                           ) : (
-                            `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                            formatCurrency(stats.data?.totalRevenue || 0)
                           )}
                         </span>
                         {stats.loading ? (
@@ -1227,6 +1231,7 @@ const Dashboard = () => {
                   data={revenueChart.data}
                   loading={revenueChart.loading}
                   error={revenueChart.error}
+                  formatCurrency={formatCurrency}
                 />
               </CardContent>
             </Card>
@@ -1238,6 +1243,7 @@ const Dashboard = () => {
               data={financialOverview.data}
               loading={financialOverview.loading}
               error={financialOverview.error}
+              formatCurrency={formatCurrency}
             />
           </div>
         </div>
@@ -1326,7 +1332,7 @@ const Dashboard = () => {
                         ) : stats.error ? (
                           <span className="text-red-500">Error</span>
                         ) : (
-                          `$${stats.data?.totalRevenue?.toLocaleString() || '0'}`
+                          formatCurrency(stats.data?.totalRevenue || 0)
                         )}
                       </div>
 
@@ -1349,6 +1355,7 @@ const Dashboard = () => {
                       data={revenueChart.data}
                       loading={revenueChart.loading}
                       error={revenueChart.error}
+                      formatCurrency={formatCurrency}
                     />
                   </CardContent>
                 </Card>
@@ -1360,6 +1367,7 @@ const Dashboard = () => {
                   data={financialOverview.data}
                   loading={financialOverview.loading}
                   error={financialOverview.error}
+                  formatCurrency={formatCurrency}
                 />
               </div>
             </div>

@@ -45,8 +45,8 @@ const stockReportSchema = dateRangeSchema.extend({
 });
 
 const salesReportSchema = dateRangeSchema.extend({
-  paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']).optional(),
-  paymentStatus: z.enum(['pending', 'completed', 'failed', 'refunded']).optional(),
+  paymentMethod: z.enum(['momo_pay', 'cash', 'bank_transfer']).optional(),
+  paymentStatus: z.enum(['paid', 'pending', 'partial']).optional(),
 });
 
 const financialReportSchema = z.object({
@@ -159,8 +159,8 @@ reports.get('/stock/pdf', validateQuery(stockReportSchema), generateStockReport)
  * Query Parameters:
  * - dateFrom (optional): Start date for filtering (ISO string)
  * - dateTo (optional): End date for filtering (ISO string)
- * - paymentMethod (optional): Filter by payment method ('cash', 'card', 'transfer', 'other')
- * - paymentStatus (optional): Filter by payment status ('pending', 'completed', 'failed', 'refunded')
+ * - paymentMethod (optional): Filter by payment method ('momo_pay', 'cash', 'bank_transfer')
+ * - paymentStatus (optional): Filter by payment status ('paid', 'pending', 'partial')
  */
 reports.get('/sales/pdf', validateQuery(salesReportSchema), generateSalesReport);
 

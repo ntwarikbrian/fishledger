@@ -25,6 +25,7 @@ import { transactions } from './transaction.routes';
 import { dashboard } from './dashboard.routes';
 import upload from './upload';
 import { reports } from './report.routes';
+import { settings } from './settings.routes';
  
 
 /**
@@ -52,6 +53,7 @@ export function createApiRoutes() {
   api.route('/dashboard', dashboard);
   api.route('/upload', upload);
   api.route('/reports', reports);
+  api.route('/settings', settings);
 
   return api;
 }

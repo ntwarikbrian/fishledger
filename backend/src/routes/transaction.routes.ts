@@ -14,6 +14,7 @@ import {
   getTransactionStatsHandler,
   getTransactionsBySaleHandler,
   createTransactionWithImageHandler,
+  getDebtorsHandler,
 } from '../handlers/transactions';
 import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
 
@@ -35,6 +36,9 @@ transactions.get('/', requireEmployee, getTransactionsHandler);
 
 // GET /transactions/stats - Get transaction statistics and summary
 transactions.get('/stats', requireEmployee, getTransactionStatsHandler);
+
+// GET /transactions/debtors - Get customers with unpaid or partially paid sales
+transactions.get('/debtors', requireEmployee, getDebtorsHandler);
 
 // GET /transactions/:id - Get a specific transaction by ID
 transactions.get('/:id', requireEmployee, getTransactionHandler);
