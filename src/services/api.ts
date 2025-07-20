@@ -398,6 +398,54 @@ export const healthAPI = {
   },
 };
 
+// Transactions API types
+export interface MarkAsPaidRequest {
+  client_name: string;
+  amount_paid: number;
+  payment_method?: 'momo_pay' | 'cash' | 'bank_transfer';
+  reference?: string;
+}
+
+export interface MarkAsPaidResponse {
+  client_name: string;
+  amount_paid: number;
+  payment_method: string;
+  reference?: string;
+  updated_sales: number;
+  updated_transactions: number;
+  remaining_outstanding: number;
+  sales_updated: Array<{
+    sale_id: string;
+    new_payment_status: string;
+    amount_paid_to_sale: number;
+    remaining_amount: number;
+  }>;
+}
+
+export interface TransactionApiResponse<T> {
+  success: boolean;
+  data: T;
+  message: string;
+  timestamp: string;
+  requestId?: string;
+}
+
+// Transactions API
+export const transactionsAPI = {
+  // Mark debtor as paid
+  markAsPaid: async (request: MarkAsPaidRequest): Promise<TransactionApiResponse<MarkAsPaidResponse>> => {
+    console.log('🔄 Calling mark as paid API with request:', request);
+    try {
+      const response = await apiClient.post<TransactionApiResponse<MarkAsPaidResponse>>('/api/transactions/mark-as-paid', request);
+      console.log('✅ Mark as paid API response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Mark as paid API error:', error);
+      throw error;
+    }
+  },
+};
+
 // Dashboard API types
 export interface DashboardStats {
   totalRevenue: number;

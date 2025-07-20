@@ -13,7 +13,8 @@ import {
   deleteProductHandler,
   getLowStockHandler,
   getDamagedProductHandler,
-  recordDamagedProductHandler
+  recordDamagedProductHandler,
+  deleteDamagedProductHandler
 } from '../handlers/products';
 import {
   createStockAdditionHandler,
@@ -57,6 +58,9 @@ products.delete('/:id', requireManager, deleteProductHandler);
 
 // POST /products/:id/damage - Record damaged product (manager or admin)
 products.post('/:id/damage', requireManager, recordDamagedProductHandler);
+
+// DELETE /products/damaged/:damageId - Delete damaged product record (manager or admin)
+products.delete('/damaged/:damageId', requireManager, deleteDamagedProductHandler);
 
 // POST /products/:id/stock - Add stock to product (manager or admin)
 products.post('/:id/stock', requireManager, createStockAdditionHandler);

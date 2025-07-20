@@ -32,7 +32,7 @@ const API_BASE_URL = getApiBaseUrl();
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
-): Promise<{ success: boolean; data?: T; message?: string; error?: string }> {
+): Promise<{ success: boolean; data?: T; message?: string; error?: string; status?: number }> {
   try {
     const token = localStorage.getItem('auth_token');
 
@@ -234,6 +234,14 @@ export const productsApi = {
    * Get all damaged products
    */
   getDamagedProducts: () => apiRequest<any[]>('/api/products/damaged'),
+
+  /**
+   * Delete a damaged product record and restore stock
+   */
+  deleteDamagedProduct: (damageId: string) =>
+    apiRequest(`/api/products/damaged/${damageId}`, {
+      method: 'DELETE',
+    }),
 };
 
 /**
@@ -278,7 +286,7 @@ export const stockMovementsApi = {
    */
   create: (data: {
     product_id: string;
-    movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'product_edit' | 'product_delete';
+    movement_type: 'damaged' | 'new_stock' | 'stock_correction' | 'product_edit' | 'product_delete' | 'product_create';
     box_change?: number;
     kg_change?: number;
     reason?: string;
@@ -324,6 +332,57 @@ export const stockMovementsApi = {
    */
   rejectProductDelete: (movementId: string, reason?: string) =>
     apiRequest(`/api/stock-movements/${movementId}/reject-delete`, {
+      method: 'POST',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    }),
+
+  /**
+   * Approve a pending stock addition request
+   */
+  approveStockAddition: (movementId: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/approve-stock-addition`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Reject a pending stock addition request
+   */
+  rejectStockAddition: (movementId: string, reason?: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/reject-stock-addition`, {
+      method: 'POST',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    }),
+
+  /**
+   * Approve a pending stock correction request
+   */
+  approveStockCorrection: (movementId: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/approve-stock-correction`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Reject a pending stock correction request
+   */
+  rejectStockCorrection: (movementId: string, reason?: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/reject-stock-correction`, {
+      method: 'POST',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    }),
+
+  /**
+   * Approve a pending product creation request
+   */
+  approveProductCreate: (movementId: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/approve-product-create`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Reject a pending product creation request
+   */
+  rejectProductCreate: (movementId: string, reason?: string) =>
+    apiRequest(`/api/stock-movements/${movementId}/reject-product-create`, {
       method: 'POST',
       body: reason ? JSON.stringify({ reason }) : undefined,
     }),

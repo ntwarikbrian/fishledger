@@ -18,14 +18,14 @@ const stockMovementFiltersSchema = z.object({
   sortBy: z.string().default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   product_id: z.string().uuid().optional(),
-  movement_type: z.enum(['damaged', 'new_stock', 'stock_correction', 'product_edit']).optional(),
+  movement_type: z.enum(['damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create']).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
 });
 
 const createStockMovementSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
-  movement_type: z.enum(['damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete']),
+  movement_type: z.enum(['damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create']),
   box_change: z.number().int().default(0),
   kg_change: z.number().default(0),
   reason: z.string().optional(),
@@ -45,16 +45,20 @@ const createStockMovementSchema = z.object({
   if (data.movement_type === 'product_delete') {
     return data.field_changed && data.old_value !== undefined && data.new_value !== undefined;
   }
+  // For product_create movements, field_changed is required
+  if (data.movement_type === 'product_create') {
+    return data.field_changed && data.new_value !== undefined;
+  }
   // For other movements, box_change or kg_change must be non-zero
   return data.box_change !== 0 || data.kg_change !== 0;
 }, {
-  message: "Product edit and delete movements require field_changed, old_value, and new_value. Other movements require non-zero quantity changes.",
+  message: "Product edit and delete movements require field_changed, old_value, and new_value. Product create movements require field_changed and new_value. Other movements require non-zero quantity changes.",
 });
 
 /**
  * Get all stock movements with pagination and filtering
  */
-export const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
+const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
   // Parse and validate query parameters
   const queryParams = Object.fromEntries(
     Object.entries(c.req.queries()).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
@@ -178,7 +182,7 @@ export const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
 /**
  * Create a new stock movement
  */
-export const createStockMovementHandler = asyncHandler(async (c: HonoContext) => {
+const createStockMovementHandler = asyncHandler(async (c: HonoContext) => {
   const body = await c.req.json();
 
   // Validate request body
@@ -241,7 +245,7 @@ export const createStockMovementHandler = asyncHandler(async (c: HonoContext) =>
 /**
  * Get stock movements for a specific product
  */
-export const getProductStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
+const getProductStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
   const productId = c.req.param('productId');
 
   if (!productId) {
@@ -295,7 +299,7 @@ export const getProductStockMovementsHandler = asyncHandler(async (c: HonoContex
 /**
  * Get stock summary for a product
  */
-export const getStockSummaryHandler = asyncHandler(async (c: HonoContext) => {
+const getStockSummaryHandler = asyncHandler(async (c: HonoContext) => {
   const productId = c.req.param('productId');
 
   if (!productId) {
@@ -359,7 +363,7 @@ export const getStockSummaryHandler = asyncHandler(async (c: HonoContext) => {
 /**
  * Approve a pending product edit request
  */
-export const approveProductEditHandler = asyncHandler(async (c: HonoContext) => {
+const approveProductEditHandler = asyncHandler(async (c: HonoContext) => {
   const movementId = c.req.param('movementId');
 
   if (!movementId) {
@@ -439,7 +443,7 @@ export const approveProductEditHandler = asyncHandler(async (c: HonoContext) => 
 /**
  * Reject a pending product edit request
  */
-export const rejectProductEditHandler = asyncHandler(async (c: HonoContext) => {
+const rejectProductEditHandler = asyncHandler(async (c: HonoContext) => {
   const movementId = c.req.param('movementId');
 
   if (!movementId) {
@@ -493,7 +497,7 @@ export const rejectProductEditHandler = asyncHandler(async (c: HonoContext) => {
 /**
  * Approve a pending product delete request
  */
-export const approveProductDeleteHandler = asyncHandler(async (c: HonoContext) => {
+const approveProductDeleteHandler = asyncHandler(async (c: HonoContext) => {
   const movementId = c.req.param('movementId');
 
   if (!movementId) {
@@ -634,7 +638,7 @@ export const approveProductDeleteHandler = asyncHandler(async (c: HonoContext) =
 /**
  * Reject a pending product delete request
  */
-export const rejectProductDeleteHandler = asyncHandler(async (c: HonoContext) => {
+const rejectProductDeleteHandler = asyncHandler(async (c: HonoContext) => {
   const movementId = c.req.param('movementId');
 
   if (!movementId) {
@@ -684,3 +688,394 @@ export const rejectProductDeleteHandler = asyncHandler(async (c: HonoContext) =>
     requestId: c.get('requestId'),
   });
 });
+
+/**
+ * Approve a pending stock addition request
+ */
+const approveStockAdditionHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Get the pending stock addition movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'new_stock')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending stock addition request');
+  }
+
+  // Get current product data
+  const { data: product, error: productError } = await c.get('supabase')
+    .from('products')
+    .select('*')
+    .eq('product_id', movement.product_id)
+    .single();
+
+  if (productError || !product) {
+    throwNotFoundError('Product');
+  }
+
+  // Update product quantities
+  const { error: updateError } = await c.get('supabase')
+    .from('products')
+    .update({
+      quantity_box: product.quantity_box + movement.box_change,
+      quantity_kg: product.quantity_kg + movement.kg_change,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('product_id', movement.product_id);
+
+  if (updateError) {
+    throw new Error(`Failed to update product quantities: ${updateError.message}`);
+  }
+
+  // Update the movement status to completed
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      status: 'completed'
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to update movement status: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Stock addition request approved and applied successfully',
+    data: {
+      movement_id: movementId,
+      product_id: movement.product_id,
+      boxes_added: movement.box_change,
+      kg_added: movement.kg_change
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+/**
+ * Reject a pending stock addition request
+ */
+const rejectStockAdditionHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Parse request body for rejection reason
+  const body = await c.req.json().catch(() => ({}));
+  const rejectionReason = body.reason || 'No reason provided';
+
+  // Get the pending stock addition movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'new_stock')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending stock addition request');
+  }
+
+  // Update the movement status to rejected with rejection reason
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      status: 'rejected',
+      reason: `${movement.reason} | REJECTED: ${rejectionReason}`
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to reject movement: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Stock addition request rejected successfully',
+    data: {
+      movement_id: movementId,
+      product_id: movement.product_id,
+      rejection_reason: rejectionReason
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+/**
+ * Approve a pending stock correction request
+ */
+const approveStockCorrectionHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Get the pending stock correction movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'stock_correction')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending stock correction request');
+  }
+
+  // Get current product data
+  const { data: product, error: productError } = await c.get('supabase')
+    .from('products')
+    .select('*')
+    .eq('product_id', movement.product_id)
+    .single();
+
+  if (productError || !product) {
+    throwNotFoundError('Product');
+  }
+
+  // Update product quantities
+  const { error: updateError } = await c.get('supabase')
+    .from('products')
+    .update({
+      quantity_box: product.quantity_box + movement.box_change,
+      quantity_kg: product.quantity_kg + movement.kg_change,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('product_id', movement.product_id);
+
+  if (updateError) {
+    throw new Error(`Failed to update product quantities: ${updateError.message}`);
+  }
+
+  // Update the movement status to completed
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      status: 'completed'
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to update movement status: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Stock correction request approved and applied successfully',
+    data: {
+      movement_id: movementId,
+      product_id: movement.product_id,
+      box_adjustment: movement.box_change,
+      kg_adjustment: movement.kg_change
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+/**
+ * Reject a pending stock correction request
+ */
+const rejectStockCorrectionHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Parse request body for rejection reason
+  const body = await c.req.json().catch(() => ({}));
+  const rejectionReason = body.reason || 'No reason provided';
+
+  // Get the pending stock correction movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'stock_correction')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending stock correction request');
+  }
+
+  // Update the movement status to rejected with rejection reason
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      status: 'rejected',
+      reason: `${movement.reason} | REJECTED: ${rejectionReason}`
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to reject movement: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Stock correction request rejected successfully',
+    data: {
+      movement_id: movementId,
+      product_id: movement.product_id,
+      rejection_reason: rejectionReason
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+/**
+ * Approve a pending product creation request
+ */
+const approveProductCreateHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Get the pending product creation movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'product_create')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending product creation request');
+  }
+
+  // Parse the product data from new_value
+  let productData;
+  try {
+    productData = JSON.parse(movement.new_value);
+  } catch (error) {
+    throw new Error('Invalid product data in creation request');
+  }
+
+  // Create the product
+  const { data: newProduct, error: createError } = await c.get('supabase')
+    .from('products')
+    .insert([productData])
+    .select()
+    .single();
+
+  if (createError) {
+    throw new Error(`Failed to create product: ${createError.message}`);
+  }
+
+  // Update the movement with the actual product_id and mark as completed
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      product_id: newProduct.product_id,
+      status: 'completed'
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to update movement status: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Product creation request approved and product created successfully',
+    data: {
+      movement_id: movementId,
+      product: newProduct
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+/**
+ * Reject a pending product creation request
+ */
+const rejectProductCreateHandler = asyncHandler(async (c: HonoContext) => {
+  const movementId = c.req.param('movementId');
+
+  if (!movementId) {
+    throwValidationError('Movement ID is required');
+  }
+
+  // Parse request body for rejection reason
+  const body = await c.req.json().catch(() => ({}));
+  const rejectionReason = body.reason || 'No reason provided';
+
+  // Get the pending product creation movement
+  const { data: movement, error: fetchError } = await c.get('supabase')
+    .from('stock_movements')
+    .select('*')
+    .eq('movement_id', movementId)
+    .eq('movement_type', 'product_create')
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !movement) {
+    throwNotFoundError('Pending product creation request');
+  }
+
+  // Update the movement status to rejected with rejection reason
+  const { error: statusError } = await c.get('supabase')
+    .from('stock_movements')
+    .update({
+      status: 'rejected',
+      reason: `${movement.reason} | REJECTED: ${rejectionReason}`
+    })
+    .eq('movement_id', movementId);
+
+  if (statusError) {
+    throw new Error(`Failed to reject movement: ${statusError.message}`);
+  }
+
+  return c.json({
+    success: true,
+    message: 'Product creation request rejected successfully',
+    data: {
+      movement_id: movementId,
+      rejection_reason: rejectionReason
+    },
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+  });
+});
+
+// Export all handlers
+export {
+  getStockMovementsHandler,
+  createStockMovementHandler,
+  getProductStockMovementsHandler,
+  getStockSummaryHandler,
+  approveProductEditHandler,
+  rejectProductEditHandler,
+  approveProductDeleteHandler,
+  rejectProductDeleteHandler,
+  approveStockAdditionHandler,
+  rejectStockAdditionHandler,
+  approveStockCorrectionHandler,
+  rejectStockCorrectionHandler,
+  approveProductCreateHandler,
+  rejectProductCreateHandler
+};

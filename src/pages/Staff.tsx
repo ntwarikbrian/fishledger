@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Users,
   UserPlus,
@@ -26,15 +27,14 @@ import {
   Image,
   X,
   CreditCard,
-  CheckSquare,
-  Plus,
-  AlertCircle,
   CheckCircle,
   XCircle,
-  Timer,
-  Flag,
-  Search,
-  Filter
+  ChevronDown,
+  ChevronUp,
+  Package,
+  ShoppingCart,
+  CreditCard as TransactionIcon,
+  Receipt
 } from "lucide-react";
 import {
   Select,
@@ -52,6 +52,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import {
+  createWorker,
+  getAllWorkers,
+  updateWorkerPermissions,
+  getWorkerPermissions,
+  type Worker,
+  type CreateWorkerData,
+  type WorkerPermissions
+} from "@/services/workerService";
 
 const Staff = () => {
   // State for create worker form
@@ -69,22 +78,100 @@ const Staff = () => {
   const [idCardFrontPreview, setIdCardFrontPreview] = useState<string | null>(null);
   const [idCardBackPreview, setIdCardBackPreview] = useState<string | null>(null);
 
-  // State for task management
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-    assignedTo: "",
-    priority: "",
-    dueDate: "",
-    category: ""
-  });
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  // State for create worker dialog
+  const [isCreateWorkerDialogOpen, setIsCreateWorkerDialogOpen] = useState(false);
+
+
 
   // State for selected worker in roles and permissions
-  const [selectedWorker, setSelectedWorker] = useState<any>(null);
+  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
 
-  // Mock data for existing workers with login and revenue data
-  const workersData = [
+  // State for workers data and loading
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [isLoadingWorkers, setIsLoadingWorkers] = useState(false);
+  const [isCreatingWorker, setIsCreatingWorker] = useState(false);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+
+  // State for permissions management
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    productInventory: false,
+    sales: false,
+    transactions: false,
+    expenses: false
+  });
+
+  const [permissions, setPermissions] = useState<Record<string, Record<string, boolean>>>({
+    productInventory: {
+      viewProducts: false,
+      createProduct: false,
+      editProduct: false,
+      deleteProduct: false,
+      manageCategories: false,
+      viewStock: false,
+      updateStock: false,
+      viewReports: false
+    },
+    sales: {
+      viewSales: false,
+      createSale: false,
+      editSale: false,
+      deleteSale: false,
+      manageSalesReports: false,
+      viewCustomers: false,
+      managePayments: false
+    },
+    transactions: {
+      viewTransactions: false,
+      createTransaction: false,
+      editTransaction: false,
+      deleteTransaction: false,
+      manageDeposits: false,
+      viewFinancialReports: false,
+      manageDebtors: false
+    },
+    expenses: {
+      viewExpenses: false,
+      createExpense: false,
+      editExpense: false,
+      deleteExpense: false,
+      manageCategories: false,
+      viewExpenseReports: false,
+      approveExpenses: false
+    }
+  });
+
+  // Load workers data on component mount
+  useEffect(() => {
+    loadWorkers();
+  }, []);
+
+  // Load workers from API
+  const loadWorkers = async () => {
+    setIsLoadingWorkers(true);
+    try {
+      const response = await getAllWorkers();
+      if (response.success && response.data) {
+        setWorkers(response.data);
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to load workers",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load workers",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingWorkers(false);
+    }
+  };
+
+  // Mock data for existing workers with login and revenue data (fallback)
+  const mockWorkersData = [
     {
       id: 1,
       name: "John Smith",
@@ -147,79 +234,7 @@ const Staff = () => {
     }
   ];
 
-  // Mock data for tasks
-  const tasksData = [
-    {
-      id: 1,
-      title: "Update Fish Inventory System",
-      description: "Review and update the current fish inventory tracking system to improve accuracy",
-      assignedTo: "John Smith",
-      assignedToId: 1,
-      priority: "High",
-      status: "In Progress",
-      category: "System Management",
-      dueDate: "2024-01-25",
-      createdDate: "2024-01-20",
-      completedDate: null,
-      progress: 65
-    },
-    {
-      id: 2,
-      title: "Customer Service Training",
-      description: "Complete customer service training module for better customer interaction",
-      assignedTo: "Maria Rodriguez",
-      assignedToId: 2,
-      priority: "Medium",
-      status: "Pending",
-      category: "Training",
-      dueDate: "2024-01-28",
-      createdDate: "2024-01-22",
-      completedDate: null,
-      progress: 0
-    },
-    {
-      id: 3,
-      title: "Delivery Route Optimization",
-      description: "Analyze and optimize delivery routes to reduce time and fuel costs",
-      assignedTo: "David Chen",
-      assignedToId: 3,
-      priority: "Medium",
-      status: "Completed",
-      category: "Operations",
-      dueDate: "2024-01-20",
-      createdDate: "2024-01-15",
-      completedDate: "2024-01-19",
-      progress: 100
-    },
-    {
-      id: 4,
-      title: "Quality Control Checklist Update",
-      description: "Update the quality control checklist based on new fish handling standards",
-      assignedTo: "John Smith",
-      assignedToId: 1,
-      priority: "High",
-      status: "Overdue",
-      category: "Quality Control",
-      dueDate: "2024-01-18",
-      createdDate: "2024-01-10",
-      completedDate: null,
-      progress: 30
-    },
-    {
-      id: 5,
-      title: "Monthly Sales Report",
-      description: "Prepare comprehensive monthly sales report with analytics and insights",
-      assignedTo: "Maria Rodriguez",
-      assignedToId: 2,
-      priority: "Low",
-      status: "In Progress",
-      category: "Reporting",
-      dueDate: "2024-01-30",
-      createdDate: "2024-01-23",
-      completedDate: null,
-      progress: 45
-    }
-  ];
+
 
   // Handle form input changes
   const handleInputChange = (field: string, value: string) => {
@@ -300,7 +315,7 @@ const Staff = () => {
   };
 
   // Handle create worker form submission
-  const handleCreateWorker = (e: React.FormEvent) => {
+  const handleCreateWorker = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Basic validation
@@ -323,20 +338,49 @@ const Staff = () => {
       return;
     }
 
-    // Simulate API call with ID card files
-    console.log("Creating worker:", {
-      ...createWorkerForm,
-      idCardFront: idCardFront.name,
-      idCardBack: idCardBack.name
-    });
+    setIsCreatingWorker(true);
 
-    toast({
-      title: "Success",
-      description: "Worker account created successfully with ID card attachments",
-    });
+    try {
+      const workerData: CreateWorkerData = {
+        full_name: createWorkerForm.name,
+        email: createWorkerForm.email,
+        password: createWorkerForm.password,
+        phone_number: createWorkerForm.phone || undefined,
+        monthly_salary: createWorkerForm.salary ? parseFloat(createWorkerForm.salary) : undefined,
+        id_card_front: idCardFront,
+        id_card_back: idCardBack
+      };
 
-    // Reset form
-    resetForm();
+      const response = await createWorker(workerData);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: response.message || "Worker account created successfully",
+        });
+
+        // Reset form and close dialog
+        resetForm();
+        setIsCreateWorkerDialogOpen(false);
+
+        // Reload workers list
+        await loadWorkers();
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to create worker account",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingWorker(false);
+    }
   };
 
   // Reset form function
@@ -354,74 +398,124 @@ const Staff = () => {
     setIdCardBackPreview(null);
   };
 
-  // Task management functions
-  const handleTaskInputChange = (field: string, value: string) => {
-    setNewTask(prev => ({
+  // Permission management functions
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
       ...prev,
-      [field]: value
+      [section]: !prev[section]
     }));
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
-    e.preventDefault();
+  const togglePermission = (section: string, permission: string) => {
+    setPermissions(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [permission]: !prev[section][permission]
+      }
+    }));
+  };
 
-    // Basic validation
-    if (!newTask.title || !newTask.assignedTo || !newTask.dueDate) {
+  const savePermissions = async () => {
+    if (!selectedWorker) return;
+
+    setIsSavingPermissions(true);
+
+    try {
+      const response = await updateWorkerPermissions(selectedWorker.worker_id, permissions);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: response.message || `Permissions updated for ${selectedWorker.full_name}`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to update permissions",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsSavingPermissions(false);
     }
+  };
 
-    // Simulate API call
-    console.log("Creating task:", newTask);
+  // Load permissions when worker is selected
+  const loadWorkerPermissions = async (worker: Worker) => {
+    setSelectedWorker(worker);
 
-    toast({
-      title: "Success",
-      description: "Task assigned successfully",
+    // Reset expanded sections
+    setExpandedSections({
+      productInventory: false,
+      sales: false,
+      transactions: false,
+      expenses: false
     });
 
-    // Reset task form and close dialog
-    setNewTask({
-      title: "",
-      description: "",
-      assignedTo: "",
-      priority: "",
-      dueDate: "",
-      category: ""
-    });
-    setIsTaskDialogOpen(false);
-  };
+    try {
+      const response = await getWorkerPermissions(worker.worker_id);
 
-  const getTaskStatusBadge = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completed</Badge>;
-      case "In Progress":
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">In Progress</Badge>;
-      case "Pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pending</Badge>;
-      case "Overdue":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Overdue</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+      if (response.success && response.data) {
+        setPermissions(response.data);
+      } else {
+        // Set default permissions if none exist
+        setPermissions({
+          productInventory: {
+            viewProducts: false,
+            createProduct: false,
+            editProduct: false,
+            deleteProduct: false,
+            manageCategories: false,
+            viewStock: false,
+            updateStock: false,
+            viewReports: false
+          },
+          sales: {
+            viewSales: false,
+            createSale: false,
+            editSale: false,
+            deleteSale: false,
+            manageSalesReports: false,
+            viewCustomers: false,
+            managePayments: false
+          },
+          transactions: {
+            viewTransactions: false,
+            createTransaction: false,
+            editTransaction: false,
+            deleteTransaction: false,
+            manageDeposits: false,
+            viewFinancialReports: false,
+            manageDebtors: false
+          },
+          expenses: {
+            viewExpenses: false,
+            createExpense: false,
+            editExpense: false,
+            deleteExpense: false,
+            manageCategories: false,
+            viewExpenseReports: false,
+            approveExpenses: false
+          }
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load worker permissions",
+        variant: "destructive"
+      });
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">High</Badge>;
-      case "Medium":
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Medium</Badge>;
-      case "Low":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Low</Badge>;
-      default:
-        return <Badge variant="secondary">{priority}</Badge>;
-    }
-  };
+
 
   // Get status badge component
   const getStatusBadge = (status: string) => {
@@ -450,18 +544,10 @@ const Staff = () => {
 
         {/* Workers Management Tabs */}
         <Tabs defaultValue="all-workers" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="all-workers" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               All Workers
-            </TabsTrigger>
-            <TabsTrigger value="create-worker" className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Create Worker
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4" />
-              Tasks
             </TabsTrigger>
             <TabsTrigger value="roles-permissions" className="flex items-center gap-2">
               <Lock className="h-4 w-4" />
@@ -474,27 +560,282 @@ const Staff = () => {
             {/* Workers List */}
             <Card>
               <CardHeader>
-                <CardTitle>All Workers</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Manage worker accounts and track their performance
-                </p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>All Workers</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Manage worker accounts and track their performance
+                    </p>
+                  </div>
+                  <Dialog open={isCreateWorkerDialogOpen} onOpenChange={setIsCreateWorkerDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Create Worker
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <UserPlus className="h-5 w-5" />
+                          Create New Worker Account
+                        </DialogTitle>
+                        <DialogDescription>
+                          Add a new worker to your fish selling management system
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <form onSubmit={handleCreateWorker} className="space-y-4">
+                        {/* Personal Information */}
+                        <div className="space-y-3">
+                          <h3 className="text-md font-medium">Personal Information</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="name">Full Name *</Label>
+                              <Input
+                                id="name"
+                                type="text"
+                                placeholder="Enter worker's full name"
+                                value={createWorkerForm.name}
+                                onChange={(e) => handleInputChange("name", e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="email">Email Address *</Label>
+                              <Input
+                                id="email"
+                                type="email"
+                                placeholder="worker@fishsales.com"
+                                value={createWorkerForm.email}
+                                onChange={(e) => handleInputChange("email", e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="phone">Phone Number</Label>
+                              <Input
+                                id="phone"
+                                type="tel"
+                                placeholder="+1 (555) 123-4567"
+                                value={createWorkerForm.phone}
+                                onChange={(e) => handleInputChange("phone", e.target.value)}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="password">Password *</Label>
+                              <Input
+                                id="password"
+                                type="password"
+                                placeholder="Create a secure password"
+                                value={createWorkerForm.password}
+                                onChange={(e) => handleInputChange("password", e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Work Information */}
+                        <div className="space-y-3">
+                          <h3 className="text-md font-medium">Work Information</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="salary">Monthly Salary ($)</Label>
+                            <Input
+                              id="salary"
+                              type="number"
+                              placeholder="4200"
+                              value={createWorkerForm.salary}
+                              onChange={(e) => handleInputChange("salary", e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* ID Card Attachments */}
+                        <div className="space-y-3">
+                          <h3 className="text-md font-medium flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            ID Card Attachments *
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            Please select exactly 2 images: front and back of the worker's ID card
+                          </p>
+
+                          {/* Single Upload Interface */}
+                          {!idCardFrontPreview && !idCardBackPreview ? (
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                              <h4 className="text-sm font-semibold mb-1">Upload ID Card Images</h4>
+                              <p className="text-xs text-gray-600 mb-2">Select both front and back images at once</p>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    handleIdCardUpload(e.target.files);
+                                  }
+                                }}
+                                className="hidden"
+                                id="id-cards-upload-dialog"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  const input = document.getElementById('id-cards-upload-dialog') as HTMLInputElement;
+                                  if (input) {
+                                    input.click();
+                                  }
+                                }}
+                              >
+                                <Image className="h-4 w-4 mr-2" />
+                                Select Images
+                              </Button>
+                            </div>
+                          ) : (
+                            /* Preview Both Images */
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <h4 className="text-sm font-medium">ID Card Images</h4>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={removeAllIdCards}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="h-3 w-3 mr-1" />
+                                  Remove All
+                                </Button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* Front ID Card Preview */}
+                                <div className="space-y-1">
+                                  <Label className="text-xs font-medium text-green-600">✓ Front of ID Card</Label>
+                                  {idCardFrontPreview && (
+                                    <div className="relative">
+                                      <img
+                                        src={idCardFrontPreview}
+                                        alt="ID Card Front"
+                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-300"
+                                      />
+                                      <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
+                                        FRONT
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Back ID Card Preview */}
+                                <div className="space-y-1">
+                                  <Label className="text-xs font-medium text-green-600">✓ Back of ID Card</Label>
+                                  {idCardBackPreview && (
+                                    <div className="relative">
+                                      <img
+                                        src={idCardBackPreview}
+                                        alt="ID Card Back"
+                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-300"
+                                      />
+                                      <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
+                                        BACK
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Re-upload Option */}
+                              <div className="text-center pt-2 border-t">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                      handleIdCardUpload(e.target.files);
+                                    }
+                                  }}
+                                  className="hidden"
+                                  id="id-cards-reupload-dialog"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    const input = document.getElementById('id-cards-reupload-dialog') as HTMLInputElement;
+                                    if (input) {
+                                      input.click();
+                                    }
+                                  }}
+                                >
+                                  <Upload className="h-3 w-3 mr-2" />
+                                  Replace Images
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Form Actions */}
+                        <div className="flex justify-end gap-3 pt-3 border-t">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              resetForm();
+                              setIsCreateWorkerDialogOpen(false);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={isCreatingWorker}
+                          >
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            {isCreatingWorker ? 'Creating...' : 'Create Worker'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {workersData.map((worker) => (
-                    <div key={worker.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                  {isLoadingWorkers ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Loading workers...</p>
+                    </div>
+                  ) : workers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No workers found. Create your first worker to get started.</p>
+                    </div>
+                  ) : (
+                    workers.map((worker) => (
+                    <div key={worker.worker_id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                             <User className="h-6 w-6 text-blue-600" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg">{worker.name}</h3>
-                            <p className="text-sm text-muted-foreground">{worker.role}</p>
+                            <h3 className="font-semibold text-lg">{worker.full_name}</h3>
+                            <p className="text-sm text-muted-foreground">Worker</p>
                             <div className="flex items-center gap-2 mt-1">
-                              {getStatusBadge(worker.status)}
+                              {getStatusBadge("Active")}
                               <span className="text-xs text-muted-foreground">
-                                Created: {worker.createdDate}
+                                Created: {new Date(worker.created_at).toLocaleDateString()}
                               </span>
                             </div>
                           </div>
@@ -517,7 +858,7 @@ const Staff = () => {
                       </div>
 
                       {/* Worker Details Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         <div className="space-y-2">
                           <h4 className="font-medium text-muted-foreground">Contact Info</h4>
                           <div className="space-y-1">
@@ -527,25 +868,11 @@ const Staff = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <Phone className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">{worker.phone}</span>
+                              <span className="text-xs">{worker.phone_number || 'Not provided'}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Building className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">{worker.department}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-muted-foreground">Login Activity</h4>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">Last: {worker.lastLogin}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <LogIn className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">Total: {worker.totalLogins} logins</span>
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs">Joined: {new Date(worker.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                         </div>
@@ -555,553 +882,34 @@ const Staff = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">Total: ${worker.revenueGenerated.toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">Monthly: ${worker.monthlyRevenue.toLocaleString()}</span>
+                              <span className="text-xs">Total: ${worker.total_revenue_generated.toLocaleString()}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">Salary: ${worker.salary.toLocaleString()}/month</span>
+                              <span className="text-xs">Salary: ${worker.monthly_salary?.toLocaleString() || 'Not set'}/month</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <h4 className="font-medium text-muted-foreground">Recent Login History</h4>
+                          <h4 className="font-medium text-muted-foreground">ID Documents</h4>
                           <div className="space-y-1">
-                            {worker.loginHistory.slice(0, 3).map((login, index) => (
-                              <div key={index} className="text-xs">
-                                <span className="text-muted-foreground">{login.date}</span>
-                                <span className="ml-2">{login.time}</span>
-                                <span className="ml-2 text-blue-600">({login.duration})</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Create Worker Tab */}
-          <TabsContent value="create-worker" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5" />
-                  Create New Worker Account
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Add a new worker to your fish selling management system
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateWorker} className="space-y-6">
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Personal Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Full Name *</Label>
-                        <Input
-                          id="name"
-                          type="text"
-                          placeholder="Enter worker's full name"
-                          value={createWorkerForm.name}
-                          onChange={(e) => handleInputChange("name", e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email Address *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="worker@fishsales.com"
-                          value={createWorkerForm.email}
-                          onChange={(e) => handleInputChange("email", e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="+1 (555) 123-4567"
-                          value={createWorkerForm.phone}
-                          onChange={(e) => handleInputChange("phone", e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Password *</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="Create a secure password"
-                          value={createWorkerForm.password}
-                          onChange={(e) => handleInputChange("password", e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Work Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Work Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="salary">Monthly Salary ($)</Label>
-                        <Input
-                          id="salary"
-                          type="number"
-                          placeholder="4200"
-                          value={createWorkerForm.salary}
-                          onChange={(e) => handleInputChange("salary", e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ID Card Attachments */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      ID Card Attachments *
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Please select exactly 2 images: front and back of the worker's ID card (first image = front, second image = back)
-                    </p>
-
-                    {/* Single Upload Interface */}
-                    {!idCardFrontPreview && !idCardBackPreview ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
-                        <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold mb-2">Upload ID Card Images</h4>
-                        <p className="text-sm text-gray-600 mb-2">Select both front and back images at once</p>
-                        <p className="text-xs text-gray-500 mb-4">
-                          PNG, JPG up to 5MB each • First image = Front, Second image = Back
-                        </p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              handleIdCardUpload(e.target.files);
-                            }
-                          }}
-                          className="hidden"
-                          id="id-cards-upload"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="lg"
-                          className="cursor-pointer"
-                          onClick={() => {
-                            const input = document.getElementById('id-cards-upload') as HTMLInputElement;
-                            if (input) {
-                              input.click();
-                            }
-                          }}
-                        >
-                          <Image className="h-5 w-5 mr-2" />
-                          Select 2 Images (Front & Back)
-                        </Button>
-                      </div>
-                    ) : (
-                      /* Preview Both Images */
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <h4 className="text-md font-medium">ID Card Images</h4>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={removeAllIdCards}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Remove All
-                          </Button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Front ID Card Preview */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-green-600">✓ Front of ID Card</Label>
-                            {idCardFrontPreview && (
-                              <div className="relative">
-                                <img
-                                  src={idCardFrontPreview}
-                                  alt="ID Card Front"
-                                  className="w-full h-48 object-cover rounded-lg border-2 border-green-300"
-                                />
-                                <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                  FRONT
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Back ID Card Preview */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-green-600">✓ Back of ID Card</Label>
-                            {idCardBackPreview && (
-                              <div className="relative">
-                                <img
-                                  src={idCardBackPreview}
-                                  alt="ID Card Back"
-                                  className="w-full h-48 object-cover rounded-lg border-2 border-green-300"
-                                />
-                                <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                  BACK
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Re-upload Option */}
-                        <div className="text-center pt-4 border-t">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files.length > 0) {
-                                handleIdCardUpload(e.target.files);
-                              }
-                            }}
-                            className="hidden"
-                            id="id-cards-reupload"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="cursor-pointer"
-                            onClick={() => {
-                              const input = document.getElementById('id-cards-reupload') as HTMLInputElement;
-                              if (input) {
-                                input.click();
-                              }
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Replace Images
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Form Actions */}
-                  <div className="flex justify-end gap-4 pt-4 border-t">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={resetForm}
-                    >
-                      Clear Form
-                    </Button>
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Create Worker Account
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Tasks Tab */}
-          <TabsContent value="tasks" className="space-y-6">
-            {/* Header with Create Task Button and Overview */}
-            <div className="flex justify-between items-start gap-6">
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h2 className="text-2xl font-bold">Task Management</h2>
-                    <p className="text-muted-foreground">Assign and monitor tasks for your workers</p>
-                  </div>
-
-                  {/* Create Task Dialog */}
-                  <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-blue-600 hover:bg-blue-700">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create New Task
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <CheckSquare className="h-5 w-5" />
-                          Assign New Task
-                        </DialogTitle>
-                        <DialogDescription>
-                          Create and assign a new task to one of your workers
-                        </DialogDescription>
-                      </DialogHeader>
-
-                      <form onSubmit={handleCreateTask} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="task-title">Task Title *</Label>
-                          <Input
-                            id="task-title"
-                            type="text"
-                            placeholder="Enter task title"
-                            value={newTask.title}
-                            onChange={(e) => handleTaskInputChange("title", e.target.value)}
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="task-description">Description</Label>
-                          <Input
-                            id="task-description"
-                            type="text"
-                            placeholder="Task description"
-                            value={newTask.description}
-                            onChange={(e) => handleTaskInputChange("description", e.target.value)}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="assign-to">Assign To *</Label>
-                            <Select onValueChange={(value) => handleTaskInputChange("assignedTo", value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select worker" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {workersData.map((worker) => (
-                                  <SelectItem key={worker.id} value={worker.name}>
-                                    {worker.name} - {worker.role}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="priority">Priority</Label>
-                            <Select onValueChange={(value) => handleTaskInputChange("priority", value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select priority" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="High">High</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="Low">Low</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="due-date">Due Date *</Label>
-                            <Input
-                              id="due-date"
-                              type="date"
-                              value={newTask.dueDate}
-                              onChange={(e) => handleTaskInputChange("dueDate", e.target.value)}
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="category">Category</Label>
-                            <Select onValueChange={(value) => handleTaskInputChange("category", value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="System Management">System Management</SelectItem>
-                                <SelectItem value="Training">Training</SelectItem>
-                                <SelectItem value="Operations">Operations</SelectItem>
-                                <SelectItem value="Quality Control">Quality Control</SelectItem>
-                                <SelectItem value="Reporting">Reporting</SelectItem>
-                                <SelectItem value="Customer Service">Customer Service</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end gap-4 pt-4 border-t">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setNewTask({
-                                title: "",
-                                description: "",
-                                assignedTo: "",
-                                priority: "",
-                                dueDate: "",
-                                category: ""
-                              });
-                              setIsTaskDialogOpen(false);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                            <CheckSquare className="mr-2 h-4 w-4" />
-                            Assign Task
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {/* Compact Task Overview */}
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-xl font-bold text-blue-600">
-                      {tasksData.filter(task => task.status === "In Progress").length}
-                    </div>
-                    <p className="text-xs text-blue-600">In Progress</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-xl font-bold text-yellow-600">
-                      {tasksData.filter(task => task.status === "Pending").length}
-                    </div>
-                    <p className="text-xs text-yellow-600">Pending</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-xl font-bold text-green-600">
-                      {tasksData.filter(task => task.status === "Completed").length}
-                    </div>
-                    <p className="text-xs text-green-600">Completed</p>
-                  </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-xl font-bold text-red-600">
-                      {tasksData.filter(task => task.status === "Overdue").length}
-                    </div>
-                    <p className="text-xs text-red-600">Overdue</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* All Tasks List */}
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>All Tasks</CardTitle>
-                  <div className="flex gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Search tasks..." className="pl-8 w-64" />
-                    </div>
-                    <Select>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline" size="icon">
-                      <Filter className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {tasksData.map((task) => (
-                    <div key={task.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-lg">{task.title}</h3>
-                            {getTaskStatusBadge(task.status)}
-                            {getPriorityBadge(task.priority)}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Task Details Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-muted-foreground">Assigned To</h4>
-                          <div className="flex items-center gap-2">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{task.assignedTo}</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-muted-foreground">Due Date</h4>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{task.dueDate}</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-muted-foreground">Category</h4>
-                          <div className="flex items-center gap-2">
-                            <Flag className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{task.category}</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-muted-foreground">Progress</h4>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span>{task.progress}%</span>
-                              <span className="text-muted-foreground">
-                                {task.status === "Completed" ? "Done" : "In Progress"}
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs">
+                                {worker.id_card_front_url && worker.id_card_back_url ? 'Complete' : 'Incomplete'}
                               </span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  task.status === "Completed" ? "bg-green-600" :
-                                  task.status === "Overdue" ? "bg-red-600" :
-                                  "bg-blue-600"
-                                }`}
-                                style={{ width: `${task.progress}%` }}
-                              ></div>
-                            </div>
+                            {worker.id_card_front_url && (
+                              <div className="text-xs text-blue-600 cursor-pointer hover:underline">
+                                View ID Cards
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </div>
               </CardContent>
             </Card>
@@ -1124,29 +932,39 @@ const Staff = () => {
                 <CardContent className="space-y-4">
                   {/* Worker List */}
                   <div className="space-y-2">
-                    {workersData.map((worker) => (
-                      <div
-                        key={worker.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedWorker(worker)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{worker.name}</p>
-                            <p className="text-sm text-muted-foreground">{worker.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">Sales Worker</Badge>
-                          {selectedWorker?.id === worker.id && (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          )}
-                        </div>
+                    {isLoadingWorkers ? (
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground">Loading workers...</p>
                       </div>
-                    ))}
+                    ) : workers.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground">No workers found.</p>
+                      </div>
+                    ) : (
+                      workers.map((worker) => (
+                        <div
+                          key={worker.worker_id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => loadWorkerPermissions(worker)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                              <User className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{worker.full_name}</p>
+                              <p className="text-sm text-muted-foreground">{worker.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">Worker</Badge>
+                            {selectedWorker?.worker_id === worker.worker_id && (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1155,11 +973,10 @@ const Staff = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <CheckSquare className="h-5 w-5" />
-                    {selectedWorker ? `${selectedWorker.name}'s Permissions` : 'Worker Permissions'}
+                    {selectedWorker ? `${selectedWorker.full_name}'s Permissions` : 'Worker Permissions'}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {selectedWorker ? `View and manage permissions for ${selectedWorker.name}` : 'Select a worker to view their permissions'}
+                    {selectedWorker ? `View and manage permissions for ${selectedWorker.full_name}` : 'Select a worker to view their permissions'}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1171,98 +988,201 @@ const Staff = () => {
                           <User className="h-6 w-6 text-blue-600" />
                         </div>
                         <div>
-                          <p className="font-medium">{selectedWorker.name}</p>
+                          <p className="font-medium">{selectedWorker.full_name}</p>
                           <p className="text-sm text-muted-foreground">{selectedWorker.email}</p>
                           <Badge variant="outline" className="mt-1">Sales Worker</Badge>
                         </div>
                       </div>
 
                       {/* Permission Categories */}
-                      <div className="space-y-4">
+                      <div className="space-y-3">
+                        {/* Product Inventory Permissions */}
+                        <div className="border rounded-lg">
+                          <button
+                            onClick={() => toggleSection('productInventory')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium">Product Inventory</span>
+                            </div>
+                            {expandedSections.productInventory ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          {expandedSections.productInventory && (
+                            <div className="p-3 border-t bg-muted/20 space-y-3">
+                              <div className="grid grid-cols-1 gap-2">
+                                {[
+                                  { key: 'viewProducts', label: 'View Products' },
+                                  { key: 'createProduct', label: 'Create Product' },
+                                  { key: 'editProduct', label: 'Edit Product' },
+                                  { key: 'deleteProduct', label: 'Delete Product' },
+                                  { key: 'manageCategories', label: 'Manage Categories' },
+                                  { key: 'viewStock', label: 'View Stock' },
+                                  { key: 'updateStock', label: 'Update Stock' },
+                                  { key: 'viewReports', label: 'View Reports' }
+                                ].map((permission) => (
+                                  <div key={permission.key} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`productInventory-${permission.key}`}
+                                      checked={permissions.productInventory[permission.key]}
+                                      onCheckedChange={() => togglePermission('productInventory', permission.key)}
+                                    />
+                                    <Label htmlFor={`productInventory-${permission.key}`} className="text-sm">
+                                      {permission.label}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Sales Permissions */}
-                        <div className="space-y-2">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <DollarSign className="h-4 w-4" />
-                            Sales & Orders
-                          </h4>
-                          <div className="space-y-2 pl-6">
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">View sales data</span>
+                        <div className="border rounded-lg">
+                          <button
+                            onClick={() => toggleSection('sales')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ShoppingCart className="h-4 w-4 text-green-600" />
+                              <span className="font-medium">Sales</span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">Create new sales</span>
+                            {expandedSections.sales ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          {expandedSections.sales && (
+                            <div className="p-3 border-t bg-muted/20 space-y-3">
+                              <div className="grid grid-cols-1 gap-2">
+                                {[
+                                  { key: 'viewSales', label: 'View Sales' },
+                                  { key: 'createSale', label: 'Create Sale' },
+                                  { key: 'editSale', label: 'Edit Sale' },
+                                  { key: 'deleteSale', label: 'Delete Sale' },
+                                  { key: 'manageSalesReports', label: 'Manage Sales Reports' },
+                                  { key: 'viewCustomers', label: 'View Customers' },
+                                  { key: 'managePayments', label: 'Manage Payments' }
+                                ].map((permission) => (
+                                  <div key={permission.key} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`sales-${permission.key}`}
+                                      checked={permissions.sales[permission.key]}
+                                      onCheckedChange={() => togglePermission('sales', permission.key)}
+                                    />
+                                    <Label htmlFor={`sales-${permission.key}`} className="text-sm">
+                                      {permission.label}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Edit existing sales</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Delete sales records</span>
-                            </div>
-                          </div>
+                          )}
                         </div>
 
-                        {/* Inventory Permissions */}
-                        <div className="space-y-2">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Building className="h-4 w-4" />
-                            Inventory Management
-                          </h4>
-                          <div className="space-y-2 pl-6">
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">View inventory</span>
+                        {/* Transactions Permissions */}
+                        <div className="border rounded-lg">
+                          <button
+                            onClick={() => toggleSection('transactions')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <TransactionIcon className="h-4 w-4 text-purple-600" />
+                              <span className="font-medium">Transactions</span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Update stock levels</span>
+                            {expandedSections.transactions ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          {expandedSections.transactions && (
+                            <div className="p-3 border-t bg-muted/20 space-y-3">
+                              <div className="grid grid-cols-1 gap-2">
+                                {[
+                                  { key: 'viewTransactions', label: 'View Transactions' },
+                                  { key: 'createTransaction', label: 'Create Transaction' },
+                                  { key: 'editTransaction', label: 'Edit Transaction' },
+                                  { key: 'deleteTransaction', label: 'Delete Transaction' },
+                                  { key: 'manageDeposits', label: 'Manage Deposits' },
+                                  { key: 'viewFinancialReports', label: 'View Financial Reports' },
+                                  { key: 'manageDebtors', label: 'Manage Debtors' }
+                                ].map((permission) => (
+                                  <div key={permission.key} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`transactions-${permission.key}`}
+                                      checked={permissions.transactions[permission.key]}
+                                      onCheckedChange={() => togglePermission('transactions', permission.key)}
+                                    />
+                                    <Label htmlFor={`transactions-${permission.key}`} className="text-sm">
+                                      {permission.label}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Add new products</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Manage suppliers</span>
-                            </div>
-                          </div>
+                          )}
                         </div>
 
-                        {/* Customer Permissions */}
-                        <div className="space-y-2">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Customer Management
-                          </h4>
-                          <div className="space-y-2 pl-6">
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">View customer data</span>
+                        {/* Expenses Permissions */}
+                        <div className="border rounded-lg">
+                          <button
+                            onClick={() => toggleSection('expenses')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Receipt className="h-4 w-4 text-orange-600" />
+                              <span className="font-medium">Expenses</span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">Add new customers</span>
+                            {expandedSections.expenses ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          {expandedSections.expenses && (
+                            <div className="p-3 border-t bg-muted/20 space-y-3">
+                              <div className="grid grid-cols-1 gap-2">
+                                {[
+                                  { key: 'viewExpenses', label: 'View Expenses' },
+                                  { key: 'createExpense', label: 'Create Expense' },
+                                  { key: 'editExpense', label: 'Edit Expense' },
+                                  { key: 'deleteExpense', label: 'Delete Expense' },
+                                  { key: 'manageCategories', label: 'Manage Categories' },
+                                  { key: 'viewExpenseReports', label: 'View Expense Reports' },
+                                  { key: 'approveExpenses', label: 'Approve Expenses' }
+                                ].map((permission) => (
+                                  <div key={permission.key} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`expenses-${permission.key}`}
+                                      checked={permissions.expenses[permission.key]}
+                                      onCheckedChange={() => togglePermission('expenses', permission.key)}
+                                    />
+                                    <Label htmlFor={`expenses-${permission.key}`} className="text-sm">
+                                      {permission.label}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Edit customer information</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="text-sm">Send messages to customers</span>
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Edit Permissions Button */}
+                      {/* Save Permissions Button */}
                       <div className="pt-4 border-t">
-                        <Button className="w-full">
+                        <Button
+                          onClick={savePermissions}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          disabled={isSavingPermissions}
+                        >
                           <Edit className="mr-2 h-4 w-4" />
-                          Edit {selectedWorker.name}'s Permissions
+                          {isSavingPermissions ? 'Saving...' : `Save ${selectedWorker.full_name}'s Permissions`}
                         </Button>
                       </div>
                     </>

@@ -26,6 +26,7 @@ import { dashboard } from './dashboard.routes';
 import upload from './upload';
 import { reports } from './report.routes';
 import { settings } from './settings.routes';
+import { workerRouter } from './worker.routes';
  
 
 /**
@@ -54,6 +55,7 @@ export function createApiRoutes() {
   api.route('/upload', upload);
   api.route('/reports', reports);
   api.route('/settings', settings);
+  api.route('/workers', workerRouter);
 
   return api;
 }
@@ -159,4 +161,4 @@ export function createDebugRoutes() {
 }
 
 // Export individual route modules for flexibility
-export { auth, users, products, categories, sales, contacts, expenses, folders, files, deposits, stockAdditions, stockCorrections, stockMovements, dashboard, reports };
+export { auth, users, products, categories, sales, contacts, expenses, folders, files, deposits, stockAdditions, stockCorrections, stockMovements, dashboard, reports, workerRouter };

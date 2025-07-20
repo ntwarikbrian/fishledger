@@ -277,7 +277,7 @@ export const getProductHandler = async (c: HonoContext) => {
 };
 
 /**
- * Create product handler
+ * Create product handler - Direct creation without approval workflow
  */
 export const createProductHandler = async (c: HonoContext) => {
   try {
@@ -317,15 +317,36 @@ export const createProductHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Create product
-    const { data: newProduct, error } = await c.get('supabase')
+    // Create product directly in the products table
+    const { data: newProduct, error: createError } = await c.get('supabase')
       .from('products')
       .insert([validation.data])
-      .select()
+      .select(`
+        product_id,
+        name,
+        category_id,
+        quantity_box,
+        box_to_kg_ratio,
+        quantity_kg,
+        cost_per_box,
+        cost_per_kg,
+        price_per_box,
+        price_per_kg,
+        profit_per_box,
+        profit_per_kg,
+        boxed_low_stock_threshold,
+        expiry_date,
+        created_at,
+        updated_at,
+        product_categories (
+          category_id,
+          name
+        )
+      `)
       .single();
 
-    if (error) {
-      throw new Error(`Failed to create product: ${error.message}`);
+    if (createError) {
+      throw new Error(`Failed to create product: ${createError.message}`);
     }
 
     return c.json({
@@ -879,6 +900,111 @@ export const recordDamagedProductHandler = async (c: HonoContext) => {
     console.error('Record damaged product error:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Failed to record damaged product';
+    return c.json({
+      success: false,
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
+  }
+};
+
+/**
+ * Delete damaged product handler
+ */
+export const deleteDamagedProductHandler = async (c: HonoContext) => {
+  try {
+    const damageId = c.req.param('damageId');
+
+    if (!damageId) {
+      return c.json({
+        success: false,
+        error: 'Damage ID is required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+
+    // Get the damaged product record first to restore stock
+    const { data: damagedProduct, error: fetchError } = await c.get('supabase')
+      .from('damaged_products')
+      .select(`
+        damage_id,
+        product_id,
+        damaged_boxes,
+        damaged_kg,
+        damaged_reason,
+        loss_value,
+        products (
+          product_id,
+          name,
+          quantity_box,
+          quantity_kg
+        )
+      `)
+      .eq('damage_id', damageId)
+      .single();
+
+    if (fetchError || !damagedProduct) {
+      return c.json({
+        success: false,
+        error: 'Damaged product record not found',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 404);
+    }
+
+    // Restore the stock quantities to the product
+    const { error: updateError } = await c.get('supabase')
+      .from('products')
+      .update({
+        quantity_box: damagedProduct.products.quantity_box + (damagedProduct.damaged_boxes || 0),
+        quantity_kg: damagedProduct.products.quantity_kg + (damagedProduct.damaged_kg || 0),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('product_id', damagedProduct.product_id);
+
+    if (updateError) {
+      throw new Error(`Failed to restore product quantities: ${updateError.message}`);
+    }
+
+    // Delete related stock movement record
+    const { error: movementDeleteError } = await c.get('supabase')
+      .from('stock_movements')
+      .delete()
+      .eq('damaged_id', damageId);
+
+    if (movementDeleteError) {
+      console.error('Failed to delete stock movement:', movementDeleteError);
+      // Don't fail the request, just log the error
+    }
+
+    // Delete the damaged product record
+    const { error: deleteError } = await c.get('supabase')
+      .from('damaged_products')
+      .delete()
+      .eq('damage_id', damageId);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete damaged product record: ${deleteError.message}`);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Damaged product deleted and stock restored successfully',
+      data: {
+        damage_id: damageId,
+        product_name: damagedProduct.products.name,
+        restored_boxes: damagedProduct.damaged_boxes || 0,
+        restored_kg: damagedProduct.damaged_kg || 0,
+      },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Delete damaged product error:', error);
+
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete damaged product';
     return c.json({
       success: false,
       error: errorMessage,

@@ -143,6 +143,19 @@ const Sales = () => {
         return;
       }
 
+      // Additional validation for partial payments
+      if (fishSaleForm.payment_status === 'partial') {
+        const totalAmount = calculateFishSaleTotal();
+        if (fishSaleForm.amount_paid <= 0) {
+          alert('Amount paid must be greater than 0 for partial payments');
+          return;
+        }
+        if (fishSaleForm.amount_paid >= totalAmount) {
+          alert('Amount paid cannot be equal to or greater than total amount for partial payments. Use "Paid" status instead.');
+          return;
+        }
+      }
+
       console.log('🐟 Submitting fish sale:', fishSaleForm);
       console.log('🐟 Fish sale form validation check:', {
         product_id: !!fishSaleForm.product_id,
@@ -347,6 +360,42 @@ const Sales = () => {
     }
 
     return formatCurrency(totalProfit);
+  };
+
+  // Calculate total revenue from all sales
+  const calculateTotalRevenue = () => {
+    return sales.reduce((total, sale) => total + (sale.total_amount || 0), 0);
+  };
+
+  // Calculate total profit from all sales
+  const calculateTotalProfit = () => {
+    return sales.reduce((total, sale) => {
+      let saleProfit = 0;
+
+      // Calculate profit from boxes
+      if (sale.boxes_quantity > 0 && sale.profit_per_box !== undefined && sale.profit_per_box !== null) {
+        saleProfit += sale.boxes_quantity * sale.profit_per_box;
+      }
+
+      // Calculate profit from kg
+      if (sale.kg_quantity > 0 && sale.profit_per_kg !== undefined && sale.profit_per_kg !== null) {
+        saleProfit += sale.kg_quantity * sale.profit_per_kg;
+      }
+
+      return total + saleProfit;
+    }, 0);
+  };
+
+  // Calculate profit margin percentage
+  const calculateProfitMargin = () => {
+    const revenue = calculateTotalRevenue();
+    const profit = calculateTotalProfit();
+    return revenue > 0 ? (profit / revenue) * 100 : 0;
+  };
+
+  // Calculate average sale amount
+  const calculateAverageSale = () => {
+    return sales.length > 0 ? calculateTotalRevenue() / sales.length : 0;
   };
 
   const formatPaymentMethod = (method: string) => {
@@ -972,7 +1021,11 @@ const Sales = () => {
                         updatedForm.client_name = '';
                         updatedForm.email_address = '';
                         updatedForm.phone = '';
+                        updatedForm.amount_paid = 0; // Reset amount paid for full payment
+                      } else if (value === 'pending') {
+                        updatedForm.amount_paid = 0; // Reset amount paid for pending payment
                       }
+                      // For partial payments, keep the current amount_paid value
                       setFishSaleForm(updatedForm);
                     }}>
                       <SelectTrigger className="w-full">
@@ -986,8 +1039,9 @@ const Sales = () => {
                     </Select>
                   </div>
 
-                  {/* Amount Paid - Only show for partial payments */}
-                  {saleForm.payment_status === 'partial' && (
+                  {/* Amount Paid Field - Only show for partial payments
+                      Uses existing database columns: amount_paid, remaining_amount */}
+                  {fishSaleForm.payment_status === 'partial' && (
                     <div className="space-y-2">
                       <Label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
                         <DollarSign className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
@@ -997,14 +1051,26 @@ const Sales = () => {
                         type="number"
                         min="0"
                         step="0.01"
+                        max={calculateFishSaleTotal()}
                         value={fishSaleForm.amount_paid}
-                        onChange={(e) => setFishSaleForm({...fishSaleForm, amount_paid: parseFloat(e.target.value) || 0})}
+                        onChange={(e) => {
+                          const amount = parseFloat(e.target.value) || 0;
+                          setFishSaleForm({...fishSaleForm, amount_paid: amount});
+                        }}
                         placeholder="Enter amount already paid"
-                        className="w-full"
+                        className={`w-full ${fishSaleForm.amount_paid > calculateFishSaleTotal() ? 'border-red-500 focus:border-red-500' : ''}`}
                       />
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Total Amount: {formatCurrency(calculateFishSaleTotal())} |
-                        Remaining: {formatCurrency(Math.max(0, calculateFishSaleTotal() - fishSaleForm.amount_paid))}
+                      <div className="text-xs space-y-1">
+                        <div className="text-gray-500 dark:text-gray-400">
+                          Total Amount: {formatCurrency(calculateFishSaleTotal())} |
+                          Remaining: {formatCurrency(Math.max(0, calculateFishSaleTotal() - fishSaleForm.amount_paid))}
+                        </div>
+                        {fishSaleForm.amount_paid > calculateFishSaleTotal() && (
+                          <div className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Amount paid cannot exceed total amount
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1286,6 +1352,95 @@ const Sales = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sales Summary Components */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+              {/* Total Revenue Component */}
+              <Card className="border-0 shadow-md bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-600 dark:bg-blue-500 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Total Revenue</h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">From all sales transactions</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {formatCurrency(calculateTotalRevenue())}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {sales.length} sales • Avg: {formatCurrency(calculateAverageSale())}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Linear Progress Bar for Revenue */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                      <span>Revenue Progress</span>
+                      <span>100%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-1000 ease-out shadow-sm"
+                        style={{ width: '100%' }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>💰 Paid: {sales.filter(sale => sale.payment_status === 'paid').length}</span>
+                      <span>⚠️ Partial: {sales.filter(sale => sale.payment_status === 'partial').length}</span>
+                      <span>⏳ Pending: {sales.filter(sale => sale.payment_status === 'pending').length}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Profit Component */}
+              <Card className="border-0 shadow-md bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-green-600 dark:bg-green-500 rounded-lg">
+                        <TrendingUp className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Total Profit</h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Net profit from all sales</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(calculateTotalProfit())}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {calculateProfitMargin().toFixed(1)}% margin
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Linear Progress Bar for Profit Margin */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                      <span>Profit Margin</span>
+                      <span>{calculateProfitMargin().toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-1000 ease-out shadow-sm"
+                        style={{ width: `${Math.min(calculateProfitMargin(), 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                      Profit efficiency: {calculateProfitMargin() > 20 ? 'Excellent' : calculateProfitMargin() > 10 ? 'Good' : 'Needs improvement'}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="audit-sales" className="space-y-4">

@@ -69,6 +69,13 @@ const transactionFiltersSchema = z.object({
   search: z.string().optional(),
 });
 
+const markAsPaidSchema = z.object({
+  client_name: z.string().min(1, 'Client name is required').max(255, 'Client name too long'),
+  amount_paid: z.number().min(0.01, 'Amount paid must be greater than 0'),
+  payment_method: z.enum(['momo_pay', 'cash', 'bank_transfer']).optional().default('cash'),
+  reference: z.string().max(255, 'Reference too long').optional(),
+});
+
 // Request interfaces
 export interface CreateTransactionRequest {
   sale_id: string;
@@ -112,6 +119,13 @@ export interface TransactionFilters {
   date_from?: string;
   date_to?: string;
   search?: string;
+}
+
+export interface MarkAsPaidRequest {
+  client_name: string;
+  amount_paid: number;
+  payment_method?: 'momo_pay' | 'cash' | 'bank_transfer';
+  reference?: string;
 }
 
 /**
@@ -1102,5 +1116,165 @@ export const getDebtorsHandler = async (c: HonoContext) => {
   } catch (error) {
     console.error('Error fetching debtors:', error);
     return c.json(createErrorResponse('Failed to fetch debtors', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
+  }
+};
+
+/**
+ * Mark debtor as paid - Update payment status for outstanding sales
+ */
+export const markAsPaidHandler = async (c: HonoContext) => {
+  try {
+    const body = await c.req.json();
+
+    // Validate request body
+    const validation = markAsPaidSchema.safeParse(body);
+    if (!validation.success) {
+      return c.json(
+        createValidationErrorResponse(
+          zodErrorToValidationErrors(validation.error),
+          c.get('requestId')
+        ),
+        400
+      );
+    }
+
+    const { client_name, amount_paid, payment_method, reference } = validation.data;
+
+    // Get current user ID - use fallback for development
+    const currentUserId = c.get('user')?.id || 'system-user';
+
+    // Get all unpaid/partial sales for this client, ordered by date (oldest first)
+    const { data: unpaidSales, error: salesError } = await c.get('supabase')
+      .from('sales')
+      .select(`
+        id,
+        total_amount,
+        amount_paid,
+        remaining_amount,
+        payment_status,
+        date_time
+      `)
+      .eq('client_name', client_name)
+      .in('payment_status', ['pending', 'partial'])
+      .gt('remaining_amount', 0)
+      .order('date_time', { ascending: true });
+
+    if (salesError) {
+      throw new Error(`Failed to fetch unpaid sales: ${salesError.message}`);
+    }
+
+    if (!unpaidSales || unpaidSales.length === 0) {
+      return c.json(
+        createErrorResponse('No outstanding payments found for this customer', 404, undefined, c.get('requestId')),
+        404
+      );
+    }
+
+    // Calculate total outstanding amount
+    const totalOutstanding = unpaidSales.reduce((sum, sale) => sum + sale.remaining_amount, 0);
+
+    if (amount_paid > totalOutstanding) {
+      return c.json(
+        createErrorResponse(
+          `Payment amount (${amount_paid}) exceeds total outstanding amount (${totalOutstanding})`,
+          400,
+          undefined,
+          c.get('requestId')
+        ),
+        400
+      );
+    }
+
+    // Process payments starting from oldest sales
+    let remainingPayment = amount_paid;
+    const updatedSales = [];
+    const updatedTransactions = [];
+
+    for (const sale of unpaidSales) {
+      if (remainingPayment <= 0) break;
+
+      const paymentForThisSale = Math.min(remainingPayment, sale.remaining_amount);
+      const newAmountPaid = sale.amount_paid + paymentForThisSale;
+      const newRemainingAmount = sale.total_amount - newAmountPaid;
+      const newPaymentStatus = newRemainingAmount <= 0 ? 'paid' : 'partial';
+
+      // Update the sale record
+      const { data: updatedSale, error: updateSaleError } = await c.get('supabase')
+        .from('sales')
+        .update({
+          amount_paid: newAmountPaid,
+          remaining_amount: newRemainingAmount,
+          payment_status: newPaymentStatus,
+          payment_method: payment_method,
+          updated_at: new Date().toISOString(),
+          performed_by: currentUserId,
+        })
+        .eq('id', sale.id)
+        .select('*')
+        .single();
+
+      if (updateSaleError) {
+        throw new Error(`Failed to update sale ${sale.id}: ${updateSaleError.message}`);
+      }
+
+      updatedSales.push(updatedSale);
+
+      // Update corresponding transaction record
+      const { data: updatedTransaction, error: updateTransactionError } = await c.get('supabase')
+        .from('transactions')
+        .update({
+          payment_status: newPaymentStatus,
+          payment_method: payment_method,
+          reference: reference || null,
+          updated_at: new Date().toISOString(),
+          updated_by: currentUserId,
+        })
+        .eq('sale_id', sale.id)
+        .select('*')
+        .single();
+
+      if (updateTransactionError) {
+        console.warn(`Failed to update transaction for sale ${sale.id}: ${updateTransactionError.message}`);
+        // Don't fail the entire operation if transaction update fails
+      } else {
+        updatedTransactions.push(updatedTransaction);
+      }
+
+      remainingPayment -= paymentForThisSale;
+    }
+
+    return c.json(
+      createSuccessResponse(
+        {
+          client_name,
+          amount_paid,
+          payment_method,
+          reference,
+          updated_sales: updatedSales.length,
+          updated_transactions: updatedTransactions.length,
+          remaining_outstanding: totalOutstanding - amount_paid,
+          sales_updated: updatedSales.map(sale => ({
+            sale_id: sale.id,
+            new_payment_status: sale.payment_status,
+            amount_paid_to_sale: sale.amount_paid,
+            remaining_amount: sale.remaining_amount,
+          })),
+        },
+        'Payment recorded successfully',
+        c.get('requestId')
+      )
+    );
+
+  } catch (error) {
+    console.error('Error marking as paid:', error);
+    return c.json(
+      createErrorResponse(
+        'Failed to record payment',
+        500,
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        c.get('requestId')
+      ),
+      500
+    );
   }
 };

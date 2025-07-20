@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS workers (
     full_name VARCHAR(200) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     phone_number VARCHAR(20),
-    identification_image_url TEXT, -- Single field for ID card image
+    id_card_front_url TEXT, -- Front side of ID card image
+    id_card_back_url TEXT, -- Back side of ID card image
     monthly_salary DECIMAL(10,2),
     total_revenue_generated DECIMAL(12,2) DEFAULT 0,
     recent_login_history JSONB, -- Store recent login timestamps as JSON
@@ -45,25 +46,7 @@ CREATE TABLE IF NOT EXISTS workers (
 );
 
 -- =====================================================
--- 3. WORKER TASKS TABLE
--- Manages individual worker task assignments and progress
--- =====================================================
-
--- Worker tasks table for task assignments and progress tracking
-CREATE TABLE IF NOT EXISTS worker_tasks (
-    task_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    task_title VARCHAR(200) NOT NULL,
-    sub_tasks JSONB, -- JSON array of sub-tasks or text description
-    assigned_to UUID NOT NULL REFERENCES workers(worker_id),
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-    due_date_time TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue')),
-    progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- =====================================================
--- 4. EXPENSE CATEGORIES TABLE
+-- 3. EXPENSE CATEGORIES TABLE
 -- Defines available expense classifications
 -- =====================================================
 
@@ -80,7 +63,7 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 );
 
 -- =====================================================
--- 5. EXPENSES TABLE
+-- 4. EXPENSES TABLE
 -- Records financial transactions tied to categories
 -- =====================================================
 
@@ -99,7 +82,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 -- =====================================================
--- 6. CONTACTS TABLE
+-- 5. CONTACTS TABLE
 -- Stores business contact information (suppliers/customers)
 -- =====================================================
 
@@ -123,7 +106,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 -- =====================================================
--- 7. MESSAGES TABLE
+-- 6. MESSAGES TABLE
 -- Logs outgoing or internal communications
 -- =====================================================
 
@@ -147,7 +130,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- =====================================================
--- 8. FOLDERS TABLE
+-- 7. FOLDERS TABLE
 -- Organizes document storage
 -- =====================================================
 
@@ -168,7 +151,7 @@ CREATE TABLE IF NOT EXISTS folders (
 );
 
 -- =====================================================
--- 9. FILES TABLE
+-- 8. FILES TABLE
 -- Stores individual file entries linked to folders with Cloudinary integration
 -- =====================================================
 
@@ -190,7 +173,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 -- =====================================================
--- 10. PRODUCT CATEGORIES TABLE
+-- 9. PRODUCT CATEGORIES TABLE
 -- Stores product category data
 -- =====================================================
 
@@ -204,7 +187,7 @@ CREATE TABLE IF NOT EXISTS product_categories (
 );
 
 -- =====================================================
--- 11. PRODUCTS TABLE
+-- 10. PRODUCTS TABLE
 -- Tracks fish inventory, including pricing, damage, and expiry
 -- =====================================================
 
@@ -298,8 +281,15 @@ CREATE POLICY products_user_isolation ON products
 
 -- Note: Worker permissions policy will be added after worker_permissions table is created
 
+-- ============================================================================
+-- PRODUCT CREATION - DIRECT LOGIC (NO APPROVAL WORKFLOW)
+-- ============================================================================
+
+-- Note: Product creation now follows direct logic without approval workflow.
+-- Products are created directly in the products table without going through stock_movements.
+
 -- =====================================================
--- 12. DAMAGED PRODUCTS TABLE
+-- 11. DAMAGED PRODUCTS TABLE
 -- Tracks damaged inventory separately from main products
 -- =====================================================
 
@@ -373,7 +363,7 @@ CREATE POLICY damaged_products_user_isolation ON damaged_products
     );
 
 -- =====================================================
--- 13. AUTOMATIC MESSAGES TABLE
+-- 12. AUTOMATIC MESSAGES TABLE
 -- Handles inventory-triggered automated notifications
 -- =====================================================
 
@@ -511,7 +501,11 @@ CREATE TABLE IF NOT EXISTS sales (
     client_id UUID, -- Independent client identifier
     client_name VARCHAR(100), -- Client name (required even if not in contacts)
     email_address VARCHAR(150), -- Client email
-    phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
+    phone VARCHAR(15), -- Client phone (using smaller field for cost efficiency)
+
+    -- Audit timestamps
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL, -- When the sale record was created
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL -- When the sale record was last updated
 );
 
 -- =====================================================
@@ -587,7 +581,7 @@ CREATE TABLE IF NOT EXISTS stock_additions (
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(product_id),
-    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete')),
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create')),
 
     -- Changes in box and kg quantities
     box_change INTEGER DEFAULT 0, -- Box quantity change (positive for increase, negative for decrease)
@@ -612,6 +606,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
+    -- Note: product_create removed from constraint since it's no longer used in direct creation workflow
     CONSTRAINT chk_stock_movement_quantities CHECK (
         (movement_type NOT IN ('product_edit', 'product_delete') AND (box_change != 0 OR kg_change != 0)) OR
         (movement_type = 'product_edit' AND field_changed IS NOT NULL) OR
@@ -622,7 +617,8 @@ CREATE TABLE IF NOT EXISTS stock_movements (
         (movement_type = 'new_stock' AND stock_addition_id IS NOT NULL) OR
         (movement_type = 'stock_correction' AND correction_id IS NOT NULL) OR
         (movement_type = 'product_edit') OR
-        (movement_type = 'product_delete')
+        (movement_type = 'product_delete') OR
+        (movement_type = 'product_create')
     )
 );
 
@@ -814,6 +810,22 @@ CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
 CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
+CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_sales_updated_at ON sales(updated_at);
+
+-- Create trigger to automatically update updated_at timestamp for sales
+CREATE OR REPLACE FUNCTION update_sales_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sales_updated_at_trigger
+    BEFORE UPDATE ON sales
+    FOR EACH ROW
+    EXECUTE FUNCTION update_sales_updated_at();
 
 -- Stock movements table indexes
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product_id ON stock_movements(product_id);
@@ -1265,6 +1277,72 @@ BEGIN
     ON CONFLICT (folder_name, created_by) DO NOTHING; -- Prevent duplicates
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- VERIFICATION FUNCTIONS
+-- ============================================================================
+
+-- Function to verify the product_create constraint is working correctly
+CREATE OR REPLACE FUNCTION verify_product_create_constraint()
+RETURNS TABLE(
+    constraint_exists BOOLEAN,
+    supports_product_create BOOLEAN,
+    constraint_definition TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        EXISTS(
+            SELECT 1
+            FROM information_schema.check_constraints cc
+            JOIN information_schema.table_constraints tc
+                ON cc.constraint_name = tc.constraint_name
+            WHERE cc.constraint_name = 'chk_movement_references'
+            AND tc.table_name = 'stock_movements'
+        ) as constraint_exists,
+        EXISTS(
+            SELECT 1
+            FROM information_schema.check_constraints cc
+            JOIN information_schema.table_constraints tc
+                ON cc.constraint_name = tc.constraint_name
+            WHERE cc.constraint_name = 'chk_movement_references'
+            AND tc.table_name = 'stock_movements'
+            AND cc.check_clause LIKE '%product_create%'
+        ) as supports_product_create,
+        COALESCE(
+            (SELECT cc.check_clause::TEXT
+             FROM information_schema.check_constraints cc
+             JOIN information_schema.table_constraints tc
+                 ON cc.constraint_name = tc.constraint_name
+             WHERE cc.constraint_name = 'chk_movement_references'
+             AND tc.table_name = 'stock_movements'
+             LIMIT 1),
+            'Constraint not found'
+        ) as constraint_definition;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION verify_product_create_constraint() TO authenticated;
+
+-- ============================================================================
+-- CONSTRAINT COMMENTS AND DOCUMENTATION
+-- ============================================================================
+
+-- Update constraint comment to reflect product_create support
+COMMENT ON CONSTRAINT chk_movement_references ON stock_movements IS
+'Ensures proper reference IDs are set based on movement type. Updated to support product_create movements for approval workflow.';
+
+-- Add function comment
+COMMENT ON FUNCTION verify_product_create_constraint() IS
+'Verification function to check if product_create constraint is properly configured for the approval workflow';
+
+-- ============================================================================
+-- PLACEHOLDER PRODUCT DATA
+-- ============================================================================
+
+-- Note: Placeholder product functions removed since product creation now follows direct logic
+-- without approval workflow. Products are created directly in the products table.
 
 -- =====================================================
 -- END OF SCHEMA DEFINITION

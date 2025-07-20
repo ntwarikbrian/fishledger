@@ -41,7 +41,11 @@ CREATE TABLE IF NOT EXISTS sales (
     client_id UUID, -- Independent client identifier
     client_name VARCHAR(100), -- Client name (required even if not in contacts)
     email_address VARCHAR(150), -- Client email
-    phone VARCHAR(15) -- Client phone (using smaller field for cost efficiency)
+    phone VARCHAR(15), -- Client phone (using smaller field for cost efficiency)
+
+    -- Audit timestamps
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL, -- When the sale record was created
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL -- When the sale record was last updated
 );
 
 -- Comments for documentation
@@ -65,6 +69,8 @@ COMMENT ON COLUMN sales.client_id IS 'Independent client identifier (not linked 
 COMMENT ON COLUMN sales.client_name IS 'Name of the client/customer';
 COMMENT ON COLUMN sales.email_address IS 'Email address of the client';
 COMMENT ON COLUMN sales.phone IS 'Phone number of the client';
+COMMENT ON COLUMN sales.created_at IS 'Timestamp when the sale record was created';
+COMMENT ON COLUMN sales.updated_at IS 'Timestamp when the sale record was last updated';
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
@@ -75,6 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_sales_client_name ON sales(client_name);
 CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
+CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_sales_updated_at ON sales(updated_at);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
@@ -149,6 +157,21 @@ CREATE TRIGGER validate_sale_data_trigger
     BEFORE INSERT OR UPDATE ON sales
     FOR EACH ROW
     EXECUTE FUNCTION validate_sale_data();
+
+-- Function to automatically update updated_at column
+CREATE OR REPLACE FUNCTION update_sales_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to automatically update updated_at on record changes
+CREATE TRIGGER sales_updated_at_trigger
+    BEFORE UPDATE ON sales
+    FOR EACH ROW
+    EXECUTE FUNCTION update_sales_updated_at();
 
 -- Sample data for development
 -- Note: These will need actual product_id and user_id values from the respective tables

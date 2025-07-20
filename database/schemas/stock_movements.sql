@@ -4,10 +4,11 @@
 -- =====================================================
 
 -- Stock movements table for tracking inventory changes from irregular events
+-- Note: product_create movement_type kept for backward compatibility but not used in direct creation workflow
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(product_id),
-    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete')),
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create')),
 
     -- Changes in box and kg quantities
     box_change INTEGER DEFAULT 0, -- Box quantity change (positive for increase, negative for decrease)
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
+    -- Note: product_create removed from constraint since it's no longer used in direct creation workflow
     CONSTRAINT chk_stock_movement_quantities CHECK (
         (movement_type NOT IN ('product_edit', 'product_delete') AND (box_change != 0 OR kg_change != 0)) OR
         (movement_type = 'product_edit' AND field_changed IS NOT NULL) OR
@@ -42,7 +44,8 @@ CREATE TABLE IF NOT EXISTS stock_movements (
         (movement_type = 'new_stock' AND stock_addition_id IS NOT NULL) OR
         (movement_type = 'stock_correction' AND correction_id IS NOT NULL) OR
         (movement_type = 'product_edit') OR
-        (movement_type = 'product_delete')
+        (movement_type = 'product_delete') OR
+        (movement_type = 'product_create')
     )
 );
 
@@ -50,7 +53,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
 COMMENT ON TABLE stock_movements IS 'Tracks inventory changes from irregular events (damaged, new stock, corrections)';
 COMMENT ON COLUMN stock_movements.movement_id IS 'Unique identifier for each movement';
 COMMENT ON COLUMN stock_movements.product_id IS 'Reference to the product being moved';
-COMMENT ON COLUMN stock_movements.movement_type IS 'Type of movement: damaged, new_stock, stock_correction, product_edit';
+COMMENT ON COLUMN stock_movements.movement_type IS 'Type of movement: damaged, new_stock, stock_correction, product_edit, product_delete, product_create';
 COMMENT ON COLUMN stock_movements.box_change IS 'Change in box quantity - positive for increase, negative for decrease';
 COMMENT ON COLUMN stock_movements.kg_change IS 'Change in kg quantity - positive for increase, negative for decrease';
 COMMENT ON COLUMN stock_movements.damaged_id IS 'Reference to damaged_products record for damaged movements';

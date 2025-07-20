@@ -266,6 +266,31 @@ export const useProducts = () => {
     return totalValue > 0 ? (totalProfit / totalValue) * 100 : 0;
   }, [calculateTotalValue, calculateTotalProfit]);
 
+  /**
+   * Delete a damaged product record and restore stock
+   */
+  const deleteDamagedProduct = useCallback(async (damageId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await productsApi.deleteDamagedProduct(damageId);
+
+      if (response.success) {
+        return response;
+      } else {
+        setError(response.error || 'Failed to delete damaged product');
+        return response;
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts();
@@ -283,6 +308,7 @@ export const useProducts = () => {
     getExpiringProducts,
     getDamagedProducts,
     fetchDamagedProducts,
+    deleteDamagedProduct,
     calculateTotalValue,
     calculateTotalCost,
     calculateTotalProfit,

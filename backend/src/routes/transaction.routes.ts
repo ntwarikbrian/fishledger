@@ -15,6 +15,7 @@ import {
   getTransactionsBySaleHandler,
   createTransactionWithImageHandler,
   getDebtorsHandler,
+  markAsPaidHandler,
 } from '../handlers/transactions';
 import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
 
@@ -39,6 +40,9 @@ transactions.get('/stats', requireEmployee, getTransactionStatsHandler);
 
 // GET /transactions/debtors - Get customers with unpaid or partially paid sales
 transactions.get('/debtors', requireEmployee, getDebtorsHandler);
+
+// POST /transactions/mark-as-paid - Mark debtor as paid
+transactions.post('/mark-as-paid', requireEmployee, markAsPaidHandler);
 
 // GET /transactions/:id - Get a specific transaction by ID
 transactions.get('/:id', requireEmployee, getTransactionHandler);

@@ -82,7 +82,7 @@ export const createStockCorrectionHandler = asyncHandler(async (c: HonoContext) 
     throw new Error(`Failed to create stock correction: ${correctionError.message}`);
   }
 
-  // Create stock movement record
+  // Create pending stock movement record for approval
   const { error: movementError } = await c.get('supabase')
     .from('stock_movements')
     .insert({
@@ -90,34 +90,25 @@ export const createStockCorrectionHandler = asyncHandler(async (c: HonoContext) 
       movement_type: 'stock_correction',
       box_change: box_adjustment,
       kg_change: kg_adjustment,
-      reason: `Stock correction: ${correction_reason}`,
+      reason: `Stock correction request: ${correction_reason} (Box: ${box_adjustment >= 0 ? '+' : ''}${box_adjustment}, KG: ${kg_adjustment >= 0 ? '+' : ''}${kg_adjustment})`,
       correction_id: stockCorrection.correction_id,
       performed_by: c.get('user')?.id,
+      status: 'pending' // Set status to pending for approval
     });
 
   if (movementError) {
-    console.error('Failed to create stock movement:', movementError);
-    // Don't fail the request, just log the error
+    throw new Error(`Failed to create stock movement: ${movementError.message}`);
   }
 
-  // Update product quantities
-  const { error: updateError } = await c.get('supabase')
-    .from('products')
-    .update({
-      quantity_box: newBoxQuantity,
-      quantity_kg: newKgQuantity,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('product_id', product_id);
-
-  if (updateError) {
-    throw new Error(`Failed to update product quantities: ${updateError.message}`);
-  }
+  // DO NOT update product quantities immediately - wait for approval
 
   return c.json({
     success: true,
-    data: stockCorrection,
-    message: 'Stock correction applied successfully',
+    data: {
+      ...stockCorrection,
+      status: 'pending_approval'
+    },
+    message: 'Stock correction request submitted successfully. Pending approval from admin.',
     timestamp: new Date().toISOString(),
     requestId: c.get('requestId'),
   });

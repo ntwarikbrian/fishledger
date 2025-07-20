@@ -13,7 +13,13 @@ import {
   approveProductEditHandler,
   rejectProductEditHandler,
   approveProductDeleteHandler,
-  rejectProductDeleteHandler
+  rejectProductDeleteHandler,
+  approveStockAdditionHandler,
+  rejectStockAdditionHandler,
+  approveStockCorrectionHandler,
+  rejectStockCorrectionHandler,
+  approveProductCreateHandler,
+  rejectProductCreateHandler
 } from '../handlers/stock-movements';
 import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
 
@@ -53,5 +59,23 @@ stockMovements.post('/:movementId/approve-delete', requireManager, approveProduc
 
 // POST /stock-movements/:movementId/reject-delete - Reject pending product delete (manager or admin)
 stockMovements.post('/:movementId/reject-delete', requireManager, rejectProductDeleteHandler);
+
+// POST /stock-movements/:movementId/approve-stock-addition - Approve pending stock addition (manager or admin)
+stockMovements.post('/:movementId/approve-stock-addition', requireManager, approveStockAdditionHandler);
+
+// POST /stock-movements/:movementId/reject-stock-addition - Reject pending stock addition (manager or admin)
+stockMovements.post('/:movementId/reject-stock-addition', requireManager, rejectStockAdditionHandler);
+
+// POST /stock-movements/:movementId/approve-stock-correction - Approve pending stock correction (manager or admin)
+stockMovements.post('/:movementId/approve-stock-correction', requireManager, approveStockCorrectionHandler);
+
+// POST /stock-movements/:movementId/reject-stock-correction - Reject pending stock correction (manager or admin)
+stockMovements.post('/:movementId/reject-stock-correction', requireManager, rejectStockCorrectionHandler);
+
+// POST /stock-movements/:movementId/approve-product-create - Approve pending product creation (manager or admin)
+stockMovements.post('/:movementId/approve-product-create', requireManager, approveProductCreateHandler);
+
+// POST /stock-movements/:movementId/reject-product-create - Reject pending product creation (manager or admin)
+stockMovements.post('/:movementId/reject-product-create', requireManager, rejectProductCreateHandler);
 
 export { stockMovements };

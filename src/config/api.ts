@@ -32,6 +32,7 @@ export interface ApiConfig {
     sales: {
       list: string;
       create: string;
+      createFish: string;
       get: (id: string) => string;
       update: (id: string) => string;
       delete: (id: string) => string;
@@ -86,6 +87,27 @@ export interface ApiConfig {
     settings: {
       get: string;
       update: string;
+    };
+    transactions: {
+      list: string;
+      create: string;
+      get: (id: string) => string;
+      update: (id: string) => string;
+      delete: (id: string) => string;
+      stats: string;
+      debtors: string;
+      markAsPaid: string;
+      bySale: (saleId: string) => string;
+      upload: string;
+    };
+    workers: {
+      list: string;
+      create: string;
+      get: (id: string) => string;
+      update: (id: string) => string;
+      delete: (id: string) => string;
+      permissions: (id: string) => string;
+      updatePermissions: (id: string) => string;
     };
   };
 }
@@ -198,6 +220,18 @@ export const createApiConfig = (): ApiConfig => {
         update: (id: string) => `/api/files/${id}`,
         delete: (id: string) => `/api/files/${id}`,
       },
+      transactions: {
+        list: '/api/transactions',
+        create: '/api/transactions',
+        get: (id: string) => `/api/transactions/${id}`,
+        update: (id: string) => `/api/transactions/${id}`,
+        delete: (id: string) => `/api/transactions/${id}`,
+        stats: '/api/transactions/stats',
+        debtors: '/api/transactions/debtors',
+        markAsPaid: '/api/transactions/mark-as-paid',
+        bySale: (saleId: string) => `/api/transactions/sale/${saleId}`,
+        upload: '/api/transactions/upload',
+      },
       dashboard: {
         stats: '/api/dashboard/stats',
       },
@@ -213,6 +247,15 @@ export const createApiConfig = (): ApiConfig => {
       settings: {
         get: '/api/settings',
         update: '/api/settings',
+      },
+      workers: {
+        list: '/api/workers',
+        create: '/api/workers',
+        get: (id: string) => `/api/workers/${id}`,
+        update: (id: string) => `/api/workers/${id}`,
+        delete: (id: string) => `/api/workers/${id}`,
+        permissions: (id: string) => `/api/workers/${id}/permissions`,
+        updatePermissions: (id: string) => `/api/workers/${id}/permissions`,
       },
     },
   };

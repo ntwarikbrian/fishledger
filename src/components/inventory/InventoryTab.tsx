@@ -15,6 +15,7 @@ import { Fish, Edit, Trash2, Package, Scale, ChevronDown, Eye, AlertTriangle, Ca
 import { useCategories } from "@/hooks/use-categories";
 import { useProducts, Product, CreateProductData } from "@/hooks/use-products";
 import { stockMovementsApi } from "@/lib/api";
+import { toast } from "sonner";
 
 type ViewType = "all" | "low-stock" | "damaged" | "expiry" | "stock-adjustment";
 
@@ -111,6 +112,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     getExpiringProducts,
     getDamagedProducts,
     fetchDamagedProducts,
+    deleteDamagedProduct,
     updateProduct,
     deleteProduct
   } = useProducts();
@@ -158,6 +160,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+  // State for specialized popups
+  const [isLowStockPopupOpen, setIsLowStockPopupOpen] = useState(false);
+  const [isDamagedPopupOpen, setIsDamagedPopupOpen] = useState(false);
+  const [isExpiryPopupOpen, setIsExpiryPopupOpen] = useState(false);
+  const [isStockMovementPopupOpen, setIsStockMovementPopupOpen] = useState(false);
+  const [selectedDamagedProduct, setSelectedDamagedProduct] = useState<any>(null);
+  const [selectedStockMovement, setSelectedStockMovement] = useState<any>(null);
+
   // State for view transition animation
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextView, setNextView] = useState<ViewType | null>(null);
@@ -166,6 +176,55 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   const handleViewProductDetails = (product: Product) => {
     setSelectedProduct(product);
     setIsProductDetailsOpen(true);
+  };
+
+  // Handle specialized popup views
+  const handleViewLowStockDetails = (product: Product) => {
+    setSelectedProduct(product);
+    setIsLowStockPopupOpen(true);
+  };
+
+  const handleViewDamagedDetails = (damagedProduct: any) => {
+    setSelectedDamagedProduct(damagedProduct);
+    setIsDamagedPopupOpen(true);
+  };
+
+  const handleViewExpiryDetails = (product: Product) => {
+    setSelectedProduct(product);
+    setIsExpiryPopupOpen(true);
+  };
+
+  const handleViewStockMovementDetails = (movement: any) => {
+    setSelectedStockMovement(movement);
+    setIsStockMovementPopupOpen(true);
+  };
+
+  // Handle deleting damaged product
+  const handleDeleteDamagedProduct = async (damageId: string, productName: string) => {
+    try {
+      const confirmed = window.confirm(
+        `Are you sure you want to delete this damaged product record for "${productName}"?\n\nThis will restore the damaged quantity back to the product's stock.`
+      );
+
+      if (!confirmed) return;
+
+      const response = await deleteDamagedProduct(damageId);
+
+      if (response.success) {
+        toast.success(`Damaged product deleted and stock restored successfully!`);
+
+        // Refresh the damaged products list
+        await loadDamagedProducts();
+
+        // Refresh the main products list to show updated stock
+        await fetchProducts();
+      } else {
+        toast.error(`Failed to delete damaged product: ${response.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting damaged product:', error);
+      toast.error('An error occurred while deleting the damaged product');
+    }
   };
 
   // Handle animated view transitions
@@ -301,6 +360,120 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     }
   };
 
+  // Handle approving a pending stock addition
+  const handleApproveStockAddition = async (movementId: string) => {
+    try {
+      const response = await stockMovementsApi.approveStockAddition(movementId);
+      if (response.success) {
+        alert('Stock addition approved and applied successfully!');
+        // Refresh stock movements and products
+        loadStockMovements();
+        fetchProducts();
+      } else {
+        alert(response.error || 'Failed to approve stock addition');
+      }
+    } catch (error) {
+      console.error('Error approving stock addition:', error);
+      alert('An error occurred while approving the stock addition.');
+    }
+  };
+
+  // Handle rejecting a pending stock addition
+  const handleRejectStockAddition = async (movementId: string) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return;
+
+    try {
+      const response = await stockMovementsApi.rejectStockAddition(movementId, reason);
+      if (response.success) {
+        alert('Stock addition rejected successfully!');
+        // Refresh stock movements
+        loadStockMovements();
+      } else {
+        alert(response.error || 'Failed to reject stock addition');
+      }
+    } catch (error) {
+      console.error('Error rejecting stock addition:', error);
+      alert('An error occurred while rejecting the stock addition.');
+    }
+  };
+
+  // Handle approving a pending stock correction
+  const handleApproveStockCorrection = async (movementId: string) => {
+    try {
+      const response = await stockMovementsApi.approveStockCorrection(movementId);
+      if (response.success) {
+        alert('Stock correction approved and applied successfully!');
+        // Refresh stock movements and products
+        loadStockMovements();
+        fetchProducts();
+      } else {
+        alert(response.error || 'Failed to approve stock correction');
+      }
+    } catch (error) {
+      console.error('Error approving stock correction:', error);
+      alert('An error occurred while approving the stock correction.');
+    }
+  };
+
+  // Handle rejecting a pending stock correction
+  const handleRejectStockCorrection = async (movementId: string) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return;
+
+    try {
+      const response = await stockMovementsApi.rejectStockCorrection(movementId, reason);
+      if (response.success) {
+        alert('Stock correction rejected successfully!');
+        // Refresh stock movements
+        loadStockMovements();
+      } else {
+        alert(response.error || 'Failed to reject stock correction');
+      }
+    } catch (error) {
+      console.error('Error rejecting stock correction:', error);
+      alert('An error occurred while rejecting the stock correction.');
+    }
+  };
+
+  // Handle approving a pending product creation
+  const handleApproveProductCreate = async (movementId: string) => {
+    try {
+      const response = await stockMovementsApi.approveProductCreate(movementId);
+      if (response.success) {
+        alert('Product creation approved and product created successfully!');
+        // Refresh stock movements and products
+        loadStockMovements();
+        fetchProducts();
+      } else {
+        alert(response.error || 'Failed to approve product creation');
+      }
+    } catch (error) {
+      console.error('Error approving product creation:', error);
+      alert('An error occurred while approving the product creation.');
+    }
+  };
+
+  // Handle rejecting a pending product creation
+  const handleRejectProductCreate = async (movementId: string) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return;
+
+    try {
+      const response = await stockMovementsApi.rejectProductCreate(movementId, reason);
+      if (response.success) {
+        alert('Product creation rejected successfully!');
+        // Refresh stock movements
+        loadStockMovements();
+      } else {
+        alert(response.error || 'Failed to reject product creation');
+      }
+    } catch (error) {
+      console.error('Error rejecting product creation:', error);
+      alert('An error occurred while rejecting the product creation.');
+    }
+  };
+
   // Handle rejecting a pending product edit
   const handleRejectProductEdit = async (movementId: string) => {
     const reason = prompt('Please provide a reason for rejecting this change:');
@@ -339,6 +512,118 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     } catch (error) {
       console.error('Error approving product deletion:', error);
       alert('An error occurred while approving the product deletion.');
+    }
+  };
+
+  /**
+   * Generic handler for approving stock movements from popup
+   * Handles all movement types: product_edit, product_delete, new_stock, stock_correction, product_create
+   */
+  const handleApproveStockMovementFromPopup = async (movement: any) => {
+    try {
+      let response;
+      let confirmMessage = '';
+
+      // Handle different movement types with appropriate confirmation
+      switch (movement.movement_type) {
+        case 'product_edit':
+          response = await stockMovementsApi.approveProductEdit(movement.movement_id);
+          break;
+        case 'product_delete':
+          confirmMessage = 'Are you sure you want to approve this product deletion? This action cannot be undone and will permanently delete the product and all related records.';
+          if (!confirm(confirmMessage)) return;
+          response = await stockMovementsApi.approveProductDelete(movement.movement_id);
+          break;
+        case 'new_stock':
+          response = await stockMovementsApi.approveStockAddition(movement.movement_id);
+          break;
+        case 'stock_correction':
+          response = await stockMovementsApi.approveStockCorrection(movement.movement_id);
+          break;
+        case 'product_create':
+          response = await stockMovementsApi.approveProductCreate(movement.movement_id);
+          break;
+        default:
+          alert('Unknown movement type');
+          return;
+      }
+
+      if (response.success) {
+        const actionName = movement.movement_type === 'product_edit' ? 'Product edit' :
+                          movement.movement_type === 'product_delete' ? 'Product deletion' :
+                          movement.movement_type === 'new_stock' ? 'Stock addition' :
+                          movement.movement_type === 'stock_correction' ? 'Stock correction' :
+                          movement.movement_type === 'product_create' ? 'Product creation' :
+                          'Request';
+
+        alert(`${actionName} approved and applied successfully!`);
+
+        // Refresh data and close popup
+        loadStockMovements();
+        fetchProducts();
+        setIsStockMovementPopupOpen(false);
+      } else {
+        alert(response.error || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving stock movement:', error);
+      alert('An error occurred while approving the request.');
+    }
+  };
+
+  /**
+   * Generic handler for rejecting stock movements from popup
+   * Handles all movement types: product_edit, product_delete, new_stock, stock_correction, product_create
+   * Prompts user for rejection reason before proceeding
+   */
+  const handleRejectStockMovementFromPopup = async (movement: any) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return; // User cancelled
+
+    try {
+      let response;
+
+      // Handle different movement types
+      switch (movement.movement_type) {
+        case 'product_edit':
+          response = await stockMovementsApi.rejectProductEdit(movement.movement_id, reason);
+          break;
+        case 'product_delete':
+          response = await stockMovementsApi.rejectProductDelete(movement.movement_id, reason);
+          break;
+        case 'new_stock':
+          response = await stockMovementsApi.rejectStockAddition(movement.movement_id, reason);
+          break;
+        case 'stock_correction':
+          response = await stockMovementsApi.rejectStockCorrection(movement.movement_id, reason);
+          break;
+        case 'product_create':
+          response = await stockMovementsApi.rejectProductCreate(movement.movement_id, reason);
+          break;
+        default:
+          alert('Unknown movement type');
+          return;
+      }
+
+      if (response.success) {
+        const actionName = movement.movement_type === 'product_edit' ? 'Product edit' :
+                          movement.movement_type === 'product_delete' ? 'Product deletion' :
+                          movement.movement_type === 'new_stock' ? 'Stock addition' :
+                          movement.movement_type === 'stock_correction' ? 'Stock correction' :
+                          movement.movement_type === 'product_create' ? 'Product creation' :
+                          'Request';
+
+        alert(`${actionName} rejected successfully!`);
+
+        // Refresh data and close popup
+        loadStockMovements();
+        setIsStockMovementPopupOpen(false);
+      } else {
+        alert(response.error || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting stock movement:', error);
+      alert('An error occurred while rejecting the request.');
     }
   };
 
@@ -732,7 +1017,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <th className="text-left py-3 px-2 text-sm font-medium">Low Stock Threshold</th>
                 <th className="text-left py-3 px-2 text-sm font-medium">Box Ratio</th>
                 <th className="text-left py-3 px-2 text-sm font-medium">Pricing</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -740,7 +1024,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <tr key={product.product_id} className="border-b hover:bg-muted/50">
                   <td className="py-3 px-2 text-sm">
                     <button
-                      onClick={() => handleViewProductDetails(product)}
+                      onClick={() => handleViewLowStockDetails(product)}
                       className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
                     >
                       {product.name}
@@ -761,30 +1045,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     <div className="space-y-1">
                       <div>${product.price_per_box.toFixed(2)}/box</div>
                       <div>${product.price_per_kg.toFixed(2)}/kg</div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-sm">
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditProduct(product)}
-                        className="h-8 px-2"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setProductToDelete(product);
-                          setDeleteReason(''); // Reset reason
-                          setIsDeleteProductConfirmOpen(true);
-                        }}
-                        className="h-8 px-2 text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -837,9 +1097,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <td className="py-3 px-2">
                   <div>
                     <button
-                      onClick={() => damage.products && handleViewProductDetails(damage.products)}
+                      onClick={() => handleViewDamagedDetails(damage)}
                       className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
-                      disabled={!damage.products}
                     >
                       {damage.products?.name || 'Unknown Product'}
                     </button>
@@ -897,13 +1156,13 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 </td>
                 <td className="py-3 px-2">
                   <div className="flex items-center gap-2">
-                    {!damage.damaged_approval && (
-                      <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700">
-                        Approve
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" className="text-blue-600 hover:text-blue-700">
-                      <Eye className="h-3 w-3" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteDamagedProduct(damage.damage_id, damage.products?.name || 'Unknown Product')}
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </td>
@@ -965,7 +1224,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <th className="text-left py-3 px-2 text-sm font-medium">Days Until Expiry</th>
                 <th className="text-left py-3 px-2 text-sm font-medium">Box Ratio</th>
                 <th className="text-left py-3 px-2 text-sm font-medium">Pricing</th>
-                <th className="text-left py-3 px-2 text-sm font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -980,7 +1238,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   <tr key={product.product_id} className="border-b hover:bg-muted/50">
                     <td className="py-3 px-2 text-sm">
                       <button
-                        onClick={() => handleViewProductDetails(product)}
+                        onClick={() => handleViewExpiryDetails(product)}
                         className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
                       >
                         {product.name}
@@ -1010,30 +1268,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                       <div className="space-y-1">
                         <div>${product.price_per_box.toFixed(2)}/box</div>
                         <div>${product.price_per_kg.toFixed(2)}/kg</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-sm">
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditProduct(product)}
-                          className="h-8 px-2"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setProductToDelete(product);
-                            setDeleteReason(''); // Reset reason
-                            setIsDeleteProductConfirmOpen(true);
-                          }}
-                          className="h-8 px-2 text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -1161,9 +1395,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     </td>
                     <td className="py-3 px-2 text-sm">
                       <button
-                        onClick={() => movement.products && handleViewProductDetails(movement.products)}
+                        onClick={() => handleViewStockMovementDetails(movement)}
                         className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer text-left"
-                        disabled={!movement.products}
                       >
                         {movement.products?.name || 'Unknown Product'}
                       </button>
@@ -1301,14 +1534,33 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-2 text-sm">
-                    {movement.movement_type === 'product_edit' && movement.status === 'pending' ? (
+                    {movement.status === 'pending' ? (
                       <div className="flex gap-1">
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => handleApproveProductEdit(movement.movement_id)}
-                          title="Approve changes"
+                          onClick={() => {
+                            if (movement.movement_type === 'product_edit') {
+                              handleApproveProductEdit(movement.movement_id);
+                            } else if (movement.movement_type === 'product_delete') {
+                              handleApproveProductDelete(movement.movement_id);
+                            } else if (movement.movement_type === 'new_stock') {
+                              handleApproveStockAddition(movement.movement_id);
+                            } else if (movement.movement_type === 'stock_correction') {
+                              handleApproveStockCorrection(movement.movement_id);
+                            } else if (movement.movement_type === 'product_create') {
+                              handleApproveProductCreate(movement.movement_id);
+                            }
+                          }}
+                          title={`Approve ${
+                            movement.movement_type === 'product_edit' ? 'product edit' :
+                            movement.movement_type === 'product_delete' ? 'product deletion' :
+                            movement.movement_type === 'new_stock' ? 'stock addition' :
+                            movement.movement_type === 'stock_correction' ? 'stock correction' :
+                            movement.movement_type === 'product_create' ? 'product creation' :
+                            'request'
+                          }`}
                         >
                           ✓
                         </Button>
@@ -1316,29 +1568,27 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                           size="sm"
                           variant="outline"
                           className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleRejectProductEdit(movement.movement_id)}
-                          title="Reject changes"
-                        >
-                          ✗
-                        </Button>
-                      </div>
-                    ) : movement.movement_type === 'product_delete' && movement.status === 'pending' ? (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => handleApproveProductDelete(movement.movement_id)}
-                          title="Approve deletion"
-                        >
-                          ✓
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleRejectProductDelete(movement.movement_id)}
-                          title="Reject deletion"
+                          onClick={() => {
+                            if (movement.movement_type === 'product_edit') {
+                              handleRejectProductEdit(movement.movement_id);
+                            } else if (movement.movement_type === 'product_delete') {
+                              handleRejectProductDelete(movement.movement_id);
+                            } else if (movement.movement_type === 'new_stock') {
+                              handleRejectStockAddition(movement.movement_id);
+                            } else if (movement.movement_type === 'stock_correction') {
+                              handleRejectStockCorrection(movement.movement_id);
+                            } else if (movement.movement_type === 'product_create') {
+                              handleRejectProductCreate(movement.movement_id);
+                            }
+                          }}
+                          title={`Reject ${
+                            movement.movement_type === 'product_edit' ? 'product edit' :
+                            movement.movement_type === 'product_delete' ? 'product deletion' :
+                            movement.movement_type === 'new_stock' ? 'stock addition' :
+                            movement.movement_type === 'stock_correction' ? 'stock correction' :
+                            movement.movement_type === 'product_create' ? 'product creation' :
+                            'request'
+                          }`}
                         >
                           ✗
                         </Button>
@@ -1860,6 +2110,552 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Low Stock Details Popup */}
+      {isLowStockPopupOpen && selectedProduct && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsLowStockPopupOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-xs w-full max-h-[85vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    Low Stock Alert
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Product Details</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsLowStockPopupOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-3 space-y-3">
+              {/* Product Name */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Product Name</label>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{selectedProduct.name}</p>
+              </div>
+
+              {/* Category */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedProduct.product_categories?.name || 'Uncategorized'}</p>
+              </div>
+
+              {/* Current Stock - Warning Style */}
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Current Stock (Low)
+                </label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Boxes</span>
+                    <p className="text-sm font-bold text-yellow-700 dark:text-yellow-400">{selectedProduct.quantity_box}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">KG</span>
+                    <p className="text-sm font-bold text-yellow-700 dark:text-yellow-400">{selectedProduct.quantity_kg}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Low Stock Threshold */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-red-700 dark:text-red-400">Low Stock Threshold</label>
+                <p className="text-sm font-bold text-red-700 dark:text-red-400">{selectedProduct.boxed_low_stock_threshold} boxes</p>
+              </div>
+
+              {/* Box Ratio */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-blue-700 dark:text-blue-400">Box Ratio</label>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{selectedProduct.box_to_kg_ratio} kg/box</p>
+              </div>
+
+              {/* Pricing Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Cost Price */}
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
+                  <label className="text-xs font-medium text-orange-700 dark:text-orange-400">Cost Price</label>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-xs text-orange-600 dark:text-orange-400">${selectedProduct.cost_per_box.toFixed(2)}/box</p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400">${selectedProduct.cost_per_kg.toFixed(2)}/kg</p>
+                  </div>
+                </div>
+
+                {/* Selling Price */}
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2">
+                  <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Selling Price</label>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-xs text-purple-600 dark:text-purple-400">${selectedProduct.price_per_box.toFixed(2)}/box</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400">${selectedProduct.price_per_kg.toFixed(2)}/kg</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profit */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Profit Margin
+                </label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Per Box</span>
+                    <p className="text-sm font-bold text-green-700 dark:text-green-400">${selectedProduct.profit_per_box.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Per KG</span>
+                    <p className="text-sm font-bold text-green-700 dark:text-green-400">${selectedProduct.profit_per_kg.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="pt-1">
+                <button
+                  onClick={() => setIsLowStockPopupOpen(false)}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 rounded-lg transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Damaged Product Details Popup */}
+      {isDamagedPopupOpen && selectedDamagedProduct && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsDamagedPopupOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-xs w-full max-h-[85vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
+                  <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    Damaged Product
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Product Details</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDamagedPopupOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-3 space-y-3">
+              {/* Product Name */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Product Name</label>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{selectedDamagedProduct.products?.name || 'Unknown Product'}</p>
+              </div>
+
+              {/* Quantity */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-red-700 dark:text-red-400">Quantity Damaged</label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Boxes</span>
+                    <p className="text-sm font-bold text-red-700 dark:text-red-400">{selectedDamagedProduct.damaged_boxes || 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">KG</span>
+                    <p className="text-sm font-bold text-red-700 dark:text-red-400">{selectedDamagedProduct.damaged_kg || 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-orange-700 dark:text-orange-400">Reason</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedDamagedProduct.damaged_reason || 'No reason provided'}</p>
+              </div>
+
+              {/* Date */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-blue-700 dark:text-blue-400">Date</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedDamagedProduct.damaged_date ? new Date(selectedDamagedProduct.damaged_date).toLocaleDateString() : 'Not specified'}
+                </p>
+              </div>
+
+              {/* Loss Value */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Loss Value</label>
+                <p className="text-sm font-bold text-purple-700 dark:text-purple-400">${selectedDamagedProduct.loss_value?.toFixed(2) || '0.00'}</p>
+              </div>
+
+              {/* Reported By */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-green-700 dark:text-green-400">Reported By</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedDamagedProduct.reported_by_user?.owner_name ||
+                   selectedDamagedProduct.users?.full_name ||
+                   selectedDamagedProduct.users?.owner_name ||
+                   'Unknown User'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-1 flex gap-2">
+                <button
+                  onClick={async () => {
+                    setIsDamagedPopupOpen(false);
+                    await handleDeleteDamagedProduct(
+                      selectedDamagedProduct.damage_id,
+                      selectedDamagedProduct.products?.name || 'Unknown Product'
+                    );
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
+                <button
+                  onClick={() => setIsDamagedPopupOpen(false)}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expiry Details Popup */}
+      {isExpiryPopupOpen && selectedProduct && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsExpiryPopupOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-xs w-full max-h-[85vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                  <Calendar className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    Expiry Details
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Product Details</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExpiryPopupOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-3 space-y-3">
+              {/* Product Name */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Product Name</label>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{selectedProduct.name}</p>
+              </div>
+
+              {/* Category */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Category</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedProduct.product_categories?.name || 'Uncategorized'}</p>
+              </div>
+
+              {/* Current Stock */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-blue-700 dark:text-blue-400">Current Stock</label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Boxes</span>
+                    <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{selectedProduct.quantity_box}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">KG</span>
+                    <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{selectedProduct.quantity_kg}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expiry Date */}
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-orange-700 dark:text-orange-400">Expiry Date</label>
+                <p className="text-sm font-bold text-orange-700 dark:text-orange-400">
+                  {selectedProduct.expiry_date ? new Date(selectedProduct.expiry_date).toLocaleDateString() : 'No expiry date'}
+                </p>
+              </div>
+
+              {/* Days Until Expiry */}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-red-700 dark:text-red-400">Days Until Expiry</label>
+                {(() => {
+                  if (!selectedProduct.expiry_date) return <p className="text-sm text-gray-500">N/A</p>;
+
+                  const today = new Date();
+                  const expiryDate = new Date(selectedProduct.expiry_date);
+                  const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                  const isUrgent = daysUntilExpiry <= 3;
+                  const isWarning = daysUntilExpiry <= 7;
+
+                  return (
+                    <p className={`text-sm font-bold ${
+                      isUrgent ? 'text-red-700 dark:text-red-400' :
+                      isWarning ? 'text-orange-700 dark:text-orange-400' :
+                      'text-yellow-700 dark:text-yellow-400'
+                    }`}>
+                      {daysUntilExpiry > 0 ? `${daysUntilExpiry} days` : 'Expired'}
+                    </p>
+                  );
+                })()}
+              </div>
+
+              {/* Cost Price & Box Ratio Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Cost Price */}
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2">
+                  <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Cost Price</label>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-xs text-purple-600 dark:text-purple-400">${selectedProduct.cost_per_box.toFixed(2)}/box</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400">${selectedProduct.cost_per_kg.toFixed(2)}/kg</p>
+                  </div>
+                </div>
+
+                {/* Box Ratio */}
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+                  <label className="text-xs font-medium text-green-700 dark:text-green-400">Box Ratio</label>
+                  <p className="text-sm font-bold text-green-700 dark:text-green-400 mt-1">{selectedProduct.box_to_kg_ratio} kg/box</p>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="pt-1">
+                <button
+                  onClick={() => setIsExpiryPopupOpen(false)}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 rounded-lg transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Movement Details Popup */}
+      {isStockMovementPopupOpen && selectedStockMovement && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsStockMovementPopupOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-xs w-full max-h-[85vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
+                  <RotateCcw className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    Stock Movement
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Movement Details</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsStockMovementPopupOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-3 space-y-3">
+              {/* Date */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Date</label>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                  {new Date(selectedStockMovement.created_at).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Product */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-blue-700 dark:text-blue-400">Product</label>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-400">
+                  {selectedStockMovement.products?.name || 'Unknown Product'}
+                </p>
+              </div>
+
+              {/* Type */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Type</label>
+                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
+                  selectedStockMovement.movement_type === 'damaged' ? 'bg-red-100 text-red-800' :
+                  selectedStockMovement.movement_type === 'new_stock' ? 'bg-green-100 text-green-800' :
+                  selectedStockMovement.movement_type === 'stock_correction' ? 'bg-blue-100 text-blue-800' :
+                  selectedStockMovement.movement_type === 'product_edit' ? 'bg-purple-100 text-purple-800' :
+                  selectedStockMovement.movement_type === 'product_delete' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedStockMovement.movement_type.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
+
+              {/* Field/Stock */}
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-orange-700 dark:text-orange-400">Field/Stock</label>
+                {selectedStockMovement.movement_type === 'product_edit' ? (
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {selectedStockMovement.field_changed || 'Field not specified'}
+                  </p>
+                ) : (
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    {selectedStockMovement.box_change !== 0 && (
+                      <div className="text-center">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Boxes</span>
+                        <p className="text-sm font-bold text-orange-700 dark:text-orange-400">
+                          {selectedStockMovement.box_change > 0 ? '+' : ''}{selectedStockMovement.box_change}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStockMovement.kg_change !== 0 && (
+                      <div className="text-center">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">KG</span>
+                        <p className="text-sm font-bold text-orange-700 dark:text-orange-400">
+                          {selectedStockMovement.kg_change > 0 ? '+' : ''}{selectedStockMovement.kg_change}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Change/Values */}
+              {selectedStockMovement.movement_type === 'product_edit' && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2">
+                  <label className="text-xs font-medium text-yellow-700 dark:text-yellow-400">Change/Values</label>
+                  <div className="mt-1 space-y-1">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="text-red-600">From:</span> {selectedStockMovement.old_value || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="text-green-600">To:</span> {selectedStockMovement.new_value || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Reason & Details */}
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-indigo-700 dark:text-indigo-400">Reason & Details</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedStockMovement.reason || 'No reason provided'}
+                </p>
+              </div>
+
+              {/* Performed By */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-green-700 dark:text-green-400">Performed By</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedStockMovement.users?.full_name ||
+                   selectedStockMovement.users?.owner_name ||
+                   selectedStockMovement.performed_by_user?.full_name ||
+                   selectedStockMovement.performed_by_user?.owner_name ||
+                   'Unknown User'}
+                </p>
+              </div>
+
+              {/* Status */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
+                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
+                  selectedStockMovement.status === 'completed' ? 'bg-green-100 text-green-800' :
+                  selectedStockMovement.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  selectedStockMovement.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                  selectedStockMovement.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedStockMovement.status?.toUpperCase() || 'UNKNOWN'}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-1 space-y-2">
+                {/* Action buttons based on status */}
+                {selectedStockMovement.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveStockMovementFromPopup(selectedStockMovement)}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Package className="h-3 w-3" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleRejectStockMovementFromPopup(selectedStockMovement)}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      <X className="h-3 w-3" />
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setIsStockMovementPopupOpen(false)}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 rounded-lg transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Product Details Popup */}
       {isProductDetailsOpen && selectedProduct && (
