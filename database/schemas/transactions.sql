@@ -31,15 +31,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     payment_status VARCHAR(10) DEFAULT 'pending' CHECK (payment_status IN ('paid', 'pending', 'partial')),
     payment_method VARCHAR(15) CHECK (payment_method IN ('momo_pay', 'cash', 'bank_transfer')),
 
-    -- Deposit and reference information
-    deposit_id VARCHAR(100), -- External deposit/transaction ID
-    deposit_type VARCHAR(10) CHECK (deposit_type IN ('momo', 'bank', 'boss')),
-    account_number VARCHAR(50), -- Account number for bank transfers
-    reference VARCHAR(255), -- Additional reference information
-
-    -- Receipt/proof image
-    image_url TEXT, -- URL to receipt or proof image
-
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

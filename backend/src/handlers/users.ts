@@ -65,84 +65,70 @@ const queryParamsSchema = z.object({
 });
 
 /**
- * Get all users handler
+ * Get current user profile handler (FIXED: Data isolation enforced)
+ * Each admin can only see their own profile, not other users
  */
 export const getUsersHandler = async (c: HonoContext) => {
   try {
-    // Parse and validate query parameters
-    const queryParams = Object.fromEntries(
-      Object.entries(c.req.queries()).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
-    );
-    const validation = queryParamsSchema.safeParse(queryParams);
-
-    if (!validation.success) {
-      const errors = validation.error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-      }));
-
+    // SECURITY FIX: Get current authenticated user only
+    const user = c.get('user');
+    if (!user) {
       return c.json({
         success: false,
-        error: 'Invalid query parameters',
-        details: errors,
+        error: 'Authentication required',
         timestamp: new Date().toISOString(),
         requestId: c.get('requestId'),
-      }, 400);
+      }, 401);
     }
 
-    const { page = 1, limit = 10, search, business_name, owner_name } = validation.data;
-
-    let query = c.get('supabase')
+    // SECURITY FIX: Only return current user's data - complete data isolation
+    const { data: currentUser, error } = await c.get('supabase')
       .from('users')
-      .select('user_id, email_address, business_name, owner_name, phone_number, created_at, last_login');
-
-    // Apply search filter
-    if (search) {
-      query = query.or(`business_name.ilike.%${search}%,owner_name.ilike.%${search}%,email_address.ilike.%${search}%`);
-    }
-
-    // Apply specific filters
-    if (business_name) {
-      query = query.ilike('business_name', `%${business_name}%`);
-    }
-
-    if (owner_name) {
-      query = query.ilike('owner_name', `%${owner_name}%`);
-    }
-
-    // Get total count for pagination
-    const { count: totalCount } = await c.get('supabase')
-      .from('users')
-      .select('*', { count: 'exact', head: true });
-
-    // Apply pagination
-    const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1);
-
-    // Execute query
-    const { data: users, error } = await query;
+      .select('user_id, email_address, business_name, owner_name, phone_number, created_at, last_login')
+      .eq('user_id', user.id) // CRITICAL: Only get current user's data
+      .single();
 
     if (error) {
-      throw new Error(`Failed to fetch users: ${error.message}`);
+      console.error('Get current user error:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to retrieve user profile',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 500);
     }
 
-    // Calculate pagination metadata
-    const pagination = calculatePagination(page, limit, totalCount || 0);
+    if (!currentUser) {
+      return c.json({
+        success: false,
+        error: 'User profile not found',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 404);
+    }
 
+    // Return only current user's data in array format for consistency
     return c.json({
       success: true,
-      message: 'Users retrieved successfully',
-      data: users || [],
-      pagination,
+      message: 'User profile retrieved successfully',
+      data: [currentUser], // Single user in array for API consistency
+      pagination: {
+        page: 1,
+        limit: 1,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
     });
   } catch (error) {
-    console.error('Get users error:', error);
+    console.error('Get user profile error:', error);
 
     return c.json({
       success: false,
-      error: 'Failed to retrieve users',
+      error: 'Failed to retrieve user profile',
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
     }, 500);
@@ -150,13 +136,24 @@ export const getUsersHandler = async (c: HonoContext) => {
 };
 
 /**
- * Get user by ID handler
+ * Get user by ID handler (FIXED: Data isolation enforced)
+ * Users can only access their own profile data
  */
 export const getUserHandler = async (c: HonoContext) => {
   try {
-    const userId = c.req.param('id');
+    const requestedUserId = c.req.param('id');
+    const currentUser = c.get('user');
 
-    if (!userId) {
+    if (!currentUser) {
+      return c.json({
+        success: false,
+        error: 'Authentication required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 401);
+    }
+
+    if (!requestedUserId) {
       return c.json({
         success: false,
         error: 'User ID is required',
@@ -165,23 +162,46 @@ export const getUserHandler = async (c: HonoContext) => {
       }, 400);
     }
 
+    // SECURITY FIX: Users can only access their own data
+    if (requestedUserId !== currentUser.id) {
+      console.warn(`🚨 User ${currentUser.id} attempted to access user ${requestedUserId}'s data`);
+      return c.json({
+        success: false,
+        error: 'Access denied. You can only access your own profile.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 403);
+    }
+
+    // Get user data with data isolation
     const { data: user, error } = await c.get('supabase')
       .from('users')
       .select('user_id, email_address, business_name, owner_name, phone_number, created_at, last_login')
-      .eq('user_id', userId)
+      .eq('user_id', currentUser.id) // CRITICAL: Only get current user's data
       .single();
 
     if (error) {
-      throw new Error(`Failed to fetch user: ${error.message}`);
+      console.error('Get user error:', error);
+      return c.json({
+        success: false,
+        error: 'Failed to fetch user profile',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 500);
     }
 
     if (!user) {
-      throw new Error('User not found');
+      return c.json({
+        success: false,
+        error: 'User profile not found',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 404);
     }
 
     return c.json({
       success: true,
-      message: 'User retrieved successfully',
+      message: 'User profile retrieved successfully',
       data: {
         id: user.user_id,
         email: user.email_address,
@@ -195,22 +215,11 @@ export const getUserHandler = async (c: HonoContext) => {
       requestId: c.get('requestId'),
     });
   } catch (error) {
-    console.error('Get user error:', error);
-
-    const errorMessage = error instanceof Error ? error.message : 'Failed to retrieve user';
-
-    if (errorMessage.includes('not found')) {
-      return c.json({
-        success: false,
-        error: errorMessage,
-        timestamp: new Date().toISOString(),
-        requestId: c.get('requestId'),
-      }, 404);
-    }
+    console.error('Get user profile error:', error);
 
     return c.json({
       success: false,
-      error: errorMessage,
+      error: 'Failed to retrieve user profile',
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
     }, 500);

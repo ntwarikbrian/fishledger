@@ -27,15 +27,42 @@ export async function hashPassword(password: string, saltRounds = 12): Promise<s
 }
 
 /**
- * Verifies a password against its hash
+ * Verifies a password against its hash with enhanced security
  * @param password - Plain text password
  * @param hash - Hashed password
  * @returns Promise resolving to boolean indicating if password is valid
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   try {
-    return await bcrypt.compare(password, hash);
+    // Enhanced security: Input validation
+    if (!password || !hash) {
+      console.warn('🚨 Password verification called with empty password or hash');
+      return false;
+    }
+
+    // Enhanced security: Validate hash format (bcrypt hashes start with $2a$, $2b$, or $2y$)
+    if (!hash.match(/^\$2[aby]\$\d{2}\$.{53}$/)) {
+      console.warn('🚨 Invalid hash format detected in password verification');
+      return false;
+    }
+
+    // Enhanced security: Limit password length to prevent DoS attacks
+    if (password.length > 1000) {
+      console.warn('🚨 Excessively long password detected in verification');
+      return false;
+    }
+
+    // Perform the actual password verification
+    const isValid = await bcrypt.compare(password, hash);
+
+    // Enhanced security: Log verification attempts (without sensitive data)
+    if (!isValid) {
+      console.warn('🚨 Password verification failed - invalid password provided');
+    }
+
+    return isValid;
   } catch (error) {
+    console.error('🚨 Password verification error:', error);
     throw new Error(`Failed to verify password: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -203,16 +230,32 @@ export function validatePasswordStrength(password: string): {
     errors.push('Password must contain at least one number');
   }
 
-  // Optional: More strict validation for production
-  // Uncomment these for production use:
+  // Enhanced security: Require uppercase letter for stronger passwords
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
 
-  // if (!/[A-Z]/.test(password)) {
-  //   errors.push('Password must contain at least one uppercase letter');
-  // }
+  // Enhanced security: Require special character for stronger passwords
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password must contain at least one special character');
+  }
 
-  // if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-  //   errors.push('Password must contain at least one special character');
-  // }
+  // Enhanced security: Check for common weak patterns
+  const commonPatterns = [
+    /123456/,
+    /password/i,
+    /admin/i,
+    /qwerty/i,
+    /abc123/i,
+    /(.)\1{2,}/, // Repeated characters (aaa, 111, etc.)
+  ];
+
+  for (const pattern of commonPatterns) {
+    if (pattern.test(password)) {
+      errors.push('Password contains common weak patterns');
+      break;
+    }
+  }
 
   return {
     isValid: errors.length === 0,

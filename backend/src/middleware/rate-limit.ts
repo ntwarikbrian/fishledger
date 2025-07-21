@@ -109,20 +109,25 @@ export const rateLimit = (options: RateLimitOptions) =>
   });
 
 /**
- * Auth rate limiting middleware
- * More lenient for development, stricter for production
+ * Enhanced auth rate limiting middleware
+ * Lenient limits with short window for better user experience
  */
 export const authRateLimit = rateLimit({
-  maxRequests: 20, // Increased from 5 to 20 for development
-  windowMs: 5 * 60 * 1000, // Reduced from 15 to 5 minutes
-  message: 'Too many authentication attempts, please try again later',
+  maxRequests: 5, // Allow 5 attempts per window
+  windowMs: 10 * 1000, // 10 seconds window (much shorter for better UX)
+  message: 'Too many authentication attempts. Please try again in 10 seconds.',
   keyGenerator: (c) => {
-    return `auth:${
-      c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For') ||
-      c.req.header('X-Real-IP') ||
-      'unknown'
-    }`;
+    // Enhanced security: Use multiple IP headers for better tracking
+    const ip = c.req.header('CF-Connecting-IP') ||
+              c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
+              c.req.header('X-Real-IP') ||
+              c.req.header('X-Client-IP') ||
+              'unknown';
+
+    // Enhanced security: Log authentication attempts
+    console.log(`🔐 Auth rate limit check for IP: ${ip}`);
+
+    return `auth:${ip}`;
   },
 });
 

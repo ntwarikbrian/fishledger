@@ -13,15 +13,16 @@ import {
   updateSaleHandler,
   deleteSaleHandler,
 } from '../handlers/sales';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create sales router
 const sales = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All sales routes require authentication
+ * All sales routes require authentication and data isolation
  */
 sales.use('*', authenticate);
+sales.use('*', enforceDataIsolation);
 sales.use('*', apiRateLimit());
 
 /**

@@ -26,6 +26,13 @@ import {
   validateFileSize,
   generateUniqueFilename,
 } from '../utils/cloudinary';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData,
+  validateResourceOwnership,
+} from '../middleware/data-isolation';
 
 // Validation schemas
 const getExpensesQuerySchema = z.object({
@@ -87,32 +94,30 @@ export const getExpensesHandler = async (c: HonoContext) => {
 
     const { page, limit, sortBy, sortOrder, search, category_id, start_date, end_date, min_amount, max_amount } = validation.data;
 
-    // Build query - Updated to match database schema and include user information
-    let query = c.get('supabase')
-      .from('expenses')
-      .select(`
-        expense_id,
-        title,
-        amount,
+    // Build query with data isolation - only get expenses for the authenticated user
+    let query = createUserFilteredQuery(c, 'expenses', `
+      expense_id,
+      title,
+      amount,
+      category_id,
+      date,
+      receipt_url,
+      status,
+      added_by,
+      created_at,
+      updated_at,
+      expense_categories (
         category_id,
-        date,
-        receipt_url,
-        status,
-        added_by,
-        created_at,
-        updated_at,
-        expense_categories (
-          category_id,
-          category_name,
-          description,
-          budget
-        ),
-        users (
-          user_id,
-          owner_name,
-          business_name
-        )
-      `);
+        category_name,
+        description,
+        budget
+      ),
+      users (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `);
 
     // Apply filters
     if (category_id) {
@@ -140,8 +145,10 @@ export const getExpensesHandler = async (c: HonoContext) => {
       query = applySearch(query, search, ['title']); // Only search in title field as per database schema
     }
 
-    // Get total count for pagination
+    // Get total count for pagination with user isolation
+    const userId = getUserIdFromContext(c);
     const totalCount = await getTotalCount(c.get('supabase'), 'expenses', {
+      user_id: userId,
       category_id,
       start_date,
       end_date,
@@ -183,22 +190,21 @@ export const getExpenseHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Expense ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const { data: expense, error } = await c.get('supabase')
-      .from('expenses')
-      .select(`
-        *,
-        expense_categories (
-          category_id,
-          category_name,
-          description,
-          budget
-        ),
-        users (
-          user_id,
-          owner_name,
-          business_name
-        )
-      `)
+    // Use data isolation to ensure user can only access their own expenses
+    const { data: expense, error } = await createUserFilteredQuery(c, 'expenses', `
+      *,
+      expense_categories (
+        category_id,
+        category_name,
+        description,
+        budget
+      ),
+      users (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `)
       .eq('expense_id', id)
       .single();
 
@@ -254,27 +260,33 @@ export const createExpenseHandler = async (c: HonoContext) => {
 
     const expenseData = validation.data;
 
-    // Verify category exists
-    const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', expenseData.category_id, 'category_id');
-    if (!categoryExists) {
+    // Verify category exists and belongs to the user
+    const userId = getUserIdFromContext(c);
+    const { data: category } = await createUserFilteredQuery(c, 'expense_categories')
+      .eq('category_id', expenseData.category_id)
+      .single();
+
+    if (!category) {
       return c.json({
         success: false,
         error: 'Invalid category ID',
-        details: { error: 'The specified expense category does not exist' },
+        details: { error: 'The specified expense category does not exist or does not belong to you' },
         timestamp: new Date().toISOString(),
         requestId: c.get('requestId'),
       }, 400);
     }
 
-    // Create expense - Add required added_by field from authenticated user
+    // Create expense with data isolation - automatically adds user_id and added_by
+    const expenseDataWithUser = addUserIdToInsertData(c, {
+      ...expenseData,
+      added_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
     const { data: newExpense, error } = await c.get('supabase')
       .from('expenses')
-      .insert({
-        ...expenseData,
-        added_by: c.get('user')?.id, // Add the authenticated user ID
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(expenseDataWithUser)
       .select(`
         *,
         expense_categories (
@@ -333,21 +345,31 @@ export const updateExpenseHandler = async (c: HonoContext) => {
 
     const updateData = validation.data;
 
-    // Check if expense exists
-    const expenseExists = await recordExists(c.get('supabase'), 'expenses', id, 'expense_id');
-    if (!expenseExists) {
+    // Check if expense exists and belongs to the user
+    const { data: existingExpense } = await createUserFilteredQuery(c, 'expenses')
+      .eq('expense_id', id)
+      .single();
+
+    if (!existingExpense) {
       return c.json(createNotFoundResponse('Expense', c.get('requestId')), 404);
     }
 
-    // Verify category exists if being updated
+    // Verify category exists and belongs to the user if being updated
     if (updateData.category_id) {
-      const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', updateData.category_id, 'category_id');
-      if (!categoryExists) {
-        return c.json(createErrorResponse('Invalid category ID', 400, { error: 'The specified expense category does not exist' }, c.get('requestId')), 400);
+      const { data: category } = await createUserFilteredQuery(c, 'expense_categories')
+        .eq('category_id', updateData.category_id)
+        .single();
+
+      if (!category) {
+        return c.json(createErrorResponse('Invalid category ID', 400, { error: 'The specified expense category does not exist or does not belong to you' }, c.get('requestId')), 400);
       }
     }
 
-    // Update expense
+    // Validate and prepare update data with user isolation
+    validateUserIdInUpdateData(c, updateData);
+
+    // Update expense with data isolation
+    const userId = getUserIdFromContext(c);
     const { data: updatedExpense, error } = await c.get('supabase')
       .from('expenses')
       .update({
@@ -355,6 +377,16 @@ export const updateExpenseHandler = async (c: HonoContext) => {
         updated_at: new Date().toISOString(),
       })
       .eq('expense_id', id)
+      .eq('user_id', userId)
+      .select(`
+        *,
+        expense_categories (
+          category_id,
+          category_name,
+          description,
+          budget
+        )
+      `)
       .select(`
         *,
         expense_categories (
@@ -389,17 +421,22 @@ export const deleteExpenseHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Expense ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    // Check if expense exists
-    const expenseExists = await recordExists(c.get('supabase'), 'expenses', id, 'expense_id');
-    if (!expenseExists) {
+    // Check if expense exists and belongs to the user
+    const { data: existingExpense } = await createUserFilteredQuery(c, 'expenses')
+      .eq('expense_id', id)
+      .single();
+
+    if (!existingExpense) {
       return c.json(createNotFoundResponse('Expense', c.get('requestId')), 404);
     }
 
-    // Delete expense
+    // Delete expense with data isolation
+    const userId = getUserIdFromContext(c);
     const { error } = await c.get('supabase')
       .from('expenses')
       .delete()
-      .eq('expense_id', id);
+      .eq('expense_id', id)
+      .eq('user_id', userId);
 
     if (error) {
       throw new Error(`Failed to delete expense: ${error.message}`);

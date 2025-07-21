@@ -10,15 +10,16 @@ import {
   getRevenueChartHandler,
   getFinancialOverviewHandler,
 } from '../handlers/dashboard';
-import { authenticate, requireEmployee, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create dashboard router
 const dashboard = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All dashboard routes require authentication and rate limiting
+ * All dashboard routes require authentication, data isolation, and rate limiting
  */
 dashboard.use('*', authenticate);
+dashboard.use('*', enforceDataIsolation);
 dashboard.use('*', apiRateLimit());
 
 /**

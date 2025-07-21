@@ -15,6 +15,12 @@ import {
   recordExists,
 } from '../utils/db';
 import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
+import {
   asyncHandler,
   DatabaseError,
   throwValidationError,
@@ -64,18 +70,17 @@ export const getCategoriesHandler = asyncHandler(async (c: HonoContext) => {
 
   const { page, limit, sortBy, sortOrder, search } = validation.data!;
 
-  // Build query
-  let query = c.get('supabase')
-    .from('product_categories')
-    .select('category_id, name, description, created_at, updated_at');
+  // Build query with data isolation
+  let query = createUserFilteredQuery(c, 'product_categories', 'category_id, name, description, created_at, updated_at');
 
   // Apply search
   if (search) {
     query = applySearch(query, search, ['name', 'description']);
   }
 
-  // Get total count for pagination
-  const totalCount = await getTotalCount(c.get('supabase'), 'product_categories', {});
+  // Get total count for pagination with data isolation
+  const userId = getUserIdFromContext(c);
+  const totalCount = await getTotalCount(c.get('supabase'), 'product_categories', { user_id: userId });
 
   // Apply pagination
   query = applyPagination(query, { page, limit, sortBy, sortOrder });
@@ -109,10 +114,8 @@ export const getCategoryHandler = asyncHandler(async (c: HonoContext) => {
     throwValidationError('Category ID is required');
   }
 
-  // Get category from database
-  const { data: category, error } = await c.get('supabase')
-    .from('product_categories')
-    .select('*')
+  // Get category from database with data isolation
+  const { data: category, error } = await createUserFilteredQuery(c, 'product_categories', '*')
     .eq('category_id', id)
     .single();
 
@@ -154,10 +157,8 @@ export const createCategoryHandler = asyncHandler(async (c: HonoContext) => {
 
   const categoryData = validation.data!;
 
-  // Check if category name already exists
-  const { data: existingCategory, error: checkError } = await c.get('supabase')
-    .from('product_categories')
-    .select('category_id')
+  // Check if category name already exists with data isolation
+  const { data: existingCategory, error: checkError } = await createUserFilteredQuery(c, 'product_categories', 'category_id')
     .eq('name', categoryData.name)
     .single();
 
@@ -169,15 +170,17 @@ export const createCategoryHandler = asyncHandler(async (c: HonoContext) => {
     throwConflictError('A category with this name already exists');
   }
 
-  // Create category
+  // Create category with proper data isolation
+  const categoryDataWithUser = addUserIdToInsertData(c, {
+    name: categoryData.name,
+    description: categoryData.description || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
   const { data: newCategory, error } = await c.get('supabase')
     .from('product_categories')
-    .insert({
-      name: categoryData.name,
-      description: categoryData.description || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .insert(categoryDataWithUser)
     .select()
     .single();
 
@@ -224,11 +227,9 @@ export const updateCategoryHandler = asyncHandler(async (c: HonoContext) => {
     throwNotFoundError('Category');
   }
 
-  // Check if new name conflicts with existing category (if name is being updated)
+  // Check if new name conflicts with existing category (if name is being updated) with data isolation
   if (updateData.name) {
-    const { data: existingCategory, error: checkError } = await c.get('supabase')
-      .from('product_categories')
-      .select('category_id')
+    const { data: existingCategory, error: checkError } = await createUserFilteredQuery(c, 'product_categories', 'category_id')
       .eq('name', updateData.name)
       .neq('category_id', id)
       .single();
@@ -242,7 +243,8 @@ export const updateCategoryHandler = asyncHandler(async (c: HonoContext) => {
     }
   }
 
-  // Update category
+  // Update category with data isolation
+  const userId = getUserIdFromContext(c);
   const { data: updatedCategory, error } = await c.get('supabase')
     .from('product_categories')
     .update({
@@ -250,6 +252,7 @@ export const updateCategoryHandler = asyncHandler(async (c: HonoContext) => {
       updated_at: new Date().toISOString(),
     })
     .eq('category_id', id)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -282,10 +285,8 @@ export const deleteCategoryHandler = asyncHandler(async (c: HonoContext) => {
     throwNotFoundError('Category');
   }
 
-  // Check if category is being used by any products
-  const { data: productsUsingCategory, error: checkError } = await c.get('supabase')
-    .from('products')
-    .select('product_id')
+  // Check if category is being used by any products with data isolation
+  const { data: productsUsingCategory, error: checkError } = await createUserFilteredQuery(c, 'products', 'product_id')
     .eq('category_id', id)
     .limit(1);
 
@@ -301,11 +302,13 @@ export const deleteCategoryHandler = asyncHandler(async (c: HonoContext) => {
     );
   }
 
-  // Delete category
+  // Delete category with data isolation
+  const userId = getUserIdFromContext(c);
   const { error } = await c.get('supabase')
     .from('product_categories')
     .delete()
-    .eq('category_id', id);
+    .eq('category_id', id)
+    .eq('user_id', userId);
 
   if (error) {
     throw new DatabaseError(`Failed to delete category: ${error.message}`, error);

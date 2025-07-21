@@ -9,15 +9,16 @@ import {
   createStockCorrectionHandler,
   getStockCorrectionsHandler
 } from '../handlers/stock-corrections';
-import { authenticate, requireManager, apiRateLimit } from '../middleware';
+import { authenticate, requireManager, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create stock corrections router
 const stockCorrections = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All stock correction routes require authentication
+ * All stock correction routes require authentication and data isolation
  */
 stockCorrections.use('*', authenticate);
+stockCorrections.use('*', enforceDataIsolation);
 stockCorrections.use('*', apiRateLimit());
 
 /**

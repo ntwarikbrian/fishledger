@@ -6,6 +6,7 @@
 -- Damaged products table for tracking damaged inventory
 CREATE TABLE IF NOT EXISTS damaged_products (
     damage_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: damaged products belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
     
     -- Damaged quantities
@@ -37,6 +38,40 @@ CREATE TABLE IF NOT EXISTS damaged_products (
         (damaged_approval = false AND approved_by IS NULL AND approved_date IS NULL)
     )
 );
+
+-- Comments for damaged products table
+COMMENT ON TABLE damaged_products IS 'Tracks damaged inventory items separately from main products table';
+COMMENT ON COLUMN damaged_products.damage_id IS 'Unique identifier for each damage record';
+COMMENT ON COLUMN damaged_products.product_id IS 'Reference to the product that was damaged';
+COMMENT ON COLUMN damaged_products.damaged_boxes IS 'Number of boxes that were damaged';
+COMMENT ON COLUMN damaged_products.damaged_kg IS 'Weight in kg that was damaged';
+COMMENT ON COLUMN damaged_products.damaged_reason IS 'Reason for the damage';
+COMMENT ON COLUMN damaged_products.description IS 'Additional notes about the damage';
+COMMENT ON COLUMN damaged_products.damaged_date IS 'Date when the damage was reported';
+COMMENT ON COLUMN damaged_products.loss_value IS 'Financial loss value from the damaged products';
+COMMENT ON COLUMN damaged_products.damaged_approval IS 'Whether the damage report has been approved';
+COMMENT ON COLUMN damaged_products.approved_by IS 'User who approved the damage report';
+COMMENT ON COLUMN damaged_products.approved_date IS 'Date when the damage was approved';
+COMMENT ON COLUMN damaged_products.reported_by IS 'User who reported the damage';
+
+-- Indexes for damaged products performance
+CREATE INDEX IF NOT EXISTS idx_damaged_products_product_id ON damaged_products(product_id);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_damaged_date ON damaged_products(damaged_date);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_reported_by ON damaged_products(reported_by);
+CREATE INDEX IF NOT EXISTS idx_damaged_products_approval_status ON damaged_products(damaged_approval);
+
+-- Enable RLS for damaged products
+ALTER TABLE damaged_products ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only access damaged products from their own business
+CREATE POLICY damaged_products_user_isolation ON damaged_products
+    FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM users
+            WHERE users.user_id = auth.uid()
+        )
+    );
 
 -- Comments for documentation
 COMMENT ON TABLE damaged_products IS 'Tracks damaged inventory items separately from main products table';

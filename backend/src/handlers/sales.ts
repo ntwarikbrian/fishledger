@@ -19,6 +19,12 @@ import {
   getTotalCount,
   recordExists,
 } from '../utils/db';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 // Validation schemas
 const createSaleSchema = z.object({
@@ -96,44 +102,42 @@ export const getSalesHandler = async (c: HonoContext) => {
 
     const { page, limit, sortBy, sortOrder, search, paymentMethod, paymentStatus, startDate, endDate, minAmount, maxAmount, productId } = validation.data;
 
-    // Build query with product information
-    let query = c.get('supabase')
-      .from('sales')
-      .select(`
-        id,
+    // Build query with product information using data isolation
+    let query = createUserFilteredQuery(c, 'sales', `
+      id,
+      product_id,
+      boxes_quantity,
+      kg_quantity,
+      box_price,
+      kg_price,
+      profit_per_box,
+      profit_per_kg,
+      total_amount,
+      amount_paid,
+      remaining_amount,
+      date_time,
+      payment_status,
+      payment_method,
+      performed_by,
+      client_id,
+      client_name,
+      email_address,
+      phone,
+      products (
         product_id,
-        boxes_quantity,
-        kg_quantity,
-        box_price,
-        kg_price,
-        profit_per_box,
-        profit_per_kg,
-        total_amount,
-        amount_paid,
-        remaining_amount,
-        date_time,
-        payment_status,
-        payment_method,
-        performed_by,
-        client_id,
-        client_name,
-        email_address,
-        phone,
-        products (
-          product_id,
-          name,
+        name,
+        category_id,
+        product_categories (
           category_id,
-          product_categories (
-            category_id,
-            name
-          )
-        ),
-        users (
-          user_id,
-          owner_name,
-          business_name
+          name
         )
-      `);
+      ),
+      users (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `);
 
     // Apply filters
     if (paymentMethod) {
@@ -214,43 +218,41 @@ export const getSaleHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Sale ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const { data: sale, error } = await c.get('supabase')
-      .from('sales')
-      .select(`
-        id,
+    const { data: sale, error } = await createUserFilteredQuery(c, 'sales', `
+      id,
+      product_id,
+      boxes_quantity,
+      kg_quantity,
+      box_price,
+      kg_price,
+      profit_per_box,
+      profit_per_kg,
+      total_amount,
+      amount_paid,
+      remaining_amount,
+      date_time,
+      payment_status,
+      payment_method,
+      performed_by,
+      client_id,
+      client_name,
+      email_address,
+      phone,
+      products (
         product_id,
-        boxes_quantity,
-        kg_quantity,
-        box_price,
-        kg_price,
-        profit_per_box,
-        profit_per_kg,
-        total_amount,
-        amount_paid,
-        remaining_amount,
-        date_time,
-        payment_status,
-        payment_method,
-        performed_by,
-        client_id,
-        client_name,
-        email_address,
-        phone,
-        products (
-          product_id,
-          name,
+        name,
+        category_id,
+        product_categories (
           category_id,
-          product_categories (
-            category_id,
-            name
-          )
-        ),
-        users (
-          user_id,
-          owner_name,
-          business_name
+          name
         )
-      `)
+      ),
+      users (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `)
       .eq('id', id)
       .single();
 

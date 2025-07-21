@@ -6,6 +6,7 @@
 -- Products table for fish inventory management with box/kg support
 CREATE TABLE IF NOT EXISTS products (
     product_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: products belong to specific user
     name VARCHAR(200) NOT NULL,
     category_id UUID NOT NULL REFERENCES product_categories(category_id),
 
@@ -49,8 +50,9 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 -- Comments for documentation
-COMMENT ON TABLE products IS 'Tracks fish inventory with box/kg management, pricing, damage, and expiry';
+COMMENT ON TABLE products IS 'Tracks fish inventory with box/kg management, pricing, damage, and expiry - isolated per user';
 COMMENT ON COLUMN products.product_id IS 'Unique identifier for each product';
+COMMENT ON COLUMN products.user_id IS 'Reference to user who owns this product - ensures data isolation';
 COMMENT ON COLUMN products.name IS 'Product name (e.g., Atlantic Salmon)';
 COMMENT ON COLUMN products.category_id IS 'Reference to product category';
 COMMENT ON COLUMN products.quantity_box IS 'Number of full boxes in stock';
@@ -69,6 +71,7 @@ COMMENT ON COLUMN products.created_at IS 'Timestamp when product was created';
 COMMENT ON COLUMN products.updated_at IS 'Timestamp when product was last updated';
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id); -- Critical for data isolation
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 CREATE INDEX IF NOT EXISTS idx_products_expiry_date ON products(expiry_date);
@@ -79,28 +82,12 @@ CREATE INDEX IF NOT EXISTS idx_products_cost_per_kg ON products(cost_per_kg);
 CREATE INDEX IF NOT EXISTS idx_products_boxed_low_stock ON products(boxed_low_stock_threshold);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
 
--- Row Level Security (RLS) policies
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+-- Composite index for user-specific queries
+CREATE INDEX IF NOT EXISTS idx_products_user_category ON products(user_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_products_user_name ON products(user_id, name);
 
--- Policy: Business owners can view all products
-CREATE POLICY products_select_all ON products
-    FOR SELECT
-    USING (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can insert products
-CREATE POLICY products_insert_owner ON products
-    FOR INSERT
-    WITH CHECK (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can update products
-CREATE POLICY products_update_owner ON products
-    FOR UPDATE
-    USING (auth.uid() IS NOT NULL);
-
--- Policy: Business owners can delete products
-CREATE POLICY products_delete_owner ON products
-    FOR DELETE
-    USING (auth.uid() IS NOT NULL);
+-- Remove RLS policies as we'll handle data isolation through application logic
+-- This ensures compatibility with custom JWT authentication
 
 -- Function to validate product data with new structure
 CREATE OR REPLACE FUNCTION validate_product_data()

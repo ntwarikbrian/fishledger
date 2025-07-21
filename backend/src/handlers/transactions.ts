@@ -26,6 +26,12 @@ import {
   validateFileSize,
   generateUniqueFilename,
 } from '../utils/cloudinary';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 /**
  * Helper function to convert ZodError to ValidationError[]
@@ -180,24 +186,22 @@ export const getTransactionsHandler = async (c: HonoContext) => {
       );
     }
 
-    // Build query with filters - Query from sales table since that's where the actual data is
+    // Build query with filters using data isolation - Query from sales table since that's where the actual data is
     // Use actual column names from sales table
-    let query = c.get('supabase')
-      .from('sales')
-      .select(`
-        id,
-        product_id,
-        boxes_quantity,
-        kg_quantity,
-        total_amount,
-        date_time,
-        payment_status,
-        payment_method,
-        client_name,
-        email_address,
-        phone,
-        performed_by
-      `);
+    let query = createUserFilteredQuery(c, 'sales', `
+      id,
+      product_id,
+      boxes_quantity,
+      kg_quantity,
+      total_amount,
+      date_time,
+      payment_status,
+      payment_method,
+      client_name,
+      email_address,
+      phone,
+      performed_by
+    `);
 
     // Apply filters - adapted for sales table structure (simplified)
     if (filters.payment_status) {
@@ -222,9 +226,8 @@ export const getTransactionsHandler = async (c: HonoContext) => {
       query = query.or(`client_name.ilike.%${search}%,email_address.ilike.%${search}%`);
     }
 
-    // Get total count for pagination - create a separate query for counting from sales table
-    let countQuery = c.get('supabase')
-      .from('sales')
+    // Get total count for pagination - create a separate query for counting from sales table with user filtering
+    let countQuery = createUserFilteredQuery(c, 'sales')
       .select('*', { count: 'exact', head: true });
 
     // Apply the same filters to count query (simplified)
@@ -338,44 +341,42 @@ export const getTransactionHandler = async (c: HonoContext) => {
       );
     }
 
-    const { data: transaction, error } = await c.get('supabase')
-      .from('transactions')
-      .select(`
-        transaction_id,
-        sale_id,
-        date_time,
-        product_name,
-        client_name,
-        boxes_quantity,
-        kg_quantity,
-        total_amount,
-        payment_status,
-        payment_method,
-        deposit_id,
-        deposit_type,
-        account_number,
-        reference,
-        image_url,
-        created_at,
-        updated_at,
-        created_by,
-        sales (
-          id,
+    const { data: transaction, error } = await createUserFilteredQuery(c, 'transactions', `
+      transaction_id,
+      sale_id,
+      date_time,
+      product_name,
+      client_name,
+      boxes_quantity,
+      kg_quantity,
+      total_amount,
+      payment_status,
+      payment_method,
+      deposit_id,
+      deposit_type,
+      account_number,
+      reference,
+      image_url,
+      created_at,
+      updated_at,
+      created_by,
+      sales (
+        id,
+        product_id,
+        amount_paid,
+        remaining_amount,
+        products (
           product_id,
-          amount_paid,
-          remaining_amount,
-          products (
-            product_id,
-            name,
+          name,
+          category_id,
+          product_categories (
             category_id,
-            product_categories (
-              category_id,
-              name
-            )
+            name
           )
-        ),
-        created_by
-      `)
+        )
+      ),
+      created_by
+    `)
       .eq('transaction_id', id)
       .single();
 
@@ -425,10 +426,8 @@ export const createTransactionHandler = async (c: HonoContext) => {
 
     const transactionData = validation.data;
 
-    // Verify that the sale exists
-    const { data: sale, error: saleError } = await c.get('supabase')
-      .from('sales')
-      .select('id, product_id')
+    // Verify that the sale exists and belongs to the current user
+    const { data: sale, error: saleError } = await createUserFilteredQuery(c, 'sales', 'id, product_id')
       .eq('id', transactionData.sale_id)
       .single();
 
@@ -439,17 +438,19 @@ export const createTransactionHandler = async (c: HonoContext) => {
       );
     }
 
-    // Get current user ID - use fallback for development
-    const currentUserId = c.get('user')?.id || 'system-user';
+    // Get current user ID from context
+    const currentUserId = getUserIdFromContext(c);
 
-    // Create transaction record
+    // Create transaction record with user isolation
+    const transactionInsertData = addUserIdToInsertData(c, {
+      ...transactionData,
+      created_by: currentUserId,
+      // Note: updated_by field will be added when database is updated
+    });
+
     const { data: newTransaction, error } = await c.get('supabase')
       .from('transactions')
-      .insert({
-        ...transactionData,
-        created_by: currentUserId,
-        // Note: updated_by field will be added when database is updated
-      })
+      .insert(transactionInsertData)
       .select(`
         transaction_id,
         sale_id,
@@ -670,10 +671,8 @@ export const getTransactionStatsHandler = async (c: HonoContext) => {
     const dateTo = c.req.query('date_to');
     console.log('📅 Date filters:', { dateFrom, dateTo });
 
-    // Build base query - Query from sales table since that's where the actual data is
-    let query = supabase
-      .from('sales')
-      .select('total_amount, payment_status, payment_method, date_time');
+    // Build base query with user filtering - Query from sales table since that's where the actual data is
+    let query = createUserFilteredQuery(c, 'sales', 'total_amount, payment_status, payment_method, date_time');
 
     // Apply date filters if provided
     if (dateFrom) {
@@ -785,28 +784,26 @@ export const getTransactionsBySaleHandler = async (c: HonoContext) => {
       );
     }
 
-    const { data: transactions, error } = await c.get('supabase')
-      .from('transactions')
-      .select(`
-        transaction_id,
-        sale_id,
-        date_time,
-        product_name,
-        client_name,
-        boxes_quantity,
-        kg_quantity,
-        total_amount,
-        payment_status,
-        payment_method,
-        deposit_id,
-        deposit_type,
-        account_number,
-        reference,
-        image_url,
-        created_at,
-        updated_at,
-        created_by
-      `)
+    const { data: transactions, error } = await createUserFilteredQuery(c, 'transactions', `
+      transaction_id,
+      sale_id,
+      date_time,
+      product_name,
+      client_name,
+      boxes_quantity,
+      kg_quantity,
+      total_amount,
+      payment_status,
+      payment_method,
+      deposit_id,
+      deposit_type,
+      account_number,
+      reference,
+      image_url,
+      created_at,
+      updated_at,
+      created_by
+    `)
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false });
 
@@ -995,35 +992,33 @@ export const getDebtorsHandler = async (c: HonoContext) => {
     const sortBy = c.req.query('sortBy') || 'remaining_amount';
     const sortOrder = c.req.query('sortOrder') || 'desc';
 
-    // Build query for unpaid/partial sales
-    let query = c.get('supabase')
-      .from('sales')
-      .select(`
-        id,
-        client_name,
-        email_address,
-        phone,
-        total_amount,
-        amount_paid,
-        remaining_amount,
-        payment_status,
-        payment_method,
-        date_time,
-        products (
-          product_id,
-          name,
+    // Build query for unpaid/partial sales with user filtering
+    let query = createUserFilteredQuery(c, 'sales', `
+      id,
+      client_name,
+      email_address,
+      phone,
+      total_amount,
+      amount_paid,
+      remaining_amount,
+      payment_status,
+      payment_method,
+      date_time,
+      products (
+        product_id,
+        name,
+        category_id,
+        product_categories (
           category_id,
-          product_categories (
-            category_id,
-            name
-          )
-        ),
-        users (
-          user_id,
-          owner_name,
-          business_name
+          name
         )
-      `)
+      ),
+      users (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `)
       .in('payment_status', ['pending', 'partial'])
       .gt('remaining_amount', 0);
 

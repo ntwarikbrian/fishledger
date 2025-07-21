@@ -5,9 +5,26 @@
 
 import { Context } from 'hono';
 import { createSupabaseClient } from '../config/supabase';
-import { createCloudinaryService, CLOUDINARY_FOLDERS, validateFileType, validateFileSize } from '../config/cloudinary';
+import { initializeCloudinary, uploadToCloudinary, generateUniqueFilename, deleteFromCloudinary } from '../utils/cloudinary';
 import { createSuccessResponse, createErrorResponse } from '../utils/response';
 import type { Environment } from '../config/environment';
+import bcrypt from 'bcryptjs';
+
+// File validation utilities
+function validateFileType(filename: string, allowedTypes: string[]): boolean {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  return extension ? allowedTypes.includes(extension) : false;
+}
+
+function validateFileSize(size: number, maxSize: number): boolean {
+  return size <= maxSize;
+}
+
+function getFileExtension(filename: string): string {
+  return filename.split('.').pop()?.toLowerCase() || '';
+}
+
+
 
 // Worker interfaces
 export interface CreateWorkerRequest {
@@ -43,6 +60,7 @@ export interface Worker {
   phone_number?: string;
   id_card_front_url?: string;
   id_card_back_url?: string;
+  password?: string; // Optional for responses (never send password in responses)
   monthly_salary?: number;
   total_revenue_generated: number;
   recent_login_history?: any;
@@ -56,7 +74,17 @@ export async function createWorker(c: Context): Promise<Response> {
   try {
     const env = c.env as Environment;
     const supabase = createSupabaseClient(env);
-    const cloudinary = createCloudinaryService(env);
+
+    // Initialize Cloudinary for Workers
+    if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+      return createErrorResponse('Cloudinary configuration is missing', 500);
+    }
+
+    initializeCloudinary({
+      cloud_name: env.CLOUDINARY_CLOUD_NAME,
+      api_key: env.CLOUDINARY_API_KEY,
+      api_secret: env.CLOUDINARY_API_SECRET,
+    });
 
     // Parse form data
     const formData = await c.req.formData();
@@ -68,9 +96,9 @@ export async function createWorker(c: Context): Promise<Response> {
     const phone_number = formData.get('phone_number') as string;
     const monthly_salary = formData.get('monthly_salary') ? parseFloat(formData.get('monthly_salary') as string) : null;
     
-    // Extract ID card files
-    const id_card_front = formData.get('id_card_front') as File;
-    const id_card_back = formData.get('id_card_back') as File;
+    // Extract ID card files (optional)
+    const id_card_front = formData.get('id_card_front') as File | null;
+    const id_card_back = formData.get('id_card_back') as File | null;
 
     // Validate required fields
     if (!full_name || !email || !password) {
@@ -83,25 +111,32 @@ export async function createWorker(c: Context): Promise<Response> {
       return createErrorResponse('Invalid email format', 400);
     }
 
-    // Validate ID card files
-    if (!id_card_front || !id_card_back) {
-      return createErrorResponse('Both front and back ID card images are required', 400);
-    }
-
-    // Validate file types and sizes
+    // Validate ID card files if provided
     const maxFileSize = 5 * 1024 * 1024; // 5MB
     const allowedTypes = ['jpg', 'jpeg', 'png', 'webp'];
 
-    if (!validateFileType(id_card_front.name, allowedTypes) || !validateFileType(id_card_back.name, allowedTypes)) {
-      return createErrorResponse('Invalid file type. Only JPG, PNG, and WebP files are allowed', 400);
+    // Validate front ID card if provided
+    if (id_card_front && id_card_front instanceof File) {
+      if (!validateFileType(id_card_front.name, allowedTypes)) {
+        return createErrorResponse('Invalid front ID card file type. Only JPG, PNG, and WebP files are allowed', 400);
+      }
+      if (!validateFileSize(id_card_front.size, maxFileSize)) {
+        return createErrorResponse('Front ID card file size too large. Maximum size is 5MB', 400);
+      }
     }
 
-    if (!validateFileSize(id_card_front.size, maxFileSize) || !validateFileSize(id_card_back.size, maxFileSize)) {
-      return createErrorResponse('File size too large. Maximum size is 5MB per file', 400);
+    // Validate back ID card if provided
+    if (id_card_back && id_card_back instanceof File) {
+      if (!validateFileType(id_card_back.name, allowedTypes)) {
+        return createErrorResponse('Invalid back ID card file type. Only JPG, PNG, and WebP files are allowed', 400);
+      }
+      if (!validateFileSize(id_card_back.size, maxFileSize)) {
+        return createErrorResponse('Back ID card file size too large. Maximum size is 5MB', 400);
+      }
     }
 
     // Check if worker email already exists
-    const { data: existingWorker, error: checkError } = await supabase
+    const { data: existingWorker } = await supabase
       .from('workers')
       .select('email')
       .eq('email', email)
@@ -111,40 +146,66 @@ export async function createWorker(c: Context): Promise<Response> {
       return createErrorResponse('Worker with this email already exists', 409);
     }
 
-    // Upload ID card images to Cloudinary
-    let id_card_front_url = '';
-    let id_card_back_url = '';
+    // Hash the password before storing
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Upload ID card images to Cloudinary (optional)
+    let id_card_front_url: string | null = null;
+    let id_card_back_url: string | null = null;
+    let frontUpload: any = null;
+    let backUpload: any = null;
 
     try {
-      // Convert files to buffers
-      const frontBuffer = Buffer.from(await id_card_front.arrayBuffer());
-      const backBuffer = Buffer.from(await id_card_back.arrayBuffer());
+      // Upload front ID card if provided
+      if (id_card_front && id_card_front instanceof File) {
+        console.log('📤 Uploading front ID card...');
+        const frontBuffer = await id_card_front.arrayBuffer();
+        const frontFilename = generateUniqueFilename(id_card_front.name, 'worker_id_front');
 
-      // Upload front ID card
-      const frontUpload = await cloudinary.uploadFile(frontBuffer, {
-        folder: `${CLOUDINARY_FOLDERS.USERS}/id-cards`,
-        public_id: `worker_${email.replace('@', '_at_')}_front_${Date.now()}`,
-        resource_type: 'image',
-        quality: 'auto:good',
-        format: 'auto',
-        tags: ['worker', 'id-card', 'front']
-      });
+        frontUpload = await uploadToCloudinary(frontBuffer, {
+          folder: 'local-fishing/workers/id-cards',
+          public_id: frontFilename,
+          resource_type: 'image',
+          tags: ['worker', 'id-card', 'front']
+        });
 
-      // Upload back ID card
-      const backUpload = await cloudinary.uploadFile(backBuffer, {
-        folder: `${CLOUDINARY_FOLDERS.USERS}/id-cards`,
-        public_id: `worker_${email.replace('@', '_at_')}_back_${Date.now()}`,
-        resource_type: 'image',
-        quality: 'auto:good',
-        format: 'auto',
-        tags: ['worker', 'id-card', 'back']
-      });
+        id_card_front_url = frontUpload.secure_url;
+        console.log('✅ Front ID card uploaded successfully');
+      }
 
-      id_card_front_url = frontUpload.secure_url;
-      id_card_back_url = backUpload.secure_url;
+      // Upload back ID card if provided
+      if (id_card_back && id_card_back instanceof File) {
+        console.log('📤 Uploading back ID card...');
+        const backBuffer = await id_card_back.arrayBuffer();
+        const backFilename = generateUniqueFilename(id_card_back.name, 'worker_id_back');
+
+        backUpload = await uploadToCloudinary(backBuffer, {
+          folder: 'local-fishing/workers/id-cards',
+          public_id: backFilename,
+          resource_type: 'image',
+          tags: ['worker', 'id-card', 'back']
+        });
+
+        id_card_back_url = backUpload.secure_url;
+        console.log('✅ Back ID card uploaded successfully');
+      }
 
     } catch (uploadError) {
       console.error('Cloudinary upload error:', uploadError);
+
+      // Clean up any successfully uploaded files
+      try {
+        if (frontUpload?.public_id) {
+          await deleteFromCloudinary(frontUpload.public_id, 'image');
+        }
+        if (backUpload?.public_id) {
+          await deleteFromCloudinary(backUpload.public_id, 'image');
+        }
+      } catch (cleanupError) {
+        console.error('Failed to cleanup uploaded images:', cleanupError);
+      }
+
       return createErrorResponse('Failed to upload ID card images', 500);
     }
 
@@ -157,6 +218,7 @@ export async function createWorker(c: Context): Promise<Response> {
         phone_number,
         id_card_front_url,
         id_card_back_url,
+        password: hashedPassword,
         monthly_salary,
         total_revenue_generated: 0
       })
@@ -168,8 +230,12 @@ export async function createWorker(c: Context): Promise<Response> {
       
       // Clean up uploaded images if database insert fails
       try {
-        await cloudinary.deleteFile(frontUpload.public_id);
-        await cloudinary.deleteFile(backUpload.public_id);
+        if (frontUpload?.public_id) {
+          await deleteFromCloudinary(frontUpload.public_id, 'image');
+        }
+        if (backUpload?.public_id) {
+          await deleteFromCloudinary(backUpload.public_id, 'image');
+        }
       } catch (cleanupError) {
         console.error('Failed to cleanup uploaded images:', cleanupError);
       }
@@ -208,12 +274,12 @@ export async function createWorker(c: Context): Promise<Response> {
     }
 
     // Remove sensitive data from response
-    const { ...workerResponse } = newWorker;
+    const { password: _, ...workerResponse } = newWorker;
 
     return createSuccessResponse({
       message: 'Worker account created successfully',
       worker: workerResponse
-    }, 201);
+    }, '201');
 
   } catch (error) {
     console.error('Create worker error:', error);
@@ -225,26 +291,47 @@ export async function createWorker(c: Context): Promise<Response> {
  * Get all workers
  */
 export async function getAllWorkers(c: Context): Promise<Response> {
+  const startTime = Date.now();
+
   try {
     const env = c.env as Environment;
+    console.log('🔍 Creating Supabase client...');
     const supabase = createSupabaseClient(env);
 
+    console.log('🔍 Executing workers query...');
+    const queryStart = Date.now();
+
+    // Optimized query - exclude JSONB field for better performance but include ID card URLs
     const { data: workers, error } = await supabase
       .from('workers')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, monthly_salary, total_revenue_generated, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100); // Add reasonable limit to prevent large result sets
+
+    const queryTime = Date.now() - queryStart;
+    console.log(`📊 Workers query completed in ${queryTime}ms`);
 
     if (error) {
       console.error('Database query error:', error);
       return createErrorResponse('Failed to fetch workers', 500);
     }
 
+    console.log(`📊 Retrieved ${workers?.length || 0} workers`);
+
+    const totalTime = Date.now() - startTime;
+    console.log(`⏱️ Total getAllWorkers execution time: ${totalTime}ms`);
+
     return createSuccessResponse({
-      workers: workers || []
+      workers: workers || [],
+      meta: {
+        count: workers?.length || 0,
+        executionTime: totalTime
+      }
     });
 
   } catch (error) {
-    console.error('Get workers error:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`❌ Get workers error after ${totalTime}ms:`, error);
     return createErrorResponse('Internal server error', 500);
   }
 }
@@ -264,7 +351,7 @@ export async function getWorkerById(c: Context): Promise<Response> {
 
     const { data: worker, error } = await supabase
       .from('workers')
-      .select('*')
+      .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, monthly_salary, total_revenue_generated, recent_login_history, created_at')
       .eq('worker_id', workerId)
       .single();
 
@@ -278,6 +365,64 @@ export async function getWorkerById(c: Context): Promise<Response> {
 
   } catch (error) {
     console.error('Get worker error:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+/**
+ * Authenticate worker with email and password
+ */
+export async function authenticateWorker(c: Context): Promise<Response> {
+  try {
+    const env = c.env as Environment;
+    const supabase = createSupabaseClient(env);
+
+    // Parse request body
+    const body = await c.req.json();
+    const { email, password } = body;
+
+    // Validate required fields
+    if (!email || !password) {
+      return createErrorResponse('Email and password are required', 400);
+    }
+
+    // Get worker by email (including password for verification)
+    const { data: worker, error } = await supabase
+      .from('workers')
+      .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, password, monthly_salary, total_revenue_generated, recent_login_history, created_at')
+      .eq('email', email)
+      .single();
+
+    if (error || !worker) {
+      return createErrorResponse('Invalid email or password', 401);
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, worker.password);
+    if (!isValidPassword) {
+      return createErrorResponse('Invalid email or password', 401);
+    }
+
+    // Remove password from response
+    const { password: _, ...workerResponse } = worker;
+
+    // Update recent login history
+    const currentTime = new Date().toISOString();
+    const loginHistory = worker.recent_login_history || [];
+    const updatedHistory = [currentTime, ...loginHistory.slice(0, 9)]; // Keep last 10 logins
+
+    await supabase
+      .from('workers')
+      .update({ recent_login_history: updatedHistory })
+      .eq('worker_id', worker.worker_id);
+
+    return createSuccessResponse({
+      message: 'Authentication successful',
+      worker: workerResponse
+    });
+
+  } catch (error) {
+    console.error('Worker authentication error:', error);
     return createErrorResponse('Internal server error', 500);
   }
 }
@@ -351,7 +496,18 @@ export async function deleteWorker(c: Context): Promise<Response> {
   try {
     const env = c.env as Environment;
     const supabase = createSupabaseClient(env);
-    const cloudinary = createCloudinaryService(env);
+
+    // Initialize Cloudinary for Workers
+    if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+      return createErrorResponse('Cloudinary configuration is missing', 500);
+    }
+
+    initializeCloudinary({
+      cloud_name: env.CLOUDINARY_CLOUD_NAME,
+      api_key: env.CLOUDINARY_API_KEY,
+      api_secret: env.CLOUDINARY_API_SECRET,
+    });
+
     const workerId = c.req.param('id');
 
     if (!workerId) {
@@ -385,14 +541,14 @@ export async function deleteWorker(c: Context): Promise<Response> {
       if (worker.id_card_front_url) {
         const frontPublicId = worker.id_card_front_url.split('/').pop()?.split('.')[0];
         if (frontPublicId) {
-          await cloudinary.deleteFile(frontPublicId);
+          await deleteFromCloudinary(frontPublicId, 'image');
         }
       }
 
       if (worker.id_card_back_url) {
         const backPublicId = worker.id_card_back_url.split('/').pop()?.split('.')[0];
         if (backPublicId) {
-          await cloudinary.deleteFile(backPublicId);
+          await deleteFromCloudinary(backPublicId, 'image');
         }
       }
     } catch (cleanupError) {
@@ -436,12 +592,19 @@ export async function getWorkerPermissions(c: Context): Promise<Response> {
     // Group permissions by category
     const groupedPermissions: Record<string, Record<string, boolean>> = {};
 
-    permissions?.forEach(perm => {
-      if (!groupedPermissions[perm.permission_category]) {
-        groupedPermissions[perm.permission_category] = {};
-      }
-      groupedPermissions[perm.permission_category][perm.permission_name] = perm.is_granted;
-    });
+    if (permissions) {
+      permissions.forEach(perm => {
+        if (perm.permission_category && perm.permission_name) {
+          const category = perm.permission_category;
+          const permissionName = perm.permission_name;
+
+          if (!groupedPermissions[category]) {
+            groupedPermissions[category] = {};
+          }
+          groupedPermissions[category][permissionName] = perm.is_granted;
+        }
+      });
+    }
 
     return createSuccessResponse({
       worker_id: workerId,
@@ -526,6 +689,134 @@ export async function updateWorkerPermissions(c: Context): Promise<Response> {
 
   } catch (error) {
     console.error('Update worker permissions error:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+/**
+ * Update worker ID card (front or back)
+ * Allows step-by-step upload of ID cards
+ */
+export async function updateWorkerIdCard(c: Context): Promise<Response> {
+  try {
+    const env = c.env as Environment;
+    const supabase = createSupabaseClient(env);
+    const workerId = c.req.param('id');
+
+    // Initialize Cloudinary for Workers
+    if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+      return createErrorResponse('Cloudinary configuration is missing', 500);
+    }
+
+    initializeCloudinary({
+      cloud_name: env.CLOUDINARY_CLOUD_NAME,
+      api_key: env.CLOUDINARY_API_KEY,
+      api_secret: env.CLOUDINARY_API_SECRET,
+    });
+
+    if (!workerId) {
+      return createErrorResponse('Worker ID is required', 400);
+    }
+
+    // Parse form data
+    const formData = await c.req.formData();
+    const cardType = formData.get('card_type') as string; // 'front' or 'back'
+    const idCardFile = formData.get('id_card_file') as File | null;
+
+    // Validate required fields
+    if (!cardType || !['front', 'back'].includes(cardType)) {
+      return createErrorResponse('Card type must be either "front" or "back"', 400);
+    }
+
+    if (!idCardFile || !(idCardFile instanceof File)) {
+      return createErrorResponse('ID card file is required', 400);
+    }
+
+    // Validate file type and size
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['jpg', 'jpeg', 'png', 'webp'];
+
+    if (!validateFileType(idCardFile.name, allowedTypes)) {
+      return createErrorResponse('Invalid file type. Only JPG, PNG, and WebP files are allowed', 400);
+    }
+
+    if (!validateFileSize(idCardFile.size, maxFileSize)) {
+      return createErrorResponse('File size too large. Maximum size is 5MB', 400);
+    }
+
+    // Check if worker exists
+    const { data: worker, error: fetchError } = await supabase
+      .from('workers')
+      .select('worker_id, id_card_front_url, id_card_back_url')
+      .eq('worker_id', workerId)
+      .single();
+
+    if (fetchError || !worker) {
+      return createErrorResponse('Worker not found', 404);
+    }
+
+    // Upload new ID card image
+    let uploadResult: any = null;
+    try {
+      console.log(`📤 Uploading ${cardType} ID card for worker ${workerId}...`);
+      const fileBuffer = await idCardFile.arrayBuffer();
+      const filename = generateUniqueFilename(idCardFile.name, `worker_id_${cardType}`);
+
+      uploadResult = await uploadToCloudinary(fileBuffer, {
+        folder: 'local-fishing/workers/id-cards',
+        public_id: filename,
+        resource_type: 'image',
+        tags: ['worker', 'id-card', cardType]
+      });
+
+      console.log(`✅ ${cardType} ID card uploaded successfully`);
+    } catch (uploadError) {
+      console.error('Cloudinary upload error:', uploadError);
+      return createErrorResponse('Failed to upload ID card image', 500);
+    }
+
+    // Delete old image if it exists
+    const oldImageUrl = cardType === 'front' ? worker.id_card_front_url : worker.id_card_back_url;
+    if (oldImageUrl) {
+      try {
+        const oldPublicId = oldImageUrl.split('/').pop()?.split('.')[0];
+        if (oldPublicId) {
+          await deleteFromCloudinary(oldPublicId, 'image');
+          console.log(`🗑️ Deleted old ${cardType} ID card image`);
+        }
+      } catch (deleteError) {
+        console.warn(`Failed to delete old ${cardType} ID card:`, deleteError);
+        // Don't fail the request if old image deletion fails
+      }
+    }
+
+    // Update worker record with new image URL
+    const updateField = cardType === 'front' ? 'id_card_front_url' : 'id_card_back_url';
+    const { error: updateError } = await supabase
+      .from('workers')
+      .update({ [updateField]: uploadResult.secure_url })
+      .eq('worker_id', workerId);
+
+    if (updateError) {
+      console.error('Database update error:', updateError);
+
+      // Clean up uploaded image if database update fails
+      try {
+        await deleteFromCloudinary(uploadResult.public_id, 'image');
+      } catch (cleanupError) {
+        console.error('Failed to cleanup uploaded image:', cleanupError);
+      }
+
+      return createErrorResponse('Failed to update worker ID card', 500);
+    }
+
+    return createSuccessResponse({
+      message: `Worker ${cardType} ID card updated successfully`,
+      [updateField]: uploadResult.secure_url
+    });
+
+  } catch (error) {
+    console.error('Update worker ID card error:', error);
     return createErrorResponse('Internal server error', 500);
   }
 }

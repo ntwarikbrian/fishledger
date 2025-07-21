@@ -18,15 +18,16 @@ import {
   deleteExpenseCategoryHandler,
   createExpenseWithReceiptHandler,
 } from '../handlers/expenses';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create expenses router
 const expenses = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All expense routes require authentication
+ * All expense routes require authentication and data isolation
  */
 expenses.use('*', authenticate);
+expenses.use('*', enforceDataIsolation);
 expenses.use('*', apiRateLimit());
 
 /**

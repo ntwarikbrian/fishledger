@@ -6,11 +6,12 @@
 -- Expenses table
 CREATE TABLE IF NOT EXISTS expenses (
     expense_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: expenses belong to specific user
     title VARCHAR(255) NOT NULL, -- Title/name of the expense
     category_id UUID NOT NULL REFERENCES expense_categories(category_id),
     amount DECIMAL(12,2) NOT NULL,
     date DATE NOT NULL,
-    added_by UUID NOT NULL REFERENCES users(user_id), -- user_id or worker_id
+    added_by UUID NOT NULL REFERENCES users(user_id), -- user_id or worker_id who added the expense
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
     receipt_url TEXT, -- URL to uploaded receipt image/document
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -18,8 +19,9 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 -- Comments for documentation
-COMMENT ON TABLE expenses IS 'Records financial transactions tied to categories';
+COMMENT ON TABLE expenses IS 'Records financial transactions tied to categories - isolated per user';
 COMMENT ON COLUMN expenses.expense_id IS 'Unique identifier for each expense';
+COMMENT ON COLUMN expenses.user_id IS 'Reference to user who owns this expense - ensures data isolation';
 COMMENT ON COLUMN expenses.title IS 'Title/name of the expense';
 COMMENT ON COLUMN expenses.category_id IS 'Reference to expense category';
 COMMENT ON COLUMN expenses.amount IS 'Expense amount';
@@ -31,12 +33,17 @@ COMMENT ON COLUMN expenses.created_at IS 'Timestamp when expense was created';
 COMMENT ON COLUMN expenses.updated_at IS 'Timestamp when expense was last updated';
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id); -- Critical for data isolation
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_added_by ON expenses(added_by);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_title ON expenses(title);
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
+
+-- Composite indexes for user-specific queries
+CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_expenses_user_category ON expenses(user_id, category_id);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;

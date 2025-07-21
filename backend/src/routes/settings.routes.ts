@@ -9,15 +9,16 @@ import {
   getSettingsHandler,
   updateSettingsHandler,
 } from '../handlers/settings';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create settings router
 const settings = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All settings routes require authentication
+ * All settings routes require authentication and data isolation
  */
 settings.use('*', authenticate);
+settings.use('*', enforceDataIsolation);
 settings.use('*', apiRateLimit());
 
 /**

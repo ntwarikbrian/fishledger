@@ -4,28 +4,41 @@
  */
 
 import { Hono } from 'hono';
-import { 
+import {
   createWorker,
   getAllWorkers,
   getWorkerById,
   updateWorker,
   deleteWorker,
   getWorkerPermissions,
-  updateWorkerPermissions
+  updateWorkerPermissions,
+  authenticateWorker,
+  updateWorkerIdCard
 } from '../handlers/workers';
-import { authMiddleware } from '../middleware/auth-hono';
-import { rateLimitMiddleware } from '../middleware/rate-limit';
-import { requestIdMiddleware } from '../middleware/request-id';
-import { loggingMiddleware } from '../middleware/logging';
+import { authenticate, apiRateLimit, requestId, requestLogger, enforceDataIsolation } from '../middleware';
 
 // Create worker router
 const workerRouter = new Hono();
 
-// Apply middleware
-workerRouter.use('*', requestIdMiddleware);
-workerRouter.use('*', loggingMiddleware);
-workerRouter.use('*', authMiddleware); // Require authentication for all worker routes
-workerRouter.use('*', rateLimitMiddleware);
+// Apply middleware to all routes except authentication
+workerRouter.use('*', requestId);
+workerRouter.use('*', requestLogger);
+
+/**
+ * @route POST /workers/auth
+ * @desc Authenticate worker with email and password
+ * @access Public
+ * @body {
+ *   email: string,
+ *   password: string
+ * }
+ */
+workerRouter.post('/auth', apiRateLimit(), authenticateWorker);
+
+// Apply authentication and data isolation middleware to all other routes
+workerRouter.use('*', authenticate); // Require authentication for all other worker routes
+workerRouter.use('*', enforceDataIsolation); // Ensure data isolation between users
+workerRouter.use('*', apiRateLimit());
 
 /**
  * @route POST /workers
@@ -102,5 +115,17 @@ workerRouter.get('/:id/permissions', getWorkerPermissions);
  * }
  */
 workerRouter.put('/:id/permissions', updateWorkerPermissions);
+
+/**
+ * @route PUT /workers/:id/id-card
+ * @desc Update worker ID card (front or back)
+ * @access Private (Business owners only)
+ * @param {string} id - Worker ID
+ * @body {
+ *   card_type: 'front' | 'back',
+ *   id_card_file: File
+ * }
+ */
+workerRouter.put('/:id/id-card', updateWorkerIdCard);
 
 export { workerRouter };

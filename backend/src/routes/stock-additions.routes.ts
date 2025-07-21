@@ -8,15 +8,16 @@ import type { Env, Variables } from '../types/index';
 import {
   getStockAdditionsHandler
 } from '../handlers/stock-additions';
-import { authenticate, requireEmployee, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create stock additions router
 const stockAdditions = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All stock addition routes require authentication
+ * All stock addition routes require authentication and data isolation
  */
 stockAdditions.use('*', authenticate);
+stockAdditions.use('*', enforceDataIsolation);
 stockAdditions.use('*', apiRateLimit());
 
 /**

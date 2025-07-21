@@ -23,9 +23,11 @@ export interface Database {
           owner_name: string;
           email_address: string;
           phone_number: string | null;
-          password: string | null;
+          password: string; // Required for authentication
+          is_active: boolean; // Account status
           created_at: string;
           last_login: string | null;
+          updated_at: string;
         };
         Insert: {
           user_id?: string;
@@ -33,9 +35,11 @@ export interface Database {
           owner_name: string;
           email_address: string;
           phone_number?: string | null;
-          password?: string | null;
+          password: string; // Required for authentication
+          is_active?: boolean;
           created_at?: string;
           last_login?: string | null;
+          updated_at?: string;
         };
         Update: {
           user_id?: string;
@@ -43,9 +47,11 @@ export interface Database {
           owner_name?: string;
           email_address?: string;
           phone_number?: string | null;
-          password?: string | null;
+          password?: string;
+          is_active?: boolean;
           created_at?: string;
           last_login?: string | null;
+          updated_at?: string;
         };
       };
       // Workers table - employee management
@@ -55,7 +61,9 @@ export interface Database {
           full_name: string;
           email: string;
           phone_number: string | null;
-          identification_image_url: string | null;
+          id_card_front_url: string | null;
+          id_card_back_url: string | null;
+          password: string;
           monthly_salary: number | null;
           total_revenue_generated: number;
           recent_login_history: any | null; // JSONB
@@ -66,7 +74,9 @@ export interface Database {
           full_name: string;
           email: string;
           phone_number?: string | null;
-          identification_image_url?: string | null;
+          id_card_front_url?: string | null;
+          id_card_back_url?: string | null;
+          password: string;
           monthly_salary?: number | null;
           total_revenue_generated?: number;
           recent_login_history?: any | null;

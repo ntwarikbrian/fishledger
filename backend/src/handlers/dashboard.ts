@@ -5,6 +5,12 @@
 
 import type { Context } from 'hono';
 import type { Env, Variables } from '../types/index';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 // Response utilities are handled directly with c.json()
 
 type HonoContext = Context<{ Bindings: Env; Variables: Variables }>;
@@ -85,10 +91,8 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
       lastMonthEnd
     });
 
-    // Fetch current month sales data
-    const { data: currentSales, error: currentSalesError } = await supabase
-      .from('sales')
-      .select('total_amount, boxes_quantity, kg_quantity, box_price, kg_price')
+    // Fetch current month sales data with user filtering
+    const { data: currentSales, error: currentSalesError } = await createUserFilteredQuery(c, 'sales', 'total_amount, boxes_quantity, kg_quantity, box_price, kg_price')
       .gte('date_time', currentMonthStart)
       .lte('date_time', currentMonthEnd);
 
@@ -98,9 +102,7 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
     }
 
     // Fetch last month sales data for growth calculation
-    const { data: lastMonthSales, error: lastMonthSalesError } = await supabase
-      .from('sales')
-      .select('total_amount')
+    const { data: lastMonthSales, error: lastMonthSalesError } = await createUserFilteredQuery(c, 'sales', 'total_amount')
       .gte('date_time', lastMonthStart)
       .lte('date_time', lastMonthEnd);
 
@@ -109,10 +111,8 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
       throw new Error(`Failed to fetch last month sales: ${lastMonthSalesError.message}`);
     }
 
-    // Fetch current month expenses
-    const { data: currentExpenses, error: expensesError } = await supabase
-      .from('expenses')
-      .select('amount')
+    // Fetch current month expenses with user filtering
+    const { data: currentExpenses, error: expensesError } = await createUserFilteredQuery(c, 'expenses', 'amount')
       .gte('date', currentMonthStart.split('T')[0])
       .lte('date', currentMonthEnd.split('T')[0]);
 
@@ -121,21 +121,47 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
       throw new Error(`Failed to fetch expenses: ${expensesError.message}`);
     }
 
-    // Fetch products data for stock information
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('quantity_box, quantity_kg, boxed_low_stock_threshold, cost_per_box, cost_per_kg');
+    // Fetch products data for stock information with user filtering
+    const { data: products, error: productsError } = await createUserFilteredQuery(c, 'products', 'quantity_box, quantity_kg, boxed_low_stock_threshold, cost_per_box, cost_per_kg');
 
     if (productsError) {
       console.error('❌ Error fetching products:', productsError);
       throw new Error(`Failed to fetch products: ${productsError.message}`);
     }
 
-    // Fetch damaged products data
-    const { data: damagedProducts, error: damagedError } = await supabase
-      .from('damaged_products')
-      .select('damaged_boxes, damaged_kg')
-      .eq('damaged_approval', true);
+    // Fetch damaged products data with user filtering
+    // Handle both cases: with and without user_id column for backward compatibility
+    const userId = getUserIdFromContext(c);
+    let damagedProducts: any[] = [];
+    let damagedError: any = null;
+
+    try {
+      // Try to use direct user_id filtering first (after migration)
+      const { data, error } = await createUserFilteredQuery(c, 'damaged_products', 'damaged_boxes, damaged_kg')
+        .eq('damaged_approval', true);
+
+      damagedProducts = data || [];
+      damagedError = error;
+    } catch (error: any) {
+      // If user_id column doesn't exist, fall back to JOIN query
+      if (error.message?.includes('user_id does not exist')) {
+        console.log('🔄 Falling back to JOIN query for damaged_products (user_id column not found)');
+        const { data, error: joinError } = await c.get('supabase')
+          .from('damaged_products')
+          .select(`
+            damaged_boxes,
+            damaged_kg,
+            products!inner(user_id)
+          `)
+          .eq('damaged_approval', true)
+          .eq('products.user_id', userId);
+
+        damagedProducts = data || [];
+        damagedError = joinError;
+      } else {
+        damagedError = error;
+      }
+    }
 
     if (damagedError) {
       console.error('❌ Error fetching damaged products:', damagedError);
@@ -143,18 +169,30 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
     }
 
     // Calculate statistics
-    const totalRevenue = (currentSales || []).reduce((sum, sale) => {
+    const totalRevenue = (currentSales || []).reduce((sum, sale: any) => {
+      // Ensure sale is a valid object with total_amount property
+      if (!sale || typeof sale !== 'object' || !sale.total_amount) {
+        return sum;
+      }
       const amount = parseFloat(sale.total_amount?.toString() || '0');
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
 
-    const lastMonthRevenue = (lastMonthSales || []).reduce((sum, sale) => {
+    const lastMonthRevenue = (lastMonthSales || []).reduce((sum, sale: any) => {
+      // Ensure sale is a valid object with total_amount property
+      if (!sale || typeof sale !== 'object' || !sale.total_amount) {
+        return sum;
+      }
       const amount = parseFloat(sale.total_amount?.toString() || '0');
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
 
     // Calculate profit (revenue - cost of goods sold)
-    const totalCost = (currentSales || []).reduce((sum, sale) => {
+    const totalCost = (currentSales || []).reduce((sum, sale: any) => {
+      // Ensure sale is a valid object with required properties
+      if (!sale || typeof sale !== 'object') {
+        return sum;
+      }
       const boxesCost = (sale.boxes_quantity || 0) * parseFloat(sale.box_price?.toString() || '0');
       const kgCost = (sale.kg_quantity || 0) * parseFloat(sale.kg_price?.toString() || '0');
       return sum + boxesCost + kgCost;
@@ -162,19 +200,36 @@ export const getDashboardStatsHandler = async (c: HonoContext) => {
 
     const totalProfit = totalRevenue - totalCost;
 
-    const totalExpenses = (currentExpenses || []).reduce((sum, expense) => {
+    const totalExpenses = (currentExpenses || []).reduce((sum, expense: any) => {
+      // Ensure expense is a valid object with amount property
+      if (!expense || typeof expense !== 'object' || !expense.amount) {
+        return sum;
+      }
       const amount = parseFloat(expense.amount?.toString() || '0');
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
 
     const productsInStock = (products || []).length;
 
-    const lowStockItems = (products || []).filter(product => 
-      product.quantity_box <= (product.boxed_low_stock_threshold || 0)
-    ).length;
+    // Calculate low stock items with proper type checking
+    const lowStockItems = (products || []).filter((product: any) => {
+      // Ensure product is a valid object with required properties
+      if (!product || typeof product !== 'object') {
+        return false;
+      }
+      const quantityBox = parseInt(product.quantity_box?.toString() || '0');
+      const threshold = parseInt(product.boxed_low_stock_threshold?.toString() || '0');
+      return quantityBox <= threshold;
+    }).length;
 
-    const damagedItems = (damagedProducts || []).reduce((sum, damaged) => {
-      return sum + (damaged.damaged_boxes || 0);
+    // Calculate damaged items with proper type checking
+    const damagedItems = (damagedProducts || []).reduce((sum, damaged: any) => {
+      // Ensure damaged is a valid object with damaged_boxes property
+      if (!damaged || typeof damaged !== 'object' || !damaged.damaged_boxes) {
+        return sum;
+      }
+      const damagedBoxes = parseInt(damaged.damaged_boxes?.toString() || '0');
+      return sum + (isNaN(damagedBoxes) ? 0 : damagedBoxes);
     }, 0);
 
     // Calculate revenue growth percentage

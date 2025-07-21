@@ -6,7 +6,6 @@
 import { createMiddleware } from 'hono/factory';
 import type { AuthenticatedUser } from '../types/index';
 import { verifyAccessToken, extractBearerToken } from '../utils/auth';
-import { getUserByEmail } from '../utils/db';
 
 /**
  * Authentication middleware that validates JWT tokens
@@ -14,6 +13,7 @@ import { getUserByEmail } from '../utils/db';
  */
 export const authenticate = createMiddleware<{ Bindings: any; Variables: any }>(
   async (c, next) => {
+    const authStart = Date.now();
     try {
       // Extract token from Authorization header
       const authHeader = c.req.header('Authorization');
@@ -34,14 +34,13 @@ export const authenticate = createMiddleware<{ Bindings: any; Variables: any }>(
       // Verify and decode the token
       const payload = verifyAccessToken(token, c.env);
 
-      // Get user from database to ensure they still exist and are active
-      const user = await getUserByEmail(c.get('supabase'), payload.email);
-
-      if (!user) {
+      // Enhanced security: Validate payload structure
+      if (!payload.userId || !payload.email || !payload.role) {
+        console.warn('🚨 Invalid JWT payload structure');
         return c.json(
           {
             success: false,
-            error: 'User not found',
+            error: 'Invalid authentication token',
             timestamp: new Date().toISOString(),
             requestId: c.get('requestId'),
           },
@@ -49,17 +48,81 @@ export const authenticate = createMiddleware<{ Bindings: any; Variables: any }>(
         );
       }
 
-      // Create authenticated user object
+      // Enhanced security: Validate user ID format
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.userId)) {
+        console.warn('🚨 Invalid user ID format in JWT:', payload.userId);
+        return c.json(
+          {
+            success: false,
+            error: 'Invalid authentication token format',
+            timestamp: new Date().toISOString(),
+            requestId: c.get('requestId'),
+          },
+          401,
+        );
+      }
+
+      // Enhanced security: Validate user exists and is active in database
+      const { data: dbUser, error: dbError } = await c.get('supabase')
+        .from('users')
+        .select('user_id, is_active, email_address')
+        .eq('user_id', payload.userId)
+        .single();
+
+      if (dbError || !dbUser) {
+        console.warn('🚨 User not found in database for JWT:', payload.userId);
+        return c.json(
+          {
+            success: false,
+            error: 'User account not found',
+            timestamp: new Date().toISOString(),
+            requestId: c.get('requestId'),
+          },
+          401,
+        );
+      }
+
+      if (!dbUser.is_active) {
+        console.warn('🚨 Inactive user attempted access:', payload.userId);
+        return c.json(
+          {
+            success: false,
+            error: 'Account is deactivated',
+            timestamp: new Date().toISOString(),
+            requestId: c.get('requestId'),
+          },
+          401,
+        );
+      }
+
+      // Enhanced security: Verify email matches
+      if (dbUser.email_address !== payload.email) {
+        console.warn('🚨 Email mismatch in JWT vs database:', { jwt: payload.email, db: dbUser.email_address });
+        return c.json(
+          {
+            success: false,
+            error: 'Authentication data mismatch',
+            timestamp: new Date().toISOString(),
+            requestId: c.get('requestId'),
+          },
+          401,
+        );
+      }
+
+      // Create authenticated user object with validated data
       const authenticatedUser: AuthenticatedUser = {
-        id: user.user_id,
-        email: user.email_address,
-        username: user.owner_name, // Using owner_name as username
-        role: 'admin', // Default role for business owners
-        isActive: true, // Assume active if user exists
+        id: payload.userId,
+        email: payload.email,
+        username: payload.username,
+        role: payload.role,
+        isActive: true, // Confirmed active from database
       };
 
       // Set user in context variables
       c.set('user', authenticatedUser);
+
+      const authTime = Date.now() - authStart;
+      console.log(`🔐 Authentication completed in ${authTime}ms for user: ${authenticatedUser.email}`);
 
       // Continue to next middleware/handler
       return await next();
@@ -139,22 +202,17 @@ export const optionalAuth = createMiddleware<{ Bindings: any; Variables: any }>(
         // Verify and decode the token
         const payload = verifyAccessToken(token, c.env);
 
-        // Get user from database
-        const user = await getUserByEmail(c.get('supabase'), payload.email);
+        // Create authenticated user object directly from JWT payload
+        const authenticatedUser: AuthenticatedUser = {
+          id: payload.userId,
+          email: payload.email,
+          username: payload.username,
+          role: payload.role,
+          isActive: true, // Assume active if token is valid
+        };
 
-        if (user) {
-          // Create authenticated user object
-          const authenticatedUser: AuthenticatedUser = {
-            id: user.user_id,
-            email: user.email_address,
-            username: user.owner_name, // Using owner_name as username
-            role: 'admin', // Default role for business owners
-            isActive: true, // Assume active if user exists
-          };
-
-          // Set user in context variables
-          c.set('user', authenticatedUser);
-        }
+        // Set user in context variables
+        c.set('user', authenticatedUser);
       }
 
       // Continue regardless of authentication status

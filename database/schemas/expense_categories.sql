@@ -6,13 +6,17 @@
 -- Expense categories table
 CREATE TABLE IF NOT EXISTS expense_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    category_name VARCHAR(100) UNIQUE NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: categories belong to specific user
+    category_name VARCHAR(100) NOT NULL, -- Removed UNIQUE constraint as names can be same across different users
     description TEXT,
     budget DECIMAL(12,2) DEFAULT 0, -- Budget allocation for this category
 
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Ensure category names are unique per user
+    UNIQUE(user_id, category_name)
 );
 
 -- Comments for documentation

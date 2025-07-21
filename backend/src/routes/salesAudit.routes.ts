@@ -5,16 +5,17 @@
 
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/index';
-import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, requireManager, apiRateLimit, enforceDataIsolation } from '../middleware';
 import { createAuditHandler, getAuditsHandler, approveAuditHandler, rejectAuditHandler } from '../handlers/salesAudit';
 
 // Create sales audit router with proper typing
 const salesAuditRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All sales audit routes require authentication and rate limiting
+ * All sales audit routes require authentication, data isolation, and rate limiting
  */
 salesAuditRoutes.use('*', authenticate);
+salesAuditRoutes.use('*', enforceDataIsolation);
 salesAuditRoutes.use('*', apiRateLimit());
 
 /**

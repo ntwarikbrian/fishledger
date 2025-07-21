@@ -20,15 +20,16 @@ import {
   createStockAdditionHandler,
   getProductStockAdditionsHandler
 } from '../handlers/stock-additions';
-import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, requireManager, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create product router
 const products = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All product routes require authentication
+ * All product routes require authentication and data isolation
  */
 products.use('*', authenticate);
+products.use('*', enforceDataIsolation);
 products.use('*', apiRateLimit());
 
 /**

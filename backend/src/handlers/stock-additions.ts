@@ -10,6 +10,12 @@ import {
   throwValidationError,
   throwNotFoundError,
 } from '../middleware/error-handler';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 // Validation schemas
 const createStockAdditionSchema = z.object({
@@ -58,17 +64,19 @@ export const createStockAdditionHandler = asyncHandler(async (c: HonoContext) =>
   // TypeScript assertion: product is guaranteed to exist after the check above
   const validProduct = product!
 
-  // Create stock addition record
+  // Create stock addition record with proper data isolation
+  const stockAdditionData = addUserIdToInsertData(c, {
+    product_id,
+    boxes_added,
+    kg_added,
+    total_cost,
+    delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+    performed_by: c.get('user')?.id,
+  });
+
   const { data: stockAddition, error: additionError } = await c.get('supabase')
     .from('stock_additions')
-    .insert({
-      product_id,
-      boxes_added,
-      kg_added,
-      total_cost,
-      delivery_date: delivery_date || new Date().toISOString().split('T')[0],
-      performed_by: c.get('user')?.id,
-    })
+    .insert(stockAdditionData)
     .select()
     .single();
 
@@ -77,18 +85,21 @@ export const createStockAdditionHandler = asyncHandler(async (c: HonoContext) =>
   }
 
   // Create pending stock movement record for approval
+  // Create stock movement with proper data isolation
+  const stockMovementData = addUserIdToInsertData(c, {
+    product_id,
+    movement_type: 'new_stock',
+    box_change: boxes_added,
+    kg_change: kg_added,
+    reason: `Stock addition request: ${boxes_added} boxes, ${kg_added} kg (Cost: $${total_cost}) - Delivery: ${delivery_date || 'Today'}`,
+    stock_addition_id: stockAddition.addition_id,
+    performed_by: c.get('user')?.id,
+    status: 'pending' // Set status to pending for approval
+  });
+
   const { error: movementError } = await c.get('supabase')
     .from('stock_movements')
-    .insert({
-      product_id,
-      movement_type: 'new_stock',
-      box_change: boxes_added,
-      kg_change: kg_added,
-      reason: `Stock addition request: ${boxes_added} boxes, ${kg_added} kg (Cost: $${total_cost}) - Delivery: ${delivery_date || 'Today'}`,
-      stock_addition_id: stockAddition.addition_id,
-      performed_by: c.get('user')?.id,
-      status: 'pending' // Set status to pending for approval
-    });
+    .insert(stockMovementData);
 
   if (movementError) {
     throw new Error(`Failed to create stock movement: ${movementError.message}`);

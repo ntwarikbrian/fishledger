@@ -17,15 +17,16 @@ import {
   getDebtorsHandler,
   markAsPaidHandler,
 } from '../handlers/transactions';
-import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, requireManager, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create transaction router
 const transactions = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All transaction routes require authentication and rate limiting
+ * All transaction routes require authentication, data isolation, and rate limiting
  */
 transactions.use('*', authenticate);
+transactions.use('*', enforceDataIsolation);
 transactions.use('*', apiRateLimit());
 
 /**

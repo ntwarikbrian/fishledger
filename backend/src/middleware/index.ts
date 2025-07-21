@@ -14,6 +14,17 @@ export {
   requireSelfOrAdmin,
 } from './auth-hono';
 
+// Data isolation middleware
+export {
+  enforceDataIsolation,
+  requireAdminAccess,
+  getUserIdFromContext,
+  validateResourceOwnership,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData,
+} from './data-isolation';
+
 // CORS middleware
 export {
   createCorsMiddleware,

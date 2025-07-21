@@ -21,6 +21,7 @@ import {
   type FileUploadContext
 } from '../middleware/fileUpload';
 import { authenticate } from '../middleware/auth-hono';
+import { enforceDataIsolation } from '../middleware/data-isolation';
 import { CLOUDINARY_FOLDERS, IMAGE_PRESETS } from '../config/cloudinary';
 import type { Environment } from '../config/environment';
 
@@ -31,8 +32,9 @@ const upload = new Hono<{ Bindings: Environment }>();
  * Upload single image
  * POST /upload/image
  */
-upload.post('/image', 
+upload.post('/image',
   authenticate,
+  enforceDataIsolation,
   imageUploadMiddleware('image'),
   async (c: FileUploadContext) => {
     try {
@@ -80,7 +82,8 @@ upload.post('/image',
  */
 upload.post('/images',
   authenticate,
-  multipleFileUpload(['images'], { 
+  enforceDataIsolation,
+  multipleFileUpload(['images'], {
     maxFiles: 5,
     allowedTypes: ['jpg', 'jpeg', 'png', 'webp'],
     maxSize: 5242880, // 5MB
@@ -134,6 +137,7 @@ upload.post('/images',
  */
 upload.post('/avatar',
   authenticate,
+  enforceDataIsolation,
   avatarUploadMiddleware(),
   async (c: FileUploadContext) => {
     try {
@@ -181,6 +185,7 @@ upload.post('/avatar',
  */
 upload.post('/product',
   authenticate,
+  enforceDataIsolation,
   productImageUploadMiddleware(),
   async (c: FileUploadContext) => {
     try {
@@ -233,6 +238,7 @@ upload.post('/product',
  */
 upload.post('/receipt',
   authenticate,
+  enforceDataIsolation,
   receiptUploadMiddleware(),
   async (c: FileUploadContext) => {
     try {
@@ -272,6 +278,7 @@ upload.post('/receipt',
  */
 upload.post('/base64',
   authenticate,
+  enforceDataIsolation,
   async (c: FileUploadContext) => {
     try {
       const body = await c.req.json();
@@ -310,6 +317,7 @@ upload.post('/base64',
  */
 upload.delete('/:publicId',
   authenticate,
+  enforceDataIsolation,
   async (c: FileUploadContext) => {
     try {
       const publicId = c.req.param('publicId');
@@ -346,6 +354,7 @@ upload.delete('/:publicId',
  */
 upload.get('/info/:publicId',
   authenticate,
+  enforceDataIsolation,
   async (c: FileUploadContext) => {
     try {
       const publicId = c.req.param('publicId');

@@ -19,9 +19,18 @@ import {
   generateProfitLossReport,
 } from '../handlers/reports';
 import { createHandlerErrorResponse } from '../utils/response';
+import { authenticate, enforceDataIsolation, apiRateLimit } from '../middleware';
 
 // Create the reports router
 export const reports = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+/**
+ * All report routes require authentication and data isolation
+ * Reports should only show data for the authenticated user
+ */
+reports.use('*', authenticate);
+reports.use('*', enforceDataIsolation);
+reports.use('*', apiRateLimit());
 
 // Validation schemas for query parameters
 const dateRangeSchema = z.object({

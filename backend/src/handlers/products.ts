@@ -7,6 +7,12 @@ import { z } from 'zod';
 import type { HonoContext, PaginationParams } from '../types/index';
 import { recordExists } from '../utils/db';
 import { calculatePagination } from '../utils/response';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 // Request interfaces - Updated to match LocalFishing database schema
 export interface CreateProductRequest {
@@ -35,6 +41,7 @@ export interface UpdateProductRequest {
   price_per_kg?: number;
   boxed_low_stock_threshold?: number;
   expiry_date?: string; // DATE format
+  reason?: string; // Optional reason for the update
 }
 
 export interface ProductFilters {
@@ -61,7 +68,9 @@ const createProductSchema = z.object({
   expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
 });
 
-const updateProductSchema = createProductSchema.partial();
+const updateProductSchema = createProductSchema.partial().extend({
+  reason: z.string().optional(), // Optional reason for the update
+});
 
 const queryParamsSchema = z.object({
   page: z.string().transform(val => parseInt(val, 10)).optional(),
@@ -111,31 +120,31 @@ export const getProductsHandler = async (c: HonoContext) => {
       price_max
     } = validation.data;
 
-    let query = c.get('supabase')
-      .from('products')
-      .select(`
-        product_id,
-        name,
+    // Use data isolation to ensure user only sees their own products
+    let query = createUserFilteredQuery(c, 'products', `
+      product_id,
+      user_id,
+      name,
+      category_id,
+      quantity_box,
+      box_to_kg_ratio,
+      quantity_kg,
+      cost_per_box,
+      cost_per_kg,
+      price_per_box,
+      price_per_kg,
+      profit_per_box,
+      profit_per_kg,
+      boxed_low_stock_threshold,
+      expiry_date,
+      days_left,
+      created_at,
+      updated_at,
+      product_categories (
         category_id,
-        quantity_box,
-        box_to_kg_ratio,
-        quantity_kg,
-        cost_per_box,
-        cost_per_kg,
-        price_per_box,
-        price_per_kg,
-        profit_per_box,
-        profit_per_kg,
-        boxed_low_stock_threshold,
-        expiry_date,
-        days_left,
-        created_at,
-        updated_at,
-        product_categories (
-          category_id,
-          name
-        )
-      `);
+        name
+      )
+    `);
 
     // Apply search filter - only search by name since other fields don't exist
     if (search) {
@@ -317,10 +326,11 @@ export const createProductHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Create product directly in the products table
+    // Create product directly in the products table with proper data isolation
+    const productDataWithUser = addUserIdToInsertData(c, validation.data);
     const { data: newProduct, error: createError } = await c.get('supabase')
       .from('products')
-      .insert([validation.data])
+      .insert([productDataWithUser])
       .select(`
         product_id,
         name,
@@ -390,6 +400,7 @@ export const createProductHandler = async (c: HonoContext) => {
  * Helper function to create pending product edit requests
  */
 const createPendingProductEditRequests = async (
+  c: any,
   supabase: any,
   productId: string,
   oldProduct: any,
@@ -419,20 +430,23 @@ const createPendingProductEditRequests = async (
 
       // Only create pending request if value actually changed
       if (oldValue !== newValue) {
+        // Create stock movement with proper data isolation
+        const stockMovementData = addUserIdToInsertData(c, {
+          product_id: productId,
+          movement_type: 'product_edit',
+          box_change: 0,
+          kg_change: 0,
+          field_changed: field,
+          old_value: oldValue?.toString() || '',
+          new_value: newValue?.toString() || '',
+          reason: reason || `${displayName} update request`,
+          performed_by: userId,
+          status: 'pending' // Set status to pending for approval
+        });
+
         const pendingRequest = supabase
           .from('stock_movements')
-          .insert({
-            product_id: productId,
-            movement_type: 'product_edit',
-            box_change: 0,
-            kg_change: 0,
-            field_changed: field,
-            old_value: oldValue?.toString() || '',
-            new_value: newValue?.toString() || '',
-            reason: reason || `${displayName} update request`,
-            performed_by: userId,
-            status: 'pending' // Set status to pending for approval
-          });
+          .insert(stockMovementData);
 
         pendingRequests.push(pendingRequest);
       }
@@ -506,13 +520,25 @@ export const updateProductHandler = async (c: HonoContext) => {
       }, 404);
     }
 
+    // Get user ID for audit trail
+    const userId = c.get('user')?.id;
+    if (!userId) {
+      return c.json({
+        success: false,
+        error: 'User authentication required',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 401);
+    }
+
     // Create pending edit requests instead of applying changes immediately
     const pendingRequestsCount = await createPendingProductEditRequests(
+      c,
       c.get('supabase'),
       productId,
       currentProduct,
       validation.data,
-      c.get('user')?.id,
+      userId,
       body.reason // Optional reason from request body
     );
 
@@ -617,21 +643,23 @@ export const deleteProductHandler = async (c: HonoContext) => {
       }, 404);
     }
 
-    // Create pending delete request instead of immediately deleting
+    // Create pending delete request instead of immediately deleting with proper data isolation
+    const deleteRequestData = addUserIdToInsertData(c, {
+      product_id: productId,
+      movement_type: 'product_delete',
+      box_change: 0,
+      kg_change: 0,
+      field_changed: 'product_deletion',
+      old_value: `Product: ${product.name} (ID: ${product.product_id})`,
+      new_value: 'PENDING_DELETION',
+      reason: `Product deletion request: ${reason}`,
+      performed_by: c.get('user')?.id,
+      status: 'pending' // Set status to pending for approval
+    });
+
     const { error: insertError } = await c.get('supabase')
       .from('stock_movements')
-      .insert({
-        product_id: productId,
-        movement_type: 'product_delete',
-        box_change: 0,
-        kg_change: 0,
-        field_changed: 'product_deletion',
-        old_value: `Product: ${product.name} (ID: ${product.product_id})`,
-        new_value: 'PENDING_DELETION',
-        reason: `Product deletion request: ${reason}`,
-        performed_by: c.get('user')?.id,
-        status: 'pending' // Set status to pending for approval
-      });
+      .insert(deleteRequestData);
 
     if (insertError) {
       throw new Error(`Failed to create delete request: ${insertError.message}`);
@@ -703,46 +731,44 @@ export const getLowStockHandler = async (c: HonoContext) => {
  */
 export const getDamagedProductHandler = async (c: HonoContext) => {
   try {
-    // Get all damaged products from the damaged_products table with product details
-    const { data: damagedProducts, error } = await c.get('supabase')
-      .from('damaged_products')
-      .select(`
-        damage_id,
+    // Get all damaged products from the damaged_products table with product details using data isolation
+    const { data: damagedProducts, error } = await createUserFilteredQuery(c, 'damaged_products', `
+      damage_id,
+      product_id,
+      damaged_boxes,
+      damaged_kg,
+      damaged_reason,
+      description,
+      damaged_date,
+      loss_value,
+      damaged_approval,
+      approved_date,
+      created_at,
+      updated_at,
+      products (
         product_id,
-        damaged_boxes,
-        damaged_kg,
-        damaged_reason,
-        description,
-        damaged_date,
-        loss_value,
-        damaged_approval,
-        approved_date,
-        created_at,
-        updated_at,
-        products (
-          product_id,
-          name,
+        name,
+        category_id,
+        quantity_box,
+        quantity_kg,
+        price_per_box,
+        price_per_kg,
+        product_categories (
           category_id,
-          quantity_box,
-          quantity_kg,
-          price_per_box,
-          price_per_kg,
-          product_categories (
-            category_id,
-            name
-          )
-        ),
-        reported_by_user:users!reported_by (
-          user_id,
-          owner_name,
-          business_name
-        ),
-        approved_by_user:users!approved_by (
-          user_id,
-          owner_name,
-          business_name
+          name
         )
-      `)
+      ),
+      reported_by_user:users!reported_by (
+        user_id,
+        owner_name,
+        business_name
+      ),
+      approved_by_user:users!approved_by (
+        user_id,
+        owner_name,
+        business_name
+      )
+    `)
       .order('damaged_date', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -837,19 +863,21 @@ export const recordDamagedProductHandler = async (c: HonoContext) => {
     // Calculate loss value
     const lossValue = (damaged_boxes * product.price_per_box) + (damaged_kg * product.price_per_kg);
 
-    // Create damaged product record
+    // Create damaged product record with proper data isolation
+    const damagedProductData = addUserIdToInsertData(c, {
+      product_id: productId,
+      damaged_boxes: damaged_boxes || 0,
+      damaged_kg: damaged_kg || 0,
+      damaged_reason,
+      description,
+      loss_value: lossValue,
+      reported_by: c.get('user')?.id,
+      damaged_date: new Date().toISOString().split('T')[0],
+    });
+
     const { data: damagedProduct, error: damageError } = await c.get('supabase')
       .from('damaged_products')
-      .insert({
-        product_id: productId,
-        damaged_boxes: damaged_boxes || 0,
-        damaged_kg: damaged_kg || 0,
-        damaged_reason,
-        description,
-        loss_value: lossValue,
-        reported_by: c.get('user')?.id,
-        damaged_date: new Date().toISOString().split('T')[0],
-      })
+      .insert(damagedProductData)
       .select()
       .single();
 
@@ -857,18 +885,20 @@ export const recordDamagedProductHandler = async (c: HonoContext) => {
       throw new Error(`Failed to record damaged product: ${damageError.message}`);
     }
 
-    // Create stock movement record
+    // Create stock movement record with proper data isolation
+    const stockMovementData = addUserIdToInsertData(c, {
+      product_id: productId,
+      movement_type: 'damaged',
+      box_change: -(damaged_boxes || 0),
+      kg_change: -(damaged_kg || 0),
+      reason: `Damaged: ${damaged_reason}`,
+      damaged_id: damagedProduct.damage_id,
+      performed_by: c.get('user')?.id,
+    });
+
     const { error: movementError } = await c.get('supabase')
       .from('stock_movements')
-      .insert({
-        product_id: productId,
-        movement_type: 'damaged',
-        box_change: -(damaged_boxes || 0),
-        kg_change: -(damaged_kg || 0),
-        reason: `Damaged: ${damaged_reason}`,
-        damaged_id: damagedProduct.damage_id,
-        performed_by: c.get('user')?.id,
-      });
+      .insert(stockMovementData);
 
     if (movementError) {
       console.error('Failed to create stock movement:', movementError);
@@ -925,27 +955,25 @@ export const deleteDamagedProductHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Get the damaged product record first to restore stock
-    const { data: damagedProduct, error: fetchError } = await c.get('supabase')
-      .from('damaged_products')
-      .select(`
-        damage_id,
+    // Get the damaged product record first to restore stock using data isolation
+    const { data: damagedProductData, error: fetchError } = await createUserFilteredQuery(c, 'damaged_products', `
+      damage_id,
+      product_id,
+      damaged_boxes,
+      damaged_kg,
+      damaged_reason,
+      loss_value,
+      products (
         product_id,
-        damaged_boxes,
-        damaged_kg,
-        damaged_reason,
-        loss_value,
-        products (
-          product_id,
-          name,
-          quantity_box,
-          quantity_kg
-        )
-      `)
+        name,
+        quantity_box,
+        quantity_kg
+      )
+    `)
       .eq('damage_id', damageId)
       .single();
 
-    if (fetchError || !damagedProduct) {
+    if (fetchError || !damagedProductData) {
       return c.json({
         success: false,
         error: 'Damaged product record not found',
@@ -953,6 +981,22 @@ export const deleteDamagedProductHandler = async (c: HonoContext) => {
         requestId: c.get('requestId'),
       }, 404);
     }
+
+    // Type assertion for the damaged product data structure
+    const damagedProduct = damagedProductData as unknown as {
+      damage_id: string;
+      product_id: string;
+      damaged_boxes: number;
+      damaged_kg: number;
+      damaged_reason: string;
+      loss_value: number;
+      products: {
+        product_id: string;
+        name: string;
+        quantity_box: number;
+        quantity_kg: number;
+      };
+    };
 
     // Restore the stock quantities to the product
     const { error: updateError } = await c.get('supabase')
@@ -979,11 +1023,13 @@ export const deleteDamagedProductHandler = async (c: HonoContext) => {
       // Don't fail the request, just log the error
     }
 
-    // Delete the damaged product record
+    // Delete the damaged product record with data isolation
+    const userId = getUserIdFromContext(c);
     const { error: deleteError } = await c.get('supabase')
       .from('damaged_products')
       .delete()
-      .eq('damage_id', damageId);
+      .eq('damage_id', damageId)
+      .eq('user_id', userId);
 
     if (deleteError) {
       throw new Error(`Failed to delete damaged product record: ${deleteError.message}`);

@@ -8,19 +8,20 @@ import type { Env, Variables } from '../types/index';
 import {
   getUsersHandler,
   getUserHandler,
-  createUserHandler,
+  // createUserHandler, // DISABLED: User creation only through /auth/register
   updateUserHandler,
-  deleteUserHandler,
+  // deleteUserHandler, // DISABLED: Users cannot delete other admin accounts
 } from '../handlers/users';
-import { authenticate, requireAdmin, requireSelfOrAdmin, apiRateLimit } from '../middleware';
+import { authenticate, requireAdmin, requireSelfOrAdmin, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create user router
 const users = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All user routes require authentication
+ * All user routes require authentication and data isolation
  */
 users.use('*', authenticate);
+users.use('*', enforceDataIsolation);
 users.use('*', apiRateLimit());
 
 /**
@@ -33,13 +34,13 @@ users.get('/', requireAdmin, getUsersHandler);
 // GET /users/:id - Get user by ID (admin or self)
 users.get('/:id', requireSelfOrAdmin((c) => c.req.param('id')), getUserHandler);
 
-// POST /users - Create new user (admin only)
-users.post('/', requireAdmin, createUserHandler);
+// POST /users - DISABLED for security: User creation only through /auth/register
+// users.post('/', requireAdmin, createUserHandler);
 
 // PUT /users/:id - Update user (admin or self)
 users.put('/:id', requireSelfOrAdmin((c) => c.req.param('id')), updateUserHandler);
 
-// DELETE /users/:id - Delete user (admin only)
-users.delete('/:id', requireAdmin, deleteUserHandler);
+// DELETE /users/:id - DISABLED for security: Users cannot delete other admin accounts
+// users.delete('/:id', requireAdmin, deleteUserHandler);
 
 export { users };

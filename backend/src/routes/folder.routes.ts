@@ -12,15 +12,16 @@ import {
   updateFolderHandler,
   deleteFolderHandler,
 } from '../handlers/folders';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create folders router
 const folders = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All folder routes require authentication
+ * All folder routes require authentication and data isolation
  */
 folders.use('*', authenticate);
+folders.use('*', enforceDataIsolation);
 folders.use('*', apiRateLimit());
 
 /**

@@ -7,6 +7,7 @@
 -- Contacts table for business contact information
 CREATE TABLE IF NOT EXISTS contacts (
     contact_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: contacts belong to specific user
     company_name VARCHAR(200),                    -- Optional company name (max 200 chars for cost efficiency)
     contact_name VARCHAR(200) NOT NULL,           -- Required contact person name
     email VARCHAR(255),                           -- Optional email (standard email length)

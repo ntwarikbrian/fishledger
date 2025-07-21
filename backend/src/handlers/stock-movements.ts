@@ -10,6 +10,12 @@ import {
   throwValidationError,
   throwNotFoundError,
 } from '../middleware/error-handler';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 // Validation schemas
 const stockMovementFiltersSchema = z.object({
@@ -209,23 +215,25 @@ const createStockMovementHandler = asyncHandler(async (c: HonoContext) => {
     throwNotFoundError('Product');
   }
 
-  // Create stock movement record
+  // Create stock movement record with proper data isolation
+  const stockMovementData = addUserIdToInsertData(c, {
+    product_id,
+    movement_type,
+    box_change,
+    kg_change,
+    reason,
+    damaged_id,
+    stock_addition_id,
+    correction_id,
+    field_changed,
+    old_value,
+    new_value,
+    performed_by: c.get('user')?.id,
+  });
+
   const { data: stockMovement, error: movementError } = await c.get('supabase')
     .from('stock_movements')
-    .insert({
-      product_id,
-      movement_type,
-      box_change,
-      kg_change,
-      reason,
-      damaged_id,
-      stock_addition_id,
-      correction_id,
-      field_changed,
-      old_value,
-      new_value,
-      performed_by: c.get('user')?.id,
-    })
+    .insert(stockMovementData)
     .select()
     .single();
 

@@ -6,6 +6,7 @@
 -- Messages table for outgoing or internal communications
 CREATE TABLE IF NOT EXISTS messages (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: messages belong to specific user
     recipient_id UUID NOT NULL, -- Single recipient ID (user, worker, or contact)
     recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('user', 'worker', 'contact')),
     recipient_email VARCHAR(255), -- Email address of the recipient (extracted from contacts/users/workers)

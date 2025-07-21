@@ -7,6 +7,7 @@
 -- Note: product_create movement_type kept for backward compatibility but not used in direct creation workflow
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: movements belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id),
     movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create')),
 

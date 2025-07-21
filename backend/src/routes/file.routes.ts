@@ -12,15 +12,16 @@ import {
   updateFileHandler,
   deleteFileHandler,
 } from '../handlers/files';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create files router
 const files = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All file routes require authentication
+ * All file routes require authentication and data isolation
  */
 files.use('*', authenticate);
+files.use('*', enforceDataIsolation);
 files.use('*', apiRateLimit());
 
 /**

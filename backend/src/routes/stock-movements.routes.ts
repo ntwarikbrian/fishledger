@@ -21,15 +21,16 @@ import {
   approveProductCreateHandler,
   rejectProductCreateHandler
 } from '../handlers/stock-movements';
-import { authenticate, requireEmployee, requireManager, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, requireManager, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create stock movements router
 const stockMovements = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All stock movement routes require authentication
+ * All stock movement routes require authentication and data isolation
  */
 stockMovements.use('*', authenticate);
+stockMovements.use('*', enforceDataIsolation);
 stockMovements.use('*', apiRateLimit());
 
 /**

@@ -10,6 +10,12 @@ import {
   throwValidationError,
   throwNotFoundError,
 } from '../middleware/error-handler';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData
+} from '../middleware/data-isolation';
 
 // Validation schemas
 const createStockCorrectionSchema = z.object({
@@ -82,19 +88,21 @@ export const createStockCorrectionHandler = asyncHandler(async (c: HonoContext) 
     throw new Error(`Failed to create stock correction: ${correctionError.message}`);
   }
 
-  // Create pending stock movement record for approval
+  // Create pending stock movement record for approval with proper data isolation
+  const stockMovementData = addUserIdToInsertData(c, {
+    product_id,
+    movement_type: 'stock_correction',
+    box_change: box_adjustment,
+    kg_change: kg_adjustment,
+    reason: `Stock correction request: ${correction_reason} (Box: ${box_adjustment >= 0 ? '+' : ''}${box_adjustment}, KG: ${kg_adjustment >= 0 ? '+' : ''}${kg_adjustment})`,
+    correction_id: stockCorrection.correction_id,
+    performed_by: c.get('user')?.id,
+    status: 'pending' // Set status to pending for approval
+  });
+
   const { error: movementError } = await c.get('supabase')
     .from('stock_movements')
-    .insert({
-      product_id,
-      movement_type: 'stock_correction',
-      box_change: box_adjustment,
-      kg_change: kg_adjustment,
-      reason: `Stock correction request: ${correction_reason} (Box: ${box_adjustment >= 0 ? '+' : ''}${box_adjustment}, KG: ${kg_adjustment >= 0 ? '+' : ''}${kg_adjustment})`,
-      correction_id: stockCorrection.correction_id,
-      performed_by: c.get('user')?.id,
-      status: 'pending' // Set status to pending for approval
-    });
+    .insert(stockMovementData);
 
   if (movementError) {
     throw new Error(`Failed to create stock movement: ${movementError.message}`);

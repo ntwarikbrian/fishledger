@@ -17,14 +17,28 @@ ALTER DATABASE postgres SET row_security = on;
 -- Users table for business owners authentication
 CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    business_name VARCHAR(200) NOT NULL,
+    business_name VARCHAR(200) NOT NULL UNIQUE, -- Business name must be unique for data isolation
     owner_name VARCHAR(200) NOT NULL,
     email_address VARCHAR(255) UNIQUE NOT NULL,
     phone_number VARCHAR(20),
-    password VARCHAR(255), -- Will store hashed password (optional for existing users)
+    password VARCHAR(255) NOT NULL, -- Will store hashed password (required for authentication)
+    is_active BOOLEAN DEFAULT true, -- Account status for security
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP WITH TIME ZONE
+    last_login TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Trigger to update updated_at timestamp for users
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- 2. WORKERS TABLE
@@ -34,15 +48,20 @@ CREATE TABLE IF NOT EXISTS users (
 -- Workers table for system users employed under a business
 CREATE TABLE IF NOT EXISTS workers (
     worker_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: workers belong to specific user/business
     full_name VARCHAR(200) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL, -- Removed UNIQUE constraint as emails can be same across different businesses
     phone_number VARCHAR(20),
     id_card_front_url TEXT, -- Front side of ID card image
     id_card_back_url TEXT, -- Back side of ID card image
+    password VARCHAR(255) NOT NULL, -- Hashed password for authentication
     monthly_salary DECIMAL(10,2),
     total_revenue_generated DECIMAL(12,2) DEFAULT 0,
     recent_login_history JSONB, -- Store recent login timestamps as JSON
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Ensure worker emails are unique per business
+    UNIQUE(user_id, email)
 );
 
 -- =====================================================
@@ -53,13 +72,17 @@ CREATE TABLE IF NOT EXISTS workers (
 -- Expense categories table
 CREATE TABLE IF NOT EXISTS expense_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    category_name VARCHAR(100) UNIQUE NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: categories belong to specific user
+    category_name VARCHAR(100) NOT NULL, -- Removed UNIQUE constraint as names can be same across different users
     description TEXT,
     budget DECIMAL(12,2) DEFAULT 0, -- Budget allocation for this category
 
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Ensure category names are unique per user
+    UNIQUE(user_id, category_name)
 );
 
 -- =====================================================
@@ -70,11 +93,12 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 -- Expenses table
 CREATE TABLE IF NOT EXISTS expenses (
     expense_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: expenses belong to specific user
     title VARCHAR(255) NOT NULL, -- Title/name of the expense
     category_id UUID NOT NULL REFERENCES expense_categories(category_id),
     amount DECIMAL(12,2) NOT NULL,
     date DATE NOT NULL,
-    added_by UUID NOT NULL REFERENCES users(user_id), -- user_id or worker_id
+    added_by UUID NOT NULL REFERENCES users(user_id), -- user_id or worker_id who added the expense
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
     receipt_url TEXT, -- URL to uploaded receipt image/document
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -89,6 +113,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- Contacts table for business contact information
 CREATE TABLE IF NOT EXISTS contacts (
     contact_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: contacts belong to specific user
     company_name VARCHAR(200),
     contact_name VARCHAR(200) NOT NULL,
     email VARCHAR(255),
@@ -113,6 +138,7 @@ CREATE TABLE IF NOT EXISTS contacts (
 -- Messages table for outgoing or internal communications
 CREATE TABLE IF NOT EXISTS messages (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: messages belong to specific user
     recipient_id UUID NOT NULL, -- Single recipient ID (user, worker, or contact)
     recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('user', 'worker', 'contact')),
     recipient_email VARCHAR(255), -- Email address of the recipient (extracted from contacts/users/workers)
@@ -180,10 +206,14 @@ CREATE TABLE IF NOT EXISTS files (
 -- Product categories table for organizing products
 CREATE TABLE IF NOT EXISTS product_categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) UNIQUE NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: categories belong to specific user
+    name VARCHAR(100) NOT NULL, -- Removed UNIQUE constraint as names can be same across different users
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- Ensure category names are unique per user
+    UNIQUE(user_id, name)
 );
 
 -- =====================================================
@@ -194,6 +224,7 @@ CREATE TABLE IF NOT EXISTS product_categories (
 -- Products table for fish inventory management with box/kg support
 CREATE TABLE IF NOT EXISTS products (
     product_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: products belong to specific user
     name VARCHAR(200) NOT NULL,
     category_id UUID NOT NULL REFERENCES product_categories(category_id),
 
@@ -296,6 +327,7 @@ CREATE POLICY products_user_isolation ON products
 -- Damaged products table for tracking damaged inventory
 CREATE TABLE IF NOT EXISTS damaged_products (
     damage_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: damaged products belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
 
     -- Damaged quantities
@@ -466,6 +498,7 @@ CREATE TABLE IF NOT EXISTS message_templates (
 -- Sales table for individual product sales transactions
 CREATE TABLE IF NOT EXISTS sales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: sales belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
 
     -- Quantities sold
@@ -548,6 +581,7 @@ CREATE TABLE IF NOT EXISTS stock_corrections (
 CREATE TABLE IF NOT EXISTS stock_additions (
     addition_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: additions belong to specific user
 
     -- Added quantities
     boxes_added INTEGER DEFAULT 0 NOT NULL CHECK (boxes_added >= 0), -- Number of boxes added
@@ -580,6 +614,7 @@ CREATE TABLE IF NOT EXISTS stock_additions (
 -- Stock movements table for tracking inventory changes from irregular events
 CREATE TABLE IF NOT EXISTS stock_movements (
     movement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: movements belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id),
     movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('damaged', 'new_stock', 'stock_correction', 'product_edit', 'product_delete', 'product_create')),
 
@@ -785,8 +820,39 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =====================================================
--- INDEXES FOR PERFORMANCE
+-- INDEXES FOR PERFORMANCE AND DATA ISOLATION
 -- =====================================================
+
+-- Users table indexes
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email_address);
+CREATE INDEX IF NOT EXISTS idx_users_business_name ON users(business_name);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+
+-- Workers table indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_workers_user_id ON workers(user_id);
+
+-- Product categories indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_product_categories_user_id ON product_categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_product_categories_user_name ON product_categories(user_id, name);
+
+-- Products indexes (data isolation) - additional to existing ones
+CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id);
+CREATE INDEX IF NOT EXISTS idx_products_user_category ON products(user_id, category_id);
+CREATE INDEX IF NOT EXISTS idx_products_user_name ON products(user_id, name);
+
+-- Expense categories indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_expense_categories_user_id ON expense_categories(user_id);
+
+-- Expenses indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_expenses_user_category ON expenses(user_id, category_id);
+
+-- Contacts indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+
+-- Messages indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 
 -- Files table indexes
 CREATE INDEX IF NOT EXISTS idx_files_folder ON files(folder_id);
@@ -801,7 +867,8 @@ CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(folder_name);
 CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by);
 CREATE INDEX IF NOT EXISTS idx_folders_permanent ON folders(is_permanent);
 
--- Sales table indexes
+-- Sales table indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_sales_user_id ON sales(user_id); -- Critical for data isolation
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date_time);
 CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
@@ -812,6 +879,10 @@ CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
 CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_updated_at ON sales(updated_at);
+
+-- Composite indexes for user-specific sales queries
+CREATE INDEX IF NOT EXISTS idx_sales_user_date ON sales(user_id, date_time);
+CREATE INDEX IF NOT EXISTS idx_sales_user_status ON sales(user_id, payment_status);
 
 -- Create trigger to automatically update updated_at timestamp for sales
 CREATE OR REPLACE FUNCTION update_sales_updated_at()
@@ -827,7 +898,8 @@ CREATE TRIGGER sales_updated_at_trigger
     FOR EACH ROW
     EXECUTE FUNCTION update_sales_updated_at();
 
--- Stock movements table indexes
+-- Stock movements table indexes (data isolation)
+CREATE INDEX IF NOT EXISTS idx_stock_movements_user_id ON stock_movements(user_id); -- Critical for data isolation
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product_id ON stock_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_performed_by ON stock_movements(performed_by);

@@ -12,16 +12,17 @@ import {
   updateCategoryHandler,
   deleteCategoryHandler,
 } from '../handlers/categories';
-import { authenticate, apiRateLimit, errorHandler } from '../middleware';
+import { authenticate, apiRateLimit, errorHandler, enforceDataIsolation } from '../middleware';
 
 // Create category router
 const categories = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All category routes require authentication and error handling
+ * All category routes require authentication, data isolation, and error handling
  */
 categories.use('*', errorHandler);
 categories.use('*', authenticate);
+categories.use('*', enforceDataIsolation);
 categories.use('*', apiRateLimit());
 
 /**

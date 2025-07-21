@@ -12,15 +12,16 @@ import {
   updateContactHandler,
   deleteContactHandler,
 } from '../handlers/contacts';
-import { authenticate, apiRateLimit } from '../middleware';
+import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create contacts router
 const contacts = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All contact routes require authentication
+ * All contact routes require authentication and data isolation
  */
 contacts.use('*', authenticate);
+contacts.use('*', enforceDataIsolation);
 contacts.use('*', apiRateLimit());
 
 /**

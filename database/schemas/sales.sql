@@ -6,6 +6,7 @@
 -- Sales table for individual product sales transactions
 CREATE TABLE IF NOT EXISTS sales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: sales belong to specific user
     product_id UUID NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
 
     -- Quantities sold
@@ -49,8 +50,9 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 
 -- Comments for documentation
-COMMENT ON TABLE sales IS 'Individual product sales transactions';
+COMMENT ON TABLE sales IS 'Individual product sales transactions - isolated per user';
 COMMENT ON COLUMN sales.id IS 'Unique identifier for each sale';
+COMMENT ON COLUMN sales.user_id IS 'Reference to user who owns this sale - ensures data isolation';
 COMMENT ON COLUMN sales.product_id IS 'Reference to the product sold';
 COMMENT ON COLUMN sales.boxes_quantity IS 'Number of boxes sold';
 COMMENT ON COLUMN sales.kg_quantity IS 'Kg sold (loose weight)';
@@ -73,6 +75,7 @@ COMMENT ON COLUMN sales.created_at IS 'Timestamp when the sale record was create
 COMMENT ON COLUMN sales.updated_at IS 'Timestamp when the sale record was last updated';
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_sales_user_id ON sales(user_id); -- Critical for data isolation
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date_time);
 CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status);
@@ -83,6 +86,10 @@ CREATE INDEX IF NOT EXISTS idx_sales_profit_per_box ON sales(profit_per_box);
 CREATE INDEX IF NOT EXISTS idx_sales_profit_per_kg ON sales(profit_per_kg);
 CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_updated_at ON sales(updated_at);
+
+-- Composite indexes for user-specific queries
+CREATE INDEX IF NOT EXISTS idx_sales_user_date ON sales(user_id, date_time);
+CREATE INDEX IF NOT EXISTS idx_sales_user_status ON sales(user_id, payment_status);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;

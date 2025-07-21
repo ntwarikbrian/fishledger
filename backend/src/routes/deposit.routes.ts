@@ -14,15 +14,16 @@ import {
   deleteDepositHandler,
   getDepositStatsHandler,
 } from '../handlers/deposits';
-import { authenticate, requireEmployee, apiRateLimit } from '../middleware';
+import { authenticate, requireEmployee, apiRateLimit, enforceDataIsolation } from '../middleware';
 
 // Create deposit router
 const deposits = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
- * All deposit routes require authentication and rate limiting
+ * All deposit routes require authentication, data isolation, and rate limiting
  */
 deposits.use('*', authenticate);
+deposits.use('*', enforceDataIsolation);
 deposits.use('*', apiRateLimit());
 
 /**

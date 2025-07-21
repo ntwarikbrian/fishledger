@@ -84,9 +84,11 @@ export const loginHandler = async (c: HonoContext) => {
 
     const { email, password } = validation.data;
 
-    // Get user by email
+    // Get user by email with enhanced security checks
     const user = await getUserByEmail(c.get('supabase'), email);
     if (!user) {
+      // Log failed login attempt for security monitoring
+      console.warn(`🚨 Failed login attempt for email: ${email} - User not found`);
       return c.json({
         success: false,
         error: 'Invalid email or password',
@@ -95,14 +97,47 @@ export const loginHandler = async (c: HonoContext) => {
       }, 401);
     }
 
-    // Note: In a real implementation, you'd verify the password against a hash
-    // For now, we'll simulate password verification
-    // You should add a password_hash field to your users table
-    const isValidPassword = true; // Placeholder - implement proper password verification
+    // Enhanced security: Check if user account is active
+    if (!user.is_active) {
+      console.warn(`🚨 Login attempt for deactivated account: ${email}`);
+      return c.json({
+        success: false,
+        error: 'Account is deactivated. Please contact support.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 401);
+    }
+
+    // Enhanced security: Verify password exists and is properly hashed
+    if (!user.password || user.password.length < 10) {
+      console.error(`🚨 Account with invalid password hash: ${email}`);
+      return c.json({
+        success: false,
+        error: 'Account setup incomplete. Please contact support.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 401);
+    }
+
+    // Enhanced password verification with timing attack protection
+    const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
+      // Log failed password attempt for security monitoring
+      console.warn(`🚨 Failed password verification for user: ${email}`);
       return c.json({
         success: false,
         error: 'Invalid email or password',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 401);
+    }
+
+    // Additional security: Verify user_id exists and is valid UUID
+    if (!user.user_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.user_id)) {
+      console.error(`🚨 Invalid user_id format for user: ${email}`);
+      return c.json({
+        success: false,
+        error: 'Account data corrupted. Please contact support.',
         timestamp: new Date().toISOString(),
         requestId: c.get('requestId'),
       }, 401);
@@ -205,9 +240,10 @@ export const registerHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Check if email already exists
+    // Enhanced security: Check if email already exists
     const existingUserByEmail = await getUserByEmail(c.get('supabase'), email_address);
     if (existingUserByEmail) {
+      console.warn(`🚨 Registration attempt with existing email: ${email_address}`);
       return c.json({
         success: false,
         error: 'Email already registered',
@@ -216,9 +252,10 @@ export const registerHandler = async (c: HonoContext) => {
       }, 409);
     }
 
-    // Check if business name already exists
+    // Enhanced security: Check if business name already exists
     const existingUserByBusinessName = await getUserByBusinessName(c.get('supabase'), business_name);
     if (existingUserByBusinessName) {
+      console.warn(`🚨 Registration attempt with existing business name: ${business_name}`);
       return c.json({
         success: false,
         error: 'Business name already taken',
@@ -227,17 +264,42 @@ export const registerHandler = async (c: HonoContext) => {
       }, 409);
     }
 
-    // Hash password
+    // Enhanced security: Hash password with strong settings
     const hashedPassword = await hashPassword(password);
 
-    // Create user
+    // Enhanced security: Validate hashed password
+    if (!hashedPassword || hashedPassword.length < 10) {
+      console.error('🚨 Password hashing failed during registration');
+      return c.json({
+        success: false,
+        error: 'Password processing failed. Please try again.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 500);
+    }
+
+    // Create user with enhanced security
     const newUser = await createUser(c.get('supabase'), {
       email_address,
       business_name,
       owner_name,
       phone_number: phone_number || null,
       password: hashedPassword,
+      is_active: true, // Explicitly set active status
     });
+
+    // Enhanced security: Verify user creation
+    if (!newUser || !newUser.user_id) {
+      console.error('🚨 User creation failed - no user ID returned');
+      return c.json({
+        success: false,
+        error: 'Account creation failed. Please try again.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 500);
+    }
+
+    console.log(`✅ New user account created successfully: ${newUser.user_id} (${email_address})`);
 
     // Create authenticated user object
     const authenticatedUser: AuthenticatedUser = {

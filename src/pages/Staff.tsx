@@ -81,7 +81,9 @@ const Staff = () => {
   // State for create worker dialog
   const [isCreateWorkerDialogOpen, setIsCreateWorkerDialogOpen] = useState(false);
 
-
+  // State for ID document popup
+  const [isIdDocumentDialogOpen, setIsIdDocumentDialogOpen] = useState(false);
+  const [selectedWorkerForId, setSelectedWorkerForId] = useState<Worker | null>(null);
 
   // State for selected worker in roles and permissions
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
@@ -244,23 +246,10 @@ const Staff = () => {
     }));
   };
 
-  // Handle ID card files upload (both front and back)
-  const handleIdCardUpload = (files: FileList) => {
-    // Validate number of files
-    if (files.length !== 2) {
-      toast({
-        title: "Error",
-        description: "Please select exactly 2 images (front and back of ID card)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const fileArray = Array.from(files);
-
-    // Validate file types
-    const invalidFiles = fileArray.filter(file => !file.type.startsWith('image/'));
-    if (invalidFiles.length > 0) {
+  // Handle individual ID card file upload (step by step)
+  const handleIdCardUpload = (file: File, cardType: 'front' | 'back') => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
       toast({
         title: "Error",
         description: "Please select only image files for ID card",
@@ -269,50 +258,38 @@ const Staff = () => {
       return;
     }
 
-    // Validate file sizes (max 5MB each)
-    const oversizedFiles = fileArray.filter(file => file.size > 5 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
+    // Validate file size (5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
       toast({
         title: "Error",
-        description: "Each image file should be less than 5MB",
+        description: "Image must be smaller than 5MB",
         variant: "destructive"
       });
       return;
     }
 
-    // Set files (first as front, second as back)
-    const [frontFile, backFile] = fileArray;
-
-    // Create previews for both files
-    const frontReader = new FileReader();
-    const backReader = new FileReader();
-
-    frontReader.onload = (e) => {
-      setIdCardFront(frontFile);
-      setIdCardFrontPreview(e.target?.result as string);
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (cardType === 'front') {
+        setIdCardFront(file);
+        setIdCardFrontPreview(e.target?.result as string);
+      } else {
+        setIdCardBack(file);
+        setIdCardBackPreview(e.target?.result as string);
+      }
     };
 
-    backReader.onload = (e) => {
-      setIdCardBack(backFile);
-      setIdCardBackPreview(e.target?.result as string);
-    };
-
-    frontReader.readAsDataURL(frontFile);
-    backReader.readAsDataURL(backFile);
+    reader.readAsDataURL(file);
 
     toast({
       title: "Success",
-      description: "ID card images uploaded successfully",
+      description: `ID card ${cardType} uploaded successfully`,
     });
   };
 
-  // Remove all ID cards
-  const removeAllIdCards = () => {
-    setIdCardFront(null);
-    setIdCardBack(null);
-    setIdCardFrontPreview(null);
-    setIdCardBackPreview(null);
-  };
+
 
   // Handle create worker form submission
   const handleCreateWorker = async (e: React.FormEvent) => {
@@ -328,15 +305,8 @@ const Staff = () => {
       return;
     }
 
-    // Validate ID card attachments
-    if (!idCardFront || !idCardBack) {
-      toast({
-        title: "Error",
-        description: "Please attach both front and back of ID card",
-        variant: "destructive"
-      });
-      return;
-    }
+    // ID card attachments are now optional
+    // No validation needed since they're optional
 
     setIsCreatingWorker(true);
 
@@ -531,6 +501,12 @@ const Staff = () => {
     }
   };
 
+  // Function to handle opening ID document popup
+  const handleViewIdDocuments = (worker: Worker) => {
+    setSelectedWorkerForId(worker);
+    setIsIdDocumentDialogOpen(true);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -538,7 +514,7 @@ const Staff = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Workers Management</h1>
-            <p className="text-muted-foreground">Create and manage worker accounts with performance tracking</p>
+            <p className="text-muted-foreground">Add and manage worker accounts with performance tracking</p>
           </div>
         </div>
 
@@ -571,225 +547,220 @@ const Staff = () => {
                     <DialogTrigger asChild>
                       <Button className="bg-blue-600 hover:bg-blue-700">
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Create Worker
+                        Add Worker
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <UserPlus className="h-5 w-5" />
-                          Create New Worker Account
+                    <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+                      <DialogHeader className="pb-3">
+                        <DialogTitle className="flex items-center gap-2 text-lg">
+                          <UserPlus className="h-4 w-4" />
+                          Add Worker
                         </DialogTitle>
-                        <DialogDescription>
-                          Add a new worker to your fish selling management system
+                        <DialogDescription className="text-sm">
+                          Create a new worker account
                         </DialogDescription>
                       </DialogHeader>
 
-                      <form onSubmit={handleCreateWorker} className="space-y-4">
-                        {/* Personal Information */}
+                      <form onSubmit={handleCreateWorker} className="space-y-3">
+                        {/* Basic Information */}
                         <div className="space-y-3">
-                          <h3 className="text-md font-medium">Personal Information</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label htmlFor="name">Full Name *</Label>
-                              <Input
-                                id="name"
-                                type="text"
-                                placeholder="Enter worker's full name"
-                                value={createWorkerForm.name}
-                                onChange={(e) => handleInputChange("name", e.target.value)}
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="email">Email Address *</Label>
-                              <Input
-                                id="email"
-                                type="email"
-                                placeholder="worker@fishsales.com"
-                                value={createWorkerForm.email}
-                                onChange={(e) => handleInputChange("email", e.target.value)}
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="phone">Phone Number</Label>
-                              <Input
-                                id="phone"
-                                type="tel"
-                                placeholder="+1 (555) 123-4567"
-                                value={createWorkerForm.phone}
-                                onChange={(e) => handleInputChange("phone", e.target.value)}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="password">Password *</Label>
-                              <Input
-                                id="password"
-                                type="password"
-                                placeholder="Create a secure password"
-                                value={createWorkerForm.password}
-                                onChange={(e) => handleInputChange("password", e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Work Information */}
-                        <div className="space-y-3">
-                          <h3 className="text-md font-medium">Work Information</h3>
                           <div className="space-y-2">
-                            <Label htmlFor="salary">Monthly Salary ($)</Label>
+                            <Label htmlFor="name" className="text-sm font-medium">Full Name *</Label>
+                            <Input
+                              id="name"
+                              type="text"
+                              placeholder="Enter full name"
+                              value={createWorkerForm.name}
+                              onChange={(e) => handleInputChange("name", e.target.value)}
+                              className="h-9"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="email" className="text-sm font-medium">Email Address *</Label>
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="worker@example.com"
+                              value={createWorkerForm.email}
+                              onChange={(e) => handleInputChange("email", e.target.value)}
+                              className="h-9"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+                            <Input
+                              id="phone"
+                              type="tel"
+                              placeholder="+1234567890"
+                              value={createWorkerForm.phone}
+                              onChange={(e) => handleInputChange("phone", e.target.value)}
+                              className="h-9"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="password" className="text-sm font-medium">Password *</Label>
+                            <Input
+                              id="password"
+                              type="password"
+                              placeholder="Create password"
+                              value={createWorkerForm.password}
+                              onChange={(e) => handleInputChange("password", e.target.value)}
+                              className="h-9"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="salary" className="text-sm font-medium">Monthly Salary ($)</Label>
                             <Input
                               id="salary"
                               type="number"
                               placeholder="4200"
                               value={createWorkerForm.salary}
                               onChange={(e) => handleInputChange("salary", e.target.value)}
+                              className="h-9"
                             />
                           </div>
                         </div>
 
                         {/* ID Card Attachments */}
-                        <div className="space-y-3">
-                          <h3 className="text-md font-medium flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            ID Card Attachments *
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            Please select exactly 2 images: front and back of the worker's ID card
-                          </p>
-
-                          {/* Single Upload Interface */}
-                          {!idCardFrontPreview && !idCardBackPreview ? (
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
-                              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                              <h4 className="text-sm font-semibold mb-1">Upload ID Card Images</h4>
-                              <p className="text-xs text-gray-600 mb-2">Select both front and back images at once</p>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files.length > 0) {
-                                    handleIdCardUpload(e.target.files);
-                                  }
-                                }}
-                                className="hidden"
-                                id="id-cards-upload-dialog"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="cursor-pointer"
-                                onClick={() => {
-                                  const input = document.getElementById('id-cards-upload-dialog') as HTMLInputElement;
-                                  if (input) {
-                                    input.click();
-                                  }
-                                }}
-                              >
-                                <Image className="h-4 w-4 mr-2" />
-                                Select Images
-                              </Button>
-                            </div>
-                          ) : (
-                            /* Preview Both Images */
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                <h4 className="text-sm font-medium">ID Card Images</h4>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={removeAllIdCards}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  Remove All
-                                </Button>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {/* Front ID Card Preview */}
-                                <div className="space-y-1">
-                                  <Label className="text-xs font-medium text-green-600">✓ Front of ID Card</Label>
-                                  {idCardFrontPreview && (
-                                    <div className="relative">
-                                      <img
-                                        src={idCardFrontPreview}
-                                        alt="ID Card Front"
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-300"
-                                      />
-                                      <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
-                                        FRONT
-                                      </div>
-                                    </div>
-                                  )}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <CreditCard className="h-3 w-3" />
+                            ID Card Images (Optional)
+                          </Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* Front ID Card */}
+                            <div>
+                              {!idCardFrontPreview ? (
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 text-center hover:border-gray-400 transition-colors">
+                                  <Upload className="h-4 w-4 text-gray-400 mx-auto mb-1" />
+                                  <p className="text-xs text-gray-600 mb-1">Front</p>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleIdCardUpload(e.target.files[0], 'front');
+                                      }
+                                    }}
+                                    className="hidden"
+                                    id="id-card-front-upload"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="cursor-pointer h-7 text-xs"
+                                    onClick={() => {
+                                      const input = document.getElementById('id-card-front-upload') as HTMLInputElement;
+                                      if (input) {
+                                        input.click();
+                                      }
+                                    }}
+                                  >
+                                    <Upload className="h-3 w-3 mr-1" />
+                                    Choose
+                                  </Button>
                                 </div>
-
-                                {/* Back ID Card Preview */}
-                                <div className="space-y-1">
-                                  <Label className="text-xs font-medium text-green-600">✓ Back of ID Card</Label>
-                                  {idCardBackPreview && (
-                                    <div className="relative">
-                                      <img
-                                        src={idCardBackPreview}
-                                        alt="ID Card Back"
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-300"
-                                      />
-                                      <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
-                                        BACK
-                                      </div>
-                                    </div>
-                                  )}
+                              ) : (
+                                <div className="relative">
+                                  <img
+                                    src={idCardFrontPreview}
+                                    alt="ID Card Front"
+                                    className="w-full h-16 object-cover rounded-lg border-2 border-green-300"
+                                  />
+                                  <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
+                                    FRONT
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="absolute top-1 right-1 h-5 w-5 p-0"
+                                    onClick={() => {
+                                      setIdCardFront(null);
+                                      setIdCardFrontPreview(null);
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
                                 </div>
-                              </div>
-
-                              {/* Re-upload Option */}
-                              <div className="text-center pt-2 border-t">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  multiple
-                                  onChange={(e) => {
-                                    if (e.target.files && e.target.files.length > 0) {
-                                      handleIdCardUpload(e.target.files);
-                                    }
-                                  }}
-                                  className="hidden"
-                                  id="id-cards-reupload-dialog"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="cursor-pointer"
-                                  onClick={() => {
-                                    const input = document.getElementById('id-cards-reupload-dialog') as HTMLInputElement;
-                                    if (input) {
-                                      input.click();
-                                    }
-                                  }}
-                                >
-                                  <Upload className="h-3 w-3 mr-2" />
-                                  Replace Images
-                                </Button>
-                              </div>
+                              )}
                             </div>
-                          )}
+
+                            {/* Back ID Card */}
+                            <div>
+                              {!idCardBackPreview ? (
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 text-center hover:border-gray-400 transition-colors">
+                                  <Upload className="h-4 w-4 text-gray-400 mx-auto mb-1" />
+                                  <p className="text-xs text-gray-600 mb-1">Back</p>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleIdCardUpload(e.target.files[0], 'back');
+                                      }
+                                    }}
+                                    className="hidden"
+                                    id="id-card-back-upload"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="cursor-pointer h-7 text-xs"
+                                    onClick={() => {
+                                      const input = document.getElementById('id-card-back-upload') as HTMLInputElement;
+                                      if (input) {
+                                        input.click();
+                                      }
+                                    }}
+                                  >
+                                    <Upload className="h-3 w-3 mr-1" />
+                                    Choose
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  <img
+                                    src={idCardBackPreview}
+                                    alt="ID Card Back"
+                                    className="w-full h-16 object-cover rounded-lg border-2 border-green-300"
+                                  />
+                                  <div className="absolute top-1 left-1 bg-green-600 text-white px-1 py-0.5 rounded text-xs font-medium">
+                                    BACK
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="absolute top-1 right-1 h-6 w-6 p-0"
+                                    onClick={() => {
+                                      setIdCardBack(null);
+                                      setIdCardBackPreview(null);
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Form Actions */}
-                        <div className="flex justify-end gap-3 pt-3 border-t">
+                        <div className="flex justify-end gap-2 pt-3 border-t">
                           <Button
                             type="button"
                             variant="outline"
+                            size="sm"
                             onClick={() => {
                               resetForm();
                               setIsCreateWorkerDialogOpen(false);
@@ -799,11 +770,12 @@ const Staff = () => {
                           </Button>
                           <Button
                             type="submit"
+                            size="sm"
                             className="bg-blue-600 hover:bg-blue-700"
                             disabled={isCreatingWorker}
                           >
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            {isCreatingWorker ? 'Creating...' : 'Create Worker'}
+                            <UserPlus className="mr-1 h-3 w-3" />
+                            {isCreatingWorker ? 'Adding...' : 'Add Worker'}
                           </Button>
                         </div>
                       </form>
@@ -896,12 +868,26 @@ const Staff = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <CreditCard className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs">
-                                {worker.id_card_front_url && worker.id_card_back_url ? 'Complete' : 'Incomplete'}
+                              <span className="text-xs flex items-center gap-1">
+                                {worker.id_card_front_url && worker.id_card_back_url ? (
+                                  <>
+                                    <CheckCircle className="h-3 w-3 text-green-600" />
+                                    <span className="text-green-600 font-medium">Complete</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="h-3 w-3 text-orange-600" />
+                                    <span className="text-orange-600 font-medium">Incomplete</span>
+                                  </>
+                                )}
                               </span>
                             </div>
-                            {worker.id_card_front_url && (
-                              <div className="text-xs text-blue-600 cursor-pointer hover:underline">
+                            {(worker.id_card_front_url || worker.id_card_back_url) && (
+                              <div
+                                className="text-xs text-blue-600 cursor-pointer hover:underline flex items-center gap-1"
+                                onClick={() => handleViewIdDocuments(worker)}
+                              >
+                                <Eye className="h-3 w-3" />
                                 View ID Cards
                               </div>
                             )}
@@ -1197,6 +1183,143 @@ const Staff = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* ID Document Popup Dialog */}
+        <Dialog open={isIdDocumentDialogOpen} onOpenChange={setIsIdDocumentDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                ID Documents - {selectedWorkerForId?.full_name}
+              </DialogTitle>
+              <DialogDescription>
+                View worker's identification documents
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedWorkerForId && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Front ID Card */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">ID Card - Front</h3>
+                    {selectedWorkerForId.id_card_front_url ? (
+                      <div className="border rounded-lg overflow-hidden">
+                        <img
+                          src={selectedWorkerForId.id_card_front_url}
+                          alt="ID Card Front"
+                          className="w-full h-auto object-contain max-h-96 rounded-lg"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `
+                                <div class="flex flex-col items-center justify-center p-8 text-gray-500">
+                                  <svg class="h-12 w-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                  </svg>
+                                  <p>Failed to load image</p>
+                                </div>
+                              `;
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                        <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No front ID card uploaded</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Back ID Card */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">ID Card - Back</h3>
+                    {selectedWorkerForId.id_card_back_url ? (
+                      <div className="border rounded-lg overflow-hidden">
+                        <img
+                          src={selectedWorkerForId.id_card_back_url}
+                          alt="ID Card Back"
+                          className="w-full h-auto object-contain max-h-96 rounded-lg"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `
+                                <div class="flex flex-col items-center justify-center p-8 text-gray-500">
+                                  <svg class="h-12 w-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                  </svg>
+                                  <p>Failed to load image</p>
+                                </div>
+                              `;
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                        <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No back ID card uploaded</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Worker Information */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium mb-3">Worker Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">Full Name:</span>
+                      <span className="ml-2">{selectedWorkerForId.full_name}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Email:</span>
+                      <span className="ml-2">{selectedWorkerForId.email}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Phone:</span>
+                      <span className="ml-2">{selectedWorkerForId.phone_number || 'Not provided'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Joined:</span>
+                      <span className="ml-2">{new Date(selectedWorkerForId.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setIsIdDocumentDialogOpen(false)}>
+                    Close
+                  </Button>
+                  {selectedWorkerForId.id_card_front_url && (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(selectedWorkerForId.id_card_front_url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Front Full Size
+                    </Button>
+                  )}
+                  {selectedWorkerForId.id_card_back_url && (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(selectedWorkerForId.id_card_back_url, '_blank')}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Back Full Size
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

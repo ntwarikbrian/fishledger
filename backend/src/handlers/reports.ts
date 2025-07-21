@@ -33,6 +33,7 @@ import {
   generateProfitLossReportPdf
 } from '../services/pdfService';
 import { createSuccessResponse, createHandlerErrorResponse } from '../utils/response';
+import { getUserIdFromContext } from '../middleware/data-isolation';
 
 /**
  * Generate General Report PDF
@@ -1112,12 +1113,14 @@ export async function generateTopSellingReport(c: Context<{ Bindings: Env; Varia
 
         const { data: sales } = await salesQuery;
 
-        // Get damaged products data for this product within the date range
+        // Get damaged products data for this product within the date range with data isolation
+        const userId = getUserIdFromContext(c);
         let damagedQuery = supabase
           .from('damaged_products')
           .select('damaged_boxes, damaged_kg, damaged_date')
           .eq('product_id', product.product_id)
-          .eq('damaged_approval', true);
+          .eq('damaged_approval', true)
+          .eq('user_id', userId);
 
         // Apply date filters for damaged products
         if (dateFrom) {
@@ -1492,11 +1495,13 @@ export async function generateProfitLossReport(c: Context<{ Bindings: Env; Varia
       return sum + totalCost;
     }, 0) || 0;
 
-    // Get damaged products value for the period
+    // Get damaged products value for the period with data isolation
+    const userId = getUserIdFromContext(c);
     const { data: damagedProducts } = await supabase
       .from('damaged_products')
       .select('loss_value, damaged_date')
       .eq('damaged_approval', true)
+      .eq('user_id', userId)
       .gte('damaged_date', dateFrom)
       .lte('damaged_date', dateTo);
 
