@@ -20,18 +20,12 @@ import {
   recordExists,
 } from '../utils/db';
 
-// Validation schemas
+// Validation schemas (simplified for new schema)
 const createContactSchema = z.object({
-  company_name: z.string().max(200, 'Company name too long').optional(),
-  contact_name: z.string().min(1, 'Contact name is required').max(100, 'Contact name too long'),
+  contact_name: z.string().min(1, 'Contact name is required').max(200, 'Contact name too long'),
   email: z.string().email('Invalid email format').max(255, 'Email too long').optional(),
   phone_number: z.string().max(20, 'Phone number too long').optional(),
   contact_type: z.enum(['supplier', 'customer'], { required_error: 'Contact type is required' }),
-  address: z.string().max(500, 'Address too long').optional(),
-  email_verified: z.boolean().default(false),
-  preferred_contact_method: z.enum(['email', 'phone', 'both']).default('email'),
-  email_notifications: z.boolean().default(true),
-  notes: z.string().max(1000, 'Notes too long').optional(),
 });
 
 const updateContactSchema = createContactSchema.partial();
@@ -73,9 +67,9 @@ export const getContactsHandler = async (c: HonoContext) => {
       query = query.eq('contact_type', contact_type);
     }
 
-    // Apply search
+    // Apply search (updated for simplified schema)
     if (search) {
-      query = applySearch(query, search, ['contact_name', 'company_name', 'email']);
+      query = applySearch(query, search, ['contact_name', 'email']);
     }
 
     // Get total count
@@ -155,6 +149,12 @@ export const createContactHandler = async (c: HonoContext) => {
     }
 
     const contactData = validation.data;
+    const user = c.get('user');
+
+    // Ensure user is authenticated
+    if (!user || !user.id) {
+      return c.json(createErrorResponse('User authentication required', 401, undefined, c.get('requestId')), 401);
+    }
 
     // Check if email already exists (if provided)
     if (contactData.email) {
@@ -169,13 +169,13 @@ export const createContactHandler = async (c: HonoContext) => {
       }
     }
 
-    // Create contact
+    // Create contact (removed unused fields)
     const { data: newContact, error } = await c.get('supabase')
       .from('contacts')
       .insert({
         ...contactData,
-        added_by: 'system', // TODO: Get from authenticated user
-        total_messages_sent: 0,
+        user_id: user.id,
+        added_by: user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

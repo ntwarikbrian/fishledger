@@ -10,38 +10,36 @@ import type { HonoContext } from '../types/index';
 export interface UpdateSettingsRequest {
   currency?: 'USD' | 'RWF';
   language?: 'en' | 'rw';
-  timezone?: string;
-  date_format?: string;
-  theme?: 'light' | 'dark' | 'system';
-  email_notifications?: boolean;
-  sms_notifications?: boolean;
-  low_stock_alerts?: boolean;
-  daily_reports?: boolean;
-  weekly_reports?: boolean;
-  monthly_reports?: boolean;
-  auto_reporting?: boolean;
-  business_hours_start?: string;
-  business_hours_end?: string;
-  working_days?: number[];
+  // Email configuration
+  email_address?: string;
+  email_name?: string;
+  app_password?: string;
+  email_host?: string;
+  email_port?: number;
+  use_tls?: boolean;
+  // WhatsApp configuration
+  whapi_apikey?: string;
+  instance_id?: string;
+  whapi_phone_number?: string;
+  provider_url?: string;
 }
 
 // Validation schemas
 const updateSettingsSchema = z.object({
   currency: z.enum(['USD', 'RWF']).optional(),
   language: z.enum(['en', 'rw']).optional(),
-  timezone: z.string().max(50).optional(),
-  date_format: z.string().max(20).optional(),
-  theme: z.enum(['light', 'dark', 'system']).optional(),
-  email_notifications: z.boolean().optional(),
-  sms_notifications: z.boolean().optional(),
-  low_stock_alerts: z.boolean().optional(),
-  daily_reports: z.boolean().optional(),
-  weekly_reports: z.boolean().optional(),
-  monthly_reports: z.boolean().optional(),
-  auto_reporting: z.boolean().optional(),
-  business_hours_start: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).optional(),
-  business_hours_end: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).optional(),
-  working_days: z.array(z.number().min(1).max(7)).optional(),
+  // Email configuration
+  email_address: z.string().email().max(255).optional(),
+  email_name: z.string().max(200).optional(),
+  app_password: z.string().max(255).optional(),
+  email_host: z.string().max(255).optional(),
+  email_port: z.number().int().min(1).max(65535).optional(),
+  use_tls: z.boolean().optional(),
+  // WhatsApp configuration
+  whapi_apikey: z.string().max(255).optional(),
+  instance_id: z.string().max(100).optional(),
+  whapi_phone_number: z.string().max(20).optional(),
+  provider_url: z.string().url().max(500).optional(),
 });
 
 /**
@@ -81,21 +79,11 @@ export const getSettingsHandler = async (c: HonoContext) => {
     if (!settings) {
       const defaultSettings = {
         user_id: user.id,
-        currency: 'USD',
-        language: 'en',
-        timezone: 'UTC',
-        date_format: 'MM/DD/YYYY',
-        theme: 'light',
-        email_notifications: true,
-        sms_notifications: false,
-        low_stock_alerts: true,
-        daily_reports: true,
-        weekly_reports: true,
-        monthly_reports: false,
-        auto_reporting: true,
-        business_hours_start: '08:00:00',
-        business_hours_end: '18:00:00',
-        working_days: [1, 2, 3, 4, 5], // Monday to Friday
+        currency: 'USD' as const,
+        language: 'en' as const,
+        email_host: 'smtp.gmail.com',
+        email_port: 587,
+        use_tls: true,
       };
 
       const { data: newSettings, error: createError } = await c.get('supabase')
@@ -120,19 +108,18 @@ export const getSettingsHandler = async (c: HonoContext) => {
           settingId: newSettings.setting_id,
           currency: newSettings.currency,
           language: newSettings.language,
-          timezone: newSettings.timezone,
-          dateFormat: newSettings.date_format,
-          theme: newSettings.theme,
-          emailNotifications: newSettings.email_notifications,
-          smsNotifications: newSettings.sms_notifications,
-          lowStockAlerts: newSettings.low_stock_alerts,
-          dailyReports: newSettings.daily_reports,
-          weeklyReports: newSettings.weekly_reports,
-          monthlyReports: newSettings.monthly_reports,
-          autoReporting: newSettings.auto_reporting,
-          businessHoursStart: newSettings.business_hours_start,
-          businessHoursEnd: newSettings.business_hours_end,
-          workingDays: newSettings.working_days,
+          // Email configuration
+          emailAddress: newSettings.email_address,
+          emailName: newSettings.email_name,
+          appPassword: newSettings.app_password,
+          emailHost: newSettings.email_host,
+          emailPort: newSettings.email_port,
+          useTls: newSettings.use_tls,
+          // WhatsApp configuration
+          whapiApikey: newSettings.whapi_apikey,
+          instanceId: newSettings.instance_id,
+          whapiPhoneNumber: newSettings.whapi_phone_number,
+          providerUrl: newSettings.provider_url,
           createdAt: newSettings.created_at,
           updatedAt: newSettings.updated_at,
         },
@@ -147,19 +134,18 @@ export const getSettingsHandler = async (c: HonoContext) => {
         settingId: settings.setting_id,
         currency: settings.currency,
         language: settings.language,
-        timezone: settings.timezone,
-        dateFormat: settings.date_format,
-        theme: settings.theme,
-        emailNotifications: settings.email_notifications,
-        smsNotifications: settings.sms_notifications,
-        lowStockAlerts: settings.low_stock_alerts,
-        dailyReports: settings.daily_reports,
-        weeklyReports: settings.weekly_reports,
-        monthlyReports: settings.monthly_reports,
-        autoReporting: settings.auto_reporting,
-        businessHoursStart: settings.business_hours_start,
-        businessHoursEnd: settings.business_hours_end,
-        workingDays: settings.working_days,
+        // Email configuration
+        emailAddress: settings.email_address,
+        emailName: settings.email_name,
+        appPassword: settings.app_password,
+        emailHost: settings.email_host,
+        emailPort: settings.email_port,
+        useTls: settings.use_tls,
+        // WhatsApp configuration
+        whapiApikey: settings.whapi_apikey,
+        instanceId: settings.instance_id,
+        whapiPhoneNumber: settings.whapi_phone_number,
+        providerUrl: settings.provider_url,
         createdAt: settings.created_at,
         updatedAt: settings.updated_at,
       },
@@ -214,19 +200,18 @@ export const updateSettingsHandler = async (c: HonoContext) => {
     const dbUpdateData: any = {};
     if (updateData.currency !== undefined) dbUpdateData.currency = updateData.currency;
     if (updateData.language !== undefined) dbUpdateData.language = updateData.language;
-    if (updateData.timezone !== undefined) dbUpdateData.timezone = updateData.timezone;
-    if (updateData.date_format !== undefined) dbUpdateData.date_format = updateData.date_format;
-    if (updateData.theme !== undefined) dbUpdateData.theme = updateData.theme;
-    if (updateData.email_notifications !== undefined) dbUpdateData.email_notifications = updateData.email_notifications;
-    if (updateData.sms_notifications !== undefined) dbUpdateData.sms_notifications = updateData.sms_notifications;
-    if (updateData.low_stock_alerts !== undefined) dbUpdateData.low_stock_alerts = updateData.low_stock_alerts;
-    if (updateData.daily_reports !== undefined) dbUpdateData.daily_reports = updateData.daily_reports;
-    if (updateData.weekly_reports !== undefined) dbUpdateData.weekly_reports = updateData.weekly_reports;
-    if (updateData.monthly_reports !== undefined) dbUpdateData.monthly_reports = updateData.monthly_reports;
-    if (updateData.auto_reporting !== undefined) dbUpdateData.auto_reporting = updateData.auto_reporting;
-    if (updateData.business_hours_start !== undefined) dbUpdateData.business_hours_start = updateData.business_hours_start;
-    if (updateData.business_hours_end !== undefined) dbUpdateData.business_hours_end = updateData.business_hours_end;
-    if (updateData.working_days !== undefined) dbUpdateData.working_days = updateData.working_days;
+    // Email configuration
+    if (updateData.email_address !== undefined) dbUpdateData.email_address = updateData.email_address;
+    if (updateData.email_name !== undefined) dbUpdateData.email_name = updateData.email_name;
+    if (updateData.app_password !== undefined) dbUpdateData.app_password = updateData.app_password;
+    if (updateData.email_host !== undefined) dbUpdateData.email_host = updateData.email_host;
+    if (updateData.email_port !== undefined) dbUpdateData.email_port = updateData.email_port;
+    if (updateData.use_tls !== undefined) dbUpdateData.use_tls = updateData.use_tls;
+    // WhatsApp configuration
+    if (updateData.whapi_apikey !== undefined) dbUpdateData.whapi_apikey = updateData.whapi_apikey;
+    if (updateData.instance_id !== undefined) dbUpdateData.instance_id = updateData.instance_id;
+    if (updateData.whapi_phone_number !== undefined) dbUpdateData.whapi_phone_number = updateData.whapi_phone_number;
+    if (updateData.provider_url !== undefined) dbUpdateData.provider_url = updateData.provider_url;
 
     // Update settings in database
     const { data: updatedSettings, error } = await c.get('supabase')
@@ -253,19 +238,18 @@ export const updateSettingsHandler = async (c: HonoContext) => {
         settingId: updatedSettings.setting_id,
         currency: updatedSettings.currency,
         language: updatedSettings.language,
-        timezone: updatedSettings.timezone,
-        dateFormat: updatedSettings.date_format,
-        theme: updatedSettings.theme,
-        emailNotifications: updatedSettings.email_notifications,
-        smsNotifications: updatedSettings.sms_notifications,
-        lowStockAlerts: updatedSettings.low_stock_alerts,
-        dailyReports: updatedSettings.daily_reports,
-        weeklyReports: updatedSettings.weekly_reports,
-        monthlyReports: updatedSettings.monthly_reports,
-        autoReporting: updatedSettings.auto_reporting,
-        businessHoursStart: updatedSettings.business_hours_start,
-        businessHoursEnd: updatedSettings.business_hours_end,
-        workingDays: updatedSettings.working_days,
+        // Email configuration
+        emailAddress: updatedSettings.email_address,
+        emailName: updatedSettings.email_name,
+        appPassword: updatedSettings.app_password,
+        emailHost: updatedSettings.email_host,
+        emailPort: updatedSettings.email_port,
+        useTls: updatedSettings.use_tls,
+        // WhatsApp configuration
+        whapiApikey: updatedSettings.whapi_apikey,
+        instanceId: updatedSettings.instance_id,
+        whapiPhoneNumber: updatedSettings.whapi_phone_number,
+        providerUrl: updatedSettings.provider_url,
         updatedAt: updatedSettings.updated_at,
       },
       timestamp: new Date().toISOString(),

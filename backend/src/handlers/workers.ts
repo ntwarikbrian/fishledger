@@ -451,16 +451,17 @@ export async function authenticateWorker(c: Context): Promise<Response> {
     // Parse and validate request body
     const body = await c.req.json() as WorkerLoginRequest;
     const { email, password } = body;
-
-    // Enhanced validation
     if (!email || !password) {
       return createErrorResponse('Email and password are required', 400);
     }
-
     if (typeof email !== 'string' || typeof password !== 'string') {
       return createErrorResponse('Invalid email or password format', 400);
     }
-
+    // Enhanced security: Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return createErrorResponse('Invalid email format', 400);
+    }
     // Enhanced security: Rate limiting check (basic implementation)
     const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
     console.log(`🔐 Worker login attempt from IP: ${clientIp} for email: ${email}`);
@@ -468,20 +469,7 @@ export async function authenticateWorker(c: Context): Promise<Response> {
     // Get worker by email with enhanced security checks
     const { data: worker, error } = await supabase
       .from('workers')
-      .select(`
-        worker_id,
-        user_id,
-        full_name,
-        email,
-        phone_number,
-        password,
-        monthly_salary,
-        total_revenue_generated,
-        recent_login_history,
-        failed_login_attempts,
-        token_version,
-        created_at
-      `)
+      .select('worker_id, user_id, full_name, email, password, monthly_salary, total_revenue_generated, recent_login_history, created_at, token_version')
       .eq('email', email)
       .single();
 
