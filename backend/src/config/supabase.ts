@@ -58,6 +58,7 @@ export interface Database {
       workers: {
         Row: {
           worker_id: string;
+          user_id: string; // Data isolation: workers belong to specific user
           full_name: string;
           email: string;
           phone_number: string | null;
@@ -71,6 +72,7 @@ export interface Database {
         };
         Insert: {
           worker_id?: string;
+          user_id: string; // Required for data isolation
           full_name: string;
           email: string;
           phone_number?: string | null;
@@ -84,10 +86,13 @@ export interface Database {
         };
         Update: {
           worker_id?: string;
+          user_id?: string;
           full_name?: string;
           email?: string;
           phone_number?: string | null;
-          identification_image_url?: string | null;
+          id_card_front_url?: string | null;
+          id_card_back_url?: string | null;
+          password?: string;
           monthly_salary?: number | null;
           total_revenue_generated?: number;
           recent_login_history?: any | null;
@@ -334,6 +339,7 @@ export interface Database {
       expenses: {
         Row: {
           expense_id: string;
+          user_id: string; // Data isolation: expenses belong to specific user
           title: string;
           category_id: string;
           amount: number;
@@ -346,6 +352,7 @@ export interface Database {
         };
         Insert: {
           expense_id?: string;
+          user_id: string; // Required for data isolation
           title: string;
           category_id: string;
           amount: number;
@@ -358,6 +365,7 @@ export interface Database {
         };
         Update: {
           expense_id?: string;
+          user_id?: string;
           title?: string;
           category_id?: string;
           amount?: number;
@@ -520,6 +528,102 @@ export interface Database {
           working_days?: number[];
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      // Folders table - document organization with data isolation
+      folders: {
+        Row: {
+          folder_id: string;
+          user_id: string; // Data isolation: folders belong to specific user
+          folder_name: string;
+          description: string | null;
+          color: string;
+          icon: string;
+          file_count: number;
+          total_size: number;
+          is_permanent: boolean;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          folder_id?: string;
+          user_id: string; // Required for data isolation
+          folder_name: string;
+          description?: string | null;
+          color?: string;
+          icon?: string;
+          file_count?: number;
+          total_size?: number;
+          is_permanent?: boolean;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          folder_id?: string;
+          user_id?: string;
+          folder_name?: string;
+          description?: string | null;
+          color?: string;
+          icon?: string;
+          file_count?: number;
+          total_size?: number;
+          is_permanent?: boolean;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      // Files table - individual file entries with data isolation
+      files: {
+        Row: {
+          file_id: string;
+          user_id: string; // Data isolation: files belong to specific user
+          file_name: string;
+          file_url: string;
+          cloudinary_public_id: string | null;
+          cloudinary_url: string | null;
+          cloudinary_secure_url: string | null;
+          file_type: string | null;
+          cloudinary_resource_type: string | null;
+          description: string | null;
+          folder_id: string;
+          file_size: number | null;
+          upload_date: string;
+          added_by: string;
+        };
+        Insert: {
+          file_id?: string;
+          user_id: string; // Required for data isolation
+          file_name: string;
+          file_url: string;
+          cloudinary_public_id?: string | null;
+          cloudinary_url?: string | null;
+          cloudinary_secure_url?: string | null;
+          file_type?: string | null;
+          cloudinary_resource_type?: string | null;
+          description?: string | null;
+          folder_id: string;
+          file_size?: number | null;
+          upload_date?: string;
+          added_by: string;
+        };
+        Update: {
+          file_id?: string;
+          user_id?: string;
+          file_name?: string;
+          file_url?: string;
+          cloudinary_public_id?: string | null;
+          cloudinary_url?: string | null;
+          cloudinary_secure_url?: string | null;
+          file_type?: string | null;
+          cloudinary_resource_type?: string | null;
+          description?: string | null;
+          folder_id?: string;
+          file_size?: number | null;
+          upload_date?: string;
+          added_by?: string;
         };
       };
     };

@@ -7,7 +7,10 @@
 CREATE TABLE IF NOT EXISTS deposits (
     -- Primary key
     deposit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
+
+    -- Data isolation
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: deposits belong to specific user
+
     -- Deposit information
     date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deposit_type VARCHAR(10) NOT NULL CHECK (deposit_type IN ('momo', 'bank', 'boss')),
@@ -15,18 +18,18 @@ CREATE TABLE IF NOT EXISTS deposits (
     account_number VARCHAR(50),
     amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),
     to_recipient VARCHAR(100), -- For boss type deposits, specifies who (boss, manager, etc.)
-    
+
     -- Image storage (Cloudinary integration)
     deposit_image_url TEXT,
-    
+
     -- Approval workflow
     approval VARCHAR(10) DEFAULT 'pending' CHECK (approval IN ('pending', 'approved', 'rejected')),
-    
+
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
+    created_by UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID
+    updated_by UUID REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- Create indexes for better performance

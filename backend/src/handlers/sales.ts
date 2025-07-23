@@ -132,7 +132,7 @@ export const getSalesHandler = async (c: HonoContext) => {
           name
         )
       ),
-      users (
+      users!performed_by (
         user_id,
         owner_name,
         business_name
@@ -247,7 +247,7 @@ export const getSaleHandler = async (c: HonoContext) => {
           name
         )
       ),
-      users (
+      users!performed_by (
         user_id,
         owner_name,
         business_name
@@ -398,29 +398,31 @@ export const createSaleHandler = async (c: HonoContext) => {
     const profitPerBox = box_price - (product.cost_per_box || 0);
     const profitPerKg = kg_price - (product.cost_per_kg || 0);
 
-    // Record the sale in the database
+    // Record the sale in the database with data isolation
+    const saleData = addUserIdToInsertData(c, {
+      product_id: product_id,
+      boxes_quantity: finalBoxQty, // Boxes used in conversion (for audit trail)
+      kg_quantity: totalKgSold, // Total kg sold to customer
+      box_price: box_price, // Price per box at time of sale
+      kg_price: kg_price, // Price per kg at time of sale
+      profit_per_box: profitPerBox,
+      profit_per_kg: profitPerKg,
+      total_amount: total_amount,
+      amount_paid: amountPaid,
+      remaining_amount: remainingAmount,
+      payment_status: payment_status,
+      payment_method: payment_method,
+      performed_by: c.get('user')?.id || 'system', // Get from authenticated user
+      client_id: client_id,
+      client_name: client_name,
+      email_address: email_address,
+      phone: phone,
+      date_time: new Date().toISOString(),
+    });
+
     const { data: newSale, error: saleError } = await c.get('supabase')
       .from('sales')
-      .insert({
-        product_id: product_id,
-        boxes_quantity: finalBoxQty, // Boxes used in conversion (for audit trail)
-        kg_quantity: totalKgSold, // Total kg sold to customer
-        box_price: box_price, // Price per box at time of sale
-        kg_price: kg_price, // Price per kg at time of sale
-        profit_per_box: profitPerBox,
-        profit_per_kg: profitPerKg,
-        total_amount: total_amount,
-        amount_paid: amountPaid,
-        remaining_amount: remainingAmount,
-        payment_status: payment_status,
-        payment_method: payment_method,
-        performed_by: c.get('user')?.id || 'system', // Get from authenticated user
-        client_id: client_id,
-        client_name: client_name,
-        email_address: email_address,
-        phone: phone,
-        date_time: new Date().toISOString(),
-      })
+      .insert(saleData)
       .select()
       .single();
 
@@ -671,29 +673,31 @@ export const createFishSaleHandler = async (c: HonoContext) => {
     const profitPerBox = box_price - (product.cost_per_box || 0);
     const profitPerKg = kg_price - (product.cost_per_kg || 0);
 
-    // Record the sale
+    // Record the sale with data isolation
+    const saleData = addUserIdToInsertData(c, {
+      product_id,
+      boxes_quantity: parseInt(requested_boxes.toString()) || 0, // Record the originally requested boxes
+      kg_quantity: parseFloat(requested_kg.toString()) || 0, // Record the originally requested kg
+      box_price,
+      kg_price,
+      profit_per_box: profitPerBox,
+      profit_per_kg: profitPerKg,
+      total_amount,
+      amount_paid: amountPaid,
+      remaining_amount: remainingAmount,
+      payment_status,
+      payment_method,
+      performed_by: c.get('user')?.id || 'system',
+      client_id,
+      client_name,
+      email_address,
+      phone,
+      date_time: new Date().toISOString(),
+    });
+
     const { data: newSale, error: saleError } = await c.get('supabase')
       .from('sales')
-      .insert({
-        product_id,
-        boxes_quantity: parseInt(requested_boxes.toString()) || 0, // Record the originally requested boxes
-        kg_quantity: parseFloat(requested_kg.toString()) || 0, // Record the originally requested kg
-        box_price,
-        kg_price,
-        profit_per_box: profitPerBox,
-        profit_per_kg: profitPerKg,
-        total_amount,
-        amount_paid: amountPaid,
-        remaining_amount: remainingAmount,
-        payment_status,
-        payment_method,
-        performed_by: c.get('user')?.id || 'system',
-        client_id,
-        client_name,
-        email_address,
-        phone,
-        date_time: new Date().toISOString(),
-      })
+      .insert(saleData)
       .select()
       .single();
 
@@ -895,12 +899,14 @@ export const updateSaleHandler = async (c: HonoContext) => {
     });
 
     // Create audit record instead of direct update
+    const currentUserId = getUserIdFromContext(c);
     const auditResult = await createAuditRecord(
       c.get('supabase'),
       id,
       auditType,
       reason,
       userId,
+      currentUserId, // Add userId parameter for data isolation
       {
         boxesChange,
         kgChange,
@@ -978,12 +984,14 @@ export const deleteSaleHandler = async (c: HonoContext) => {
     }
 
     // Create audit record for deletion request
+    const currentUserId = getUserIdFromContext(c);
     const auditResult = await createAuditRecord(
       c.get('supabase'),
       id,
       'deletion',
       reason,
       userId,
+      currentUserId, // Add userId parameter for data isolation
       {
         boxesChange: 0, // Deletion audits should not have quantity changes
         kgChange: 0,    // Deletion audits should not have quantity changes

@@ -95,6 +95,7 @@ export interface CreateCategoryData {
 
 export interface FolderData {
   folder_id: string;
+  user_id: string; // Data isolation: folders belong to specific user
   folder_name: string;
   description?: string;
   color: string;
@@ -104,6 +105,7 @@ export interface FolderData {
   is_permanent?: boolean; // Whether this is a permanent system folder
   created_by: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateFolderData {
@@ -128,6 +130,7 @@ export type CloudinaryResourceType = 'image' | 'video' | 'raw' | 'auto';
 
 export interface FileData {
   file_id: string;
+  user_id: string; // Data isolation: files belong to specific user
   file_name: string;
   file_url: string;
   cloudinary_public_id?: string;

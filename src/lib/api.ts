@@ -819,6 +819,7 @@ export const foldersApi = {
  */
 export interface FileData {
   file_id: string;
+  user_id: string; // Data isolation: files belong to specific user
   file_name: string;
   file_url: string;
   cloudinary_public_id?: string;

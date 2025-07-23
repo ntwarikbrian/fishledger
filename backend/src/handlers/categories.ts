@@ -26,7 +26,6 @@ import {
   throwValidationError,
   throwNotFoundError,
   throwConflictError,
-  throwBusinessLogicError,
 } from '../middleware/error-handler';
 
 // Validation schemas
@@ -295,11 +294,16 @@ export const deleteCategoryHandler = asyncHandler(async (c: HonoContext) => {
   }
 
   if (productsUsingCategory && productsUsingCategory.length > 0) {
-    throwBusinessLogicError(
-      'Cannot delete category because it is being used by one or more products. Please remove all products from this category first.',
-      409,
-      { productsCount: productsUsingCategory.length },
-    );
+    return c.json({
+      success: false,
+      error: 'Cannot delete category because it is being used by one or more products. Please remove all products from this category first.',
+      details: {
+        productsCount: productsUsingCategory.length,
+        reason: 'Category is in use by products'
+      },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 409);
   }
 
   // Delete category with data isolation

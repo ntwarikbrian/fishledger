@@ -57,12 +57,88 @@ CREATE TABLE IF NOT EXISTS workers (
     password VARCHAR(255) NOT NULL, -- Hashed password for authentication
     monthly_salary DECIMAL(10,2),
     total_revenue_generated DECIMAL(12,2) DEFAULT 0,
-    recent_login_history JSONB, -- Store recent login timestamps as JSON
+
+    -- Session Management Fields
+    refresh_token_hash VARCHAR(255), -- Hashed refresh token for security
+    token_version INTEGER DEFAULT 1, -- For token invalidation and security
+    session_expires_at TIMESTAMP WITH TIME ZONE, -- Current session expiration
+    last_login_at TIMESTAMP WITH TIME ZONE, -- Last successful login
+    last_login_ip INET, -- Last login IP address
+    last_login_user_agent TEXT, -- Last login user agent
+    is_session_active BOOLEAN DEFAULT false, -- Whether worker has active session
+
+    -- Enhanced Login History
+    recent_login_history JSONB, -- Store detailed login history as JSON
+    failed_login_attempts JSONB, -- Store failed login attempts for security
+
+    -- Audit Fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Ensure worker emails are unique per business
     UNIQUE(user_id, email)
 );
+
+
+
+-- Indexes for workers table performance
+CREATE INDEX IF NOT EXISTS idx_workers_user_id ON workers(user_id);
+CREATE INDEX IF NOT EXISTS idx_workers_email ON workers(email);
+CREATE INDEX IF NOT EXISTS idx_workers_session_active ON workers(is_session_active) WHERE is_session_active = true;
+CREATE INDEX IF NOT EXISTS idx_workers_session_expires ON workers(session_expires_at);
+CREATE INDEX IF NOT EXISTS idx_workers_last_login ON workers(last_login_at);
+CREATE INDEX IF NOT EXISTS idx_workers_token_version ON workers(worker_id, token_version);
+
+-- Function to automatically update updated_at timestamp for workers
+CREATE OR REPLACE FUNCTION update_workers_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update updated_at on workers table updates
+CREATE TRIGGER trigger_update_workers_updated_at
+    BEFORE UPDATE ON workers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_workers_updated_at();
+
+-- Function to clean up expired worker sessions
+CREATE OR REPLACE FUNCTION cleanup_expired_worker_sessions()
+RETURNS INTEGER AS $$
+DECLARE
+    updated_count INTEGER;
+BEGIN
+    UPDATE workers
+    SET is_session_active = false,
+        refresh_token_hash = NULL,
+        session_expires_at = NULL
+    WHERE session_expires_at < CURRENT_TIMESTAMP
+    AND is_session_active = true;
+
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to invalidate all sessions for a worker (useful for security incidents)
+CREATE OR REPLACE FUNCTION invalidate_worker_sessions(p_worker_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    updated_count INTEGER;
+BEGIN
+    UPDATE workers
+    SET is_session_active = false,
+        refresh_token_hash = NULL,
+        session_expires_at = NULL,
+        token_version = token_version + 1
+    WHERE worker_id = p_worker_id;
+
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RETURN updated_count > 0;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 3. EXPENSE CATEGORIES TABLE
@@ -932,6 +1008,7 @@ CREATE TRIGGER validate_file_data_trigger
 -- Sales Audit Trail Table
 CREATE TABLE IF NOT EXISTS sales_audit (
     audit_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: audit records belong to specific user
     timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     sale_id UUID REFERENCES sales(id) ON DELETE SET NULL,
     audit_type VARCHAR(50) NOT NULL CHECK (audit_type IN ('quantity_change', 'payment_method_change', 'deletion')),
@@ -956,6 +1033,7 @@ CREATE TABLE IF NOT EXISTS sales_audit (
 );
 
 -- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_sales_audit_user_id ON sales_audit(user_id);
 CREATE INDEX IF NOT EXISTS idx_sales_audit_sale_id ON sales_audit(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sales_audit_timestamp ON sales_audit(timestamp);
 CREATE INDEX IF NOT EXISTS idx_sales_audit_audit_type ON sales_audit(audit_type);
@@ -1185,6 +1263,9 @@ CREATE TABLE IF NOT EXISTS deposits (
     -- Primary key
     deposit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+    -- Data isolation
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: deposits belong to specific user
+
     -- Deposit information
     date_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deposit_type VARCHAR(10) NOT NULL CHECK (deposit_type IN ('momo', 'bank', 'boss')),
@@ -1201,9 +1282,9 @@ CREATE TABLE IF NOT EXISTS deposits (
 
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
+    created_by UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID
+    updated_by UUID REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- Create indexes for deposits table

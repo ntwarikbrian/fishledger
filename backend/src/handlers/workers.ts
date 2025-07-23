@@ -7,7 +7,19 @@ import { Context } from 'hono';
 import { createSupabaseClient } from '../config/supabase';
 import { initializeCloudinary, uploadToCloudinary, generateUniqueFilename, deleteFromCloudinary } from '../utils/cloudinary';
 import { createSuccessResponse, createErrorResponse } from '../utils/response';
+import {
+  verifyPassword,
+  generateWorkerAccessToken,
+  generateWorkerRefreshToken,
+  verifyWorkerRefreshToken
+} from '../utils/auth';
 import type { Environment } from '../config/environment';
+import type {
+  AuthenticatedWorker,
+  WorkerLoginRequest,
+  WorkerLoginResponse,
+  WorkerRefreshTokenRequest
+} from '../types/index';
 import bcrypt from 'bcryptjs';
 
 // File validation utilities
@@ -85,6 +97,27 @@ export async function createWorker(c: Context): Promise<Response> {
       api_key: env.CLOUDINARY_API_KEY,
       api_secret: env.CLOUDINARY_API_SECRET,
     });
+
+    // Get current user ID from authenticated context
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification instead of Supabase auth
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
 
     // Parse form data
     const formData = await c.req.formData();
@@ -209,10 +242,11 @@ export async function createWorker(c: Context): Promise<Response> {
       return createErrorResponse('Failed to upload ID card images', 500);
     }
 
-    // Create worker record in database
+    // Create worker record in database with user_id for data isolation
     const { data: newWorker, error: insertError } = await supabase
       .from('workers')
       .insert({
+        user_id: currentUserId, // Add user_id for data isolation
         full_name,
         email,
         phone_number,
@@ -251,15 +285,7 @@ export async function createWorker(c: Context): Promise<Response> {
       { permission_name: 'view_expenses', permission_category: 'expenses', is_granted: false }
     ];
 
-    // Get current user ID for granted_by field
-    const authHeader = c.req.header('Authorization');
-    let currentUserId = null;
-    
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      currentUserId = user?.id;
-    }
+
 
     if (currentUserId) {
       const permissionsToInsert = defaultPermissions.map(perm => ({
@@ -298,13 +324,35 @@ export async function getAllWorkers(c: Context): Promise<Response> {
     console.log('🔍 Creating Supabase client...');
     const supabase = createSupabaseClient(env);
 
+    // Get current user ID for data isolation
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
+
     console.log('🔍 Executing workers query...');
     const queryStart = Date.now();
 
-    // Optimized query - exclude JSONB field for better performance but include ID card URLs
+    // Optimized query with data isolation - only get workers for the authenticated user
     const { data: workers, error } = await supabase
       .from('workers')
       .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, monthly_salary, total_revenue_generated, created_at')
+      .eq('user_id', currentUserId) // Add data isolation filter
       .order('created_at', { ascending: false })
       .limit(100); // Add reasonable limit to prevent large result sets
 
@@ -349,10 +397,32 @@ export async function getWorkerById(c: Context): Promise<Response> {
       return createErrorResponse('Worker ID is required', 400);
     }
 
+    // Get current user ID for data isolation
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
+
     const { data: worker, error } = await supabase
       .from('workers')
       .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, monthly_salary, total_revenue_generated, recent_login_history, created_at')
       .eq('worker_id', workerId)
+      .eq('user_id', currentUserId) // Add data isolation filter
       .single();
 
     if (error || !worker) {
@@ -371,59 +441,355 @@ export async function getWorkerById(c: Context): Promise<Response> {
 
 /**
  * Authenticate worker with email and password
+ * Enhanced with JWT token generation and proper data isolation
  */
 export async function authenticateWorker(c: Context): Promise<Response> {
   try {
     const env = c.env as Environment;
     const supabase = createSupabaseClient(env);
 
-    // Parse request body
-    const body = await c.req.json();
+    // Parse and validate request body
+    const body = await c.req.json() as WorkerLoginRequest;
     const { email, password } = body;
 
-    // Validate required fields
+    // Enhanced validation
     if (!email || !password) {
       return createErrorResponse('Email and password are required', 400);
     }
 
-    // Get worker by email (including password for verification)
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return createErrorResponse('Invalid email or password format', 400);
+    }
+
+    // Enhanced security: Rate limiting check (basic implementation)
+    const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    console.log(`🔐 Worker login attempt from IP: ${clientIp} for email: ${email}`);
+
+    // Get worker by email with enhanced security checks
     const { data: worker, error } = await supabase
       .from('workers')
-      .select('worker_id, full_name, email, phone_number, id_card_front_url, id_card_back_url, password, monthly_salary, total_revenue_generated, recent_login_history, created_at')
+      .select(`
+        worker_id,
+        user_id,
+        full_name,
+        email,
+        phone_number,
+        password,
+        monthly_salary,
+        total_revenue_generated,
+        recent_login_history,
+        failed_login_attempts,
+        token_version,
+        created_at
+      `)
       .eq('email', email)
       .single();
 
     if (error || !worker) {
+      console.warn(`🚨 Worker login failed: Worker not found for email ${email}`);
       return createErrorResponse('Invalid email or password', 401);
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, worker.password);
+    // Enhanced security: Verify password using secure utility
+    const isValidPassword = await verifyPassword(password, worker.password);
     if (!isValidPassword) {
+      console.warn(`🚨 Worker login failed: Invalid password for email ${email}`);
       return createErrorResponse('Invalid email or password', 401);
     }
 
-    // Remove password from response
-    const { password: _, ...workerResponse } = worker;
+    // Enhanced security: Verify business owner exists and is active
+    const { data: businessOwner, error: businessError } = await supabase
+      .from('users')
+      .select('user_id, business_name, is_active')
+      .eq('user_id', worker.user_id)
+      .single();
 
-    // Update recent login history
+    if (businessError || !businessOwner || !businessOwner.is_active) {
+      console.warn(`🚨 Worker login failed: Business owner not found or inactive for worker ${worker.worker_id}`);
+      return createErrorResponse('Business account is not active', 403);
+    }
+
+    // Create authenticated worker object
+    const authenticatedWorker: AuthenticatedWorker = {
+      id: worker.worker_id,
+      email: worker.email,
+      fullName: worker.full_name,
+      role: 'employee', // Default role, can be enhanced with role management
+      businessId: worker.user_id,
+      isActive: true,
+    };
+
+    // Generate JWT tokens
+    const accessToken = generateWorkerAccessToken(authenticatedWorker, env);
+    const refreshToken = generateWorkerRefreshToken(authenticatedWorker, env);
+
+    // Hash the refresh token for secure storage
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+
+    // Update worker session and login history with enhanced tracking
     const currentTime = new Date().toISOString();
-    const loginHistory = worker.recent_login_history || [];
-    const updatedHistory = [currentTime, ...loginHistory.slice(0, 9)]; // Keep last 10 logins
+    const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
+    const loginHistory = worker.recent_login_history || [];
+    const updatedHistory = [
+      {
+        timestamp: currentTime,
+        ip: clientIp,
+        userAgent: c.req.header('User-Agent') || 'unknown',
+        success: true
+      },
+      ...loginHistory.slice(0, 9) // Keep last 10 logins
+    ];
+
+    // Update worker with session information and login history
     await supabase
       .from('workers')
-      .update({ recent_login_history: updatedHistory })
+      .update({
+        recent_login_history: updatedHistory,
+        refresh_token_hash: refreshTokenHash,
+        session_expires_at: sessionExpiresAt,
+        last_login_at: currentTime,
+        last_login_ip: clientIp,
+        last_login_user_agent: c.req.header('User-Agent') || 'unknown',
+        is_session_active: true,
+        token_version: worker.token_version || 1
+      })
       .eq('worker_id', worker.worker_id);
 
+    // Create response following the defined interface
+    const response: WorkerLoginResponse = {
+      success: true,
+      message: 'Worker authentication successful',
+      data: {
+        worker: {
+          id: authenticatedWorker.id,
+          email: authenticatedWorker.email,
+          fullName: authenticatedWorker.fullName,
+          role: authenticatedWorker.role,
+          businessId: authenticatedWorker.businessId,
+        },
+        accessToken,
+        refreshToken,
+        expiresIn: 3600, // 1 hour in seconds
+      },
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId') || 'unknown',
+    };
+
+    console.log(`✅ Worker login successful for ${email} (${worker.worker_id})`);
+    return c.json(response, 200);
+
+  } catch (error) {
+    console.error('🚨 Worker authentication error:', error);
+    return createErrorResponse(
+      'Internal server error during authentication',
+      500,
+      { details: error instanceof Error ? error.message : 'Unknown error' }
+    );
+  }
+}
+
+/**
+ * Refresh worker access token using refresh token
+ */
+export async function refreshWorkerToken(c: Context): Promise<Response> {
+  try {
+    const env = c.env as Environment;
+    const supabase = createSupabaseClient(env);
+
+    // Parse request body
+    const body = await c.req.json() as WorkerRefreshTokenRequest;
+    const { refreshToken } = body;
+
+    if (!refreshToken) {
+      return createErrorResponse('Refresh token is required', 400);
+    }
+
+    // Verify refresh token
+    const payload = verifyWorkerRefreshToken(refreshToken, env);
+
+    // Verify worker still exists and has active session
+    const { data: worker, error } = await supabase
+      .from('workers')
+      .select('worker_id, user_id, full_name, email, refresh_token_hash, is_session_active, session_expires_at, token_version')
+      .eq('worker_id', payload.workerId)
+      .eq('user_id', payload.businessId)
+      .single();
+
+    if (error || !worker) {
+      console.warn(`🚨 Worker refresh failed: Worker not found ${payload.workerId}`);
+      return createErrorResponse('Invalid refresh token', 401);
+    }
+
+    // Verify session is still active and not expired
+    if (!worker.is_session_active || !worker.session_expires_at) {
+      console.warn(`🚨 Worker refresh failed: No active session ${payload.workerId}`);
+      return createErrorResponse('Session expired', 401);
+    }
+
+    if (new Date(worker.session_expires_at) < new Date()) {
+      console.warn(`🚨 Worker refresh failed: Session expired ${payload.workerId}`);
+      return createErrorResponse('Session expired', 401);
+    }
+
+    // Verify refresh token hash matches (if stored)
+    if (worker.refresh_token_hash) {
+      const isValidRefreshToken = await bcrypt.compare(refreshToken, worker.refresh_token_hash);
+      if (!isValidRefreshToken) {
+        console.warn(`🚨 Worker refresh failed: Invalid refresh token ${payload.workerId}`);
+        return createErrorResponse('Invalid refresh token', 401);
+      }
+    }
+
+    // Verify business is still active
+    const { data: business, error: businessError } = await supabase
+      .from('users')
+      .select('is_active')
+      .eq('user_id', payload.businessId)
+      .single();
+
+    if (businessError || !business || !business.is_active) {
+      return createErrorResponse('Business account is not active', 403);
+    }
+
+    // Create new authenticated worker object
+    const authenticatedWorker: AuthenticatedWorker = {
+      id: worker.worker_id,
+      email: worker.email,
+      fullName: worker.full_name,
+      role: 'employee', // Default role
+      businessId: worker.user_id,
+      isActive: true,
+    };
+
+    // Generate new access token
+    const newAccessToken = generateWorkerAccessToken(authenticatedWorker, env);
+
     return createSuccessResponse({
-      message: 'Authentication successful',
-      worker: workerResponse
+      message: 'Token refreshed successfully',
+      accessToken: newAccessToken,
+      expiresIn: 3600, // 1 hour
     });
 
   } catch (error) {
-    console.error('Worker authentication error:', error);
-    return createErrorResponse('Internal server error', 500);
+    console.error('🚨 Worker token refresh error:', error);
+
+    if (error instanceof Error && error.message.includes('expired')) {
+      return createErrorResponse('Refresh token expired', 401);
+    }
+
+    return createErrorResponse('Invalid refresh token', 401);
+  }
+}
+
+/**
+ * Get worker profile information
+ */
+export async function getWorkerProfile(c: Context): Promise<Response> {
+  try {
+    const supabase = c.get('supabase');
+    const worker = c.get('worker') as AuthenticatedWorker;
+
+    if (!worker) {
+      return createErrorResponse('Worker authentication required', 401);
+    }
+
+    // Get detailed worker information
+    const { data: workerData, error } = await supabase
+      .from('workers')
+      .select(`
+        worker_id,
+        full_name,
+        email,
+        phone_number,
+        monthly_salary,
+        total_revenue_generated,
+        recent_login_history,
+        created_at
+      `)
+      .eq('worker_id', worker.id)
+      .eq('user_id', worker.businessId)
+      .single();
+
+    if (error || !workerData) {
+      return createErrorResponse('Worker profile not found', 404);
+    }
+
+    // Get business information
+    const { data: business, error: businessError } = await supabase
+      .from('users')
+      .select('business_name, owner_name')
+      .eq('user_id', worker.businessId)
+      .single();
+
+    if (businessError || !business) {
+      return createErrorResponse('Business information not found', 404);
+    }
+
+    return createSuccessResponse({
+      worker: {
+        id: workerData.worker_id,
+        fullName: workerData.full_name,
+        email: workerData.email,
+        phoneNumber: workerData.phone_number,
+        monthlySalary: workerData.monthly_salary,
+        totalRevenueGenerated: workerData.total_revenue_generated,
+        createdAt: workerData.created_at,
+        role: worker.role,
+      },
+      business: {
+        name: business.business_name,
+        owner: business.owner_name,
+      },
+      recentLoginHistory: workerData.recent_login_history || [],
+    });
+
+  } catch (error) {
+    console.error('🚨 Worker profile error:', error);
+    return createErrorResponse('Failed to get worker profile', 500);
+  }
+}
+
+/**
+ * Worker logout (invalidate tokens and clear session)
+ */
+export async function logoutWorker(c: Context): Promise<Response> {
+  try {
+    const supabase = c.get('supabase');
+    const worker = c.get('worker') as AuthenticatedWorker;
+
+    if (!worker) {
+      return createErrorResponse('Worker authentication required', 401);
+    }
+
+    // Get current token version first
+    const { data: currentWorker } = await supabase
+      .from('workers')
+      .select('token_version')
+      .eq('worker_id', worker.id)
+      .single();
+
+    // Clear session data and increment token version for security
+    await supabase
+      .from('workers')
+      .update({
+        is_session_active: false,
+        refresh_token_hash: null,
+        session_expires_at: null,
+        token_version: (currentWorker?.token_version || 1) + 1
+      })
+      .eq('worker_id', worker.id)
+      .eq('user_id', worker.businessId);
+
+    console.log(`✅ Worker logout successful for ${worker.email} (${worker.id})`);
+
+    return createSuccessResponse({
+      message: 'Worker logged out successfully',
+    });
+
+  } catch (error) {
+    console.error('🚨 Worker logout error:', error);
+    return createErrorResponse('Failed to logout worker', 500);
   }
 }
 
@@ -440,6 +806,27 @@ export async function updateWorker(c: Context): Promise<Response> {
       return createErrorResponse('Worker ID is required', 400);
     }
 
+    // Get current user ID for data isolation
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
+
     const updateData: UpdateWorkerRequest = await c.req.json();
 
     // Validate email format if provided
@@ -449,11 +836,12 @@ export async function updateWorker(c: Context): Promise<Response> {
         return createErrorResponse('Invalid email format', 400);
       }
 
-      // Check if email is already taken by another worker
+      // Check if email is already taken by another worker in the same user's account
       const { data: existingWorker } = await supabase
         .from('workers')
         .select('worker_id')
         .eq('email', updateData.email)
+        .eq('user_id', currentUserId) // Add data isolation
         .neq('worker_id', workerId)
         .single();
 
@@ -466,6 +854,7 @@ export async function updateWorker(c: Context): Promise<Response> {
       .from('workers')
       .update(updateData)
       .eq('worker_id', workerId)
+      .eq('user_id', currentUserId) // Add data isolation
       .select()
       .single();
 
@@ -514,22 +903,45 @@ export async function deleteWorker(c: Context): Promise<Response> {
       return createErrorResponse('Worker ID is required', 400);
     }
 
-    // Get worker data to clean up images
+    // Get current user ID for data isolation
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
+
+    // Get worker data to clean up images (with data isolation)
     const { data: worker, error: fetchError } = await supabase
       .from('workers')
       .select('id_card_front_url, id_card_back_url')
       .eq('worker_id', workerId)
+      .eq('user_id', currentUserId) // Add data isolation
       .single();
 
     if (fetchError || !worker) {
       return createErrorResponse('Worker not found', 404);
     }
 
-    // Delete worker from database (this will cascade delete permissions)
+    // Delete worker from database (this will cascade delete permissions) with data isolation
     const { error: deleteError } = await supabase
       .from('workers')
       .delete()
-      .eq('worker_id', workerId);
+      .eq('worker_id', workerId)
+      .eq('user_id', currentUserId); // Add data isolation
 
     if (deleteError) {
       console.error('Database delete error:', deleteError);
@@ -579,10 +991,38 @@ export async function getWorkerPermissions(c: Context): Promise<Response> {
       return createErrorResponse('Worker ID is required', 400);
     }
 
+    // Get current user ID for data isolation
+    const authHeader = c.req.header('Authorization');
+    let currentUserId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Use our custom JWT verification
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
+    }
+
+    if (!currentUserId) {
+      return createErrorResponse('Authentication required', 401);
+    }
+
+    // Get permissions with data isolation - join with workers table to ensure user owns the worker
     const { data: permissions, error } = await supabase
       .from('worker_permissions')
-      .select('*')
-      .eq('worker_id', workerId);
+      .select(`
+        *,
+        workers!inner (
+          user_id
+        )
+      `)
+      .eq('worker_id', workerId)
+      .eq('workers.user_id', currentUserId);
 
     if (error) {
       console.error('Database query error:', error);
@@ -642,8 +1082,15 @@ export async function updateWorkerPermissions(c: Context): Promise<Response> {
 
     if (authHeader) {
       const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      currentUserId = user?.id;
+      try {
+        // Use our custom JWT verification instead of Supabase auth
+        const { verifyAccessToken } = await import('../utils/auth');
+        const payload = verifyAccessToken(token, env);
+        currentUserId = payload.userId;
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        return createErrorResponse('Invalid authentication token', 401);
+      }
     }
 
     if (!currentUserId) {

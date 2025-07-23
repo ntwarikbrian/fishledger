@@ -25,6 +25,12 @@ import {
   validateFileSize,
   generateUniqueFilename,
 } from '../utils/cloudinary';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData,
+} from '../middleware/data-isolation';
 
 // Validation schemas - Updated to match database schema
 const getFilesQuerySchema = z.object({
@@ -64,24 +70,16 @@ export const getFilesHandler = async (c: HonoContext) => {
     }
 
     const { page, limit, sortBy, sortOrder, search, folder_id } = validation.data;
-    const user = c.get('user');
 
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Build query - Get files from folders created by the authenticated user
-    let query = c.get('supabase')
-      .from('files')
-      .select(`
-        *,
-        folders!inner (
-          folder_id,
-          folder_name,
-          created_by
-        )
-      `)
-      .eq('folders.created_by', user.id);
+    // Build query with data isolation - Get files for the authenticated user
+    let query = createUserFilteredQuery(c, 'files', `
+      *,
+      folders!inner (
+        folder_id,
+        folder_name,
+        user_id
+      )
+    `);
 
     // Filter by folder if specified
     if (folder_id) {
@@ -93,13 +91,20 @@ export const getFilesHandler = async (c: HonoContext) => {
       query = applySearch(query, search, ['file_name', 'description']);
     }
 
-    // Get total count for pagination - simplified approach
-    const { count: totalCount, error: countError } = await c.get('supabase')
+    // Get total count for pagination using data isolation
+    const userId = getUserIdFromContext(c);
+    const countQuery = c.get('supabase')
       .from('files')
       .select('file_id', { count: 'exact', head: true })
-      .eq('folder_id', folder_id || '');
+      .eq('user_id', userId);
 
-    if (countError && folder_id) {
+    if (folder_id) {
+      countQuery.eq('folder_id', folder_id);
+    }
+
+    const { count: totalCount, error: countError } = await countQuery;
+
+    if (countError) {
       throw new Error(`Failed to get file count: ${countError.message}`);
     }
 
@@ -137,24 +142,16 @@ export const getFilesByFolderHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const user = c.get('user');
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Get files from the specified folder - ensure folder belongs to user
-    const { data: files, error } = await c.get('supabase')
-      .from('files')
-      .select(`
-        *,
-        folders!inner (
-          folder_id,
-          folder_name,
-          created_by
-        )
-      `)
-      .eq('folder_id', folderId)
-      .eq('folders.created_by', user.id);
+    // Get files from the specified folder with data isolation
+    const { data: files, error } = await createUserFilteredQuery(c, 'files', `
+      *,
+      folders!inner (
+        folder_id,
+        folder_name,
+        user_id
+      )
+    `)
+      .eq('folder_id', folderId);
 
     if (error) {
       throw new Error(`Failed to fetch files: ${error.message}`);
@@ -179,24 +176,16 @@ export const getFileHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('File ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const user = c.get('user');
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Get file from database - ensure it belongs to a folder created by the user
-    const { data: file, error } = await c.get('supabase')
-      .from('files')
-      .select(`
-        *,
-        folders!inner (
-          folder_id,
-          folder_name,
-          created_by
-        )
-      `)
+    // Get file from database with data isolation
+    const { data: file, error } = await createUserFilteredQuery(c, 'files', `
+      *,
+      folders!inner (
+        folder_id,
+        folder_name,
+        user_id
+      )
+    `)
       .eq('file_id', id)
-      .eq('folders.created_by', user.id)
       .single();
 
     if (error && error.code === 'PGRST116') {
@@ -239,12 +228,9 @@ export const uploadSingleFileHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    // Validate folder exists and belongs to user
-    const { data: folder, error: folderError } = await c.get('supabase')
-      .from('folders')
-      .select('folder_id, file_count, total_size')
+    // Validate folder exists and belongs to user using data isolation
+    const { data: folder, error: folderError } = await createUserFilteredQuery(c, 'folders', 'folder_id, file_count, total_size')
       .eq('folder_id', folderId)
-      .eq('created_by', user.id)
       .single();
 
     if (folderError && folderError.code === 'PGRST116') {
@@ -287,23 +273,26 @@ export const uploadSingleFileHandler = async (c: HonoContext) => {
       tags: ['document', 'local-fishing'],
     });
 
-    // Insert file record into database - using correct column names from schema
+    // Insert file record into database with data isolation
+    const userId = getUserIdFromContext(c);
+    const fileData = addUserIdToInsertData(c, {
+      file_name: file.name,
+      file_url: cloudinaryResult.secure_url, // Use Cloudinary secure URL
+      cloudinary_public_id: cloudinaryResult.public_id,
+      cloudinary_url: cloudinaryResult.url,
+      cloudinary_secure_url: cloudinaryResult.secure_url,
+      cloudinary_resource_type: cloudinaryResult.resource_type,
+      file_type: file.type,
+      file_size: file.size,
+      folder_id: folderId,
+      description: description || null,
+      upload_date: new Date().toISOString(),
+      added_by: userId,
+    });
+
     const { data: newFile, error: insertError } = await c.get('supabase')
       .from('files')
-      .insert({
-        file_name: file.name,
-        file_url: cloudinaryResult.secure_url, // Use Cloudinary secure URL
-        cloudinary_public_id: cloudinaryResult.public_id,
-        cloudinary_url: cloudinaryResult.url,
-        cloudinary_secure_url: cloudinaryResult.secure_url,
-        cloudinary_resource_type: cloudinaryResult.resource_type,
-        file_type: file.type,
-        file_size: file.size,
-        folder_id: folderId,
-        description: description || null,
-        upload_date: new Date().toISOString(),
-        added_by: user.id, // Add the required added_by field
-      })
+      .insert(fileData)
       .select('*')
       .single();
 
@@ -311,14 +300,15 @@ export const uploadSingleFileHandler = async (c: HonoContext) => {
       throw new Error(`Failed to save file record: ${insertError.message}`);
     }
 
-    // Update folder file count
+    // Update folder file count with data isolation
     await c.get('supabase')
       .from('folders')
       .update({
         file_count: folder.file_count + 1,
         total_size: folder.total_size + file.size
       })
-      .eq('folder_id', folderId);
+      .eq('folder_id', folderId)
+      .eq('user_id', userId);
 
     return c.json({
       success: true,
@@ -370,25 +360,19 @@ export const deleteFileHandler = async (c: HonoContext) => {
     const user = c.get('user');
     console.log('👤 User attempting deletion:', user ? { id: user.id, email: user.email } : 'NO USER');
 
-    if (!user) {
-      console.log('❌ User not authenticated');
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // First, get the file details to get Cloudinary public_id
+    // First, get the file details to get Cloudinary public_id using data isolation
     console.log('🔍 Fetching file details for deletion...');
-    const { data: file, error: fetchError } = await c.get('supabase')
-      .from('files')
-      .select(`
-        file_id,
-        cloudinary_public_id,
-        cloudinary_resource_type,
-        folders!inner (
-          created_by
-        )
-      `)
+    const { data: file, error: fetchError } = await createUserFilteredQuery(c, 'files', `
+      file_id,
+      cloudinary_public_id,
+      cloudinary_resource_type,
+      file_size,
+      folder_id,
+      folders!inner (
+        user_id
+      )
+    `)
       .eq('file_id', id)
-      .eq('folders.created_by', user.id)
       .single();
 
     console.log('📊 File fetch result:', {
@@ -425,12 +409,14 @@ export const deleteFileHandler = async (c: HonoContext) => {
       }
     }
 
-    // Delete file from database
+    // Delete file from database with data isolation
     console.log('🗑️ Deleting file from database...');
+    const userId = getUserIdFromContext(c);
     const { error: deleteError } = await c.get('supabase')
       .from('files')
       .delete()
-      .eq('file_id', id);
+      .eq('file_id', id)
+      .eq('user_id', userId);
 
     if (deleteError) {
       console.error('💥 Database deletion failed:', deleteError);
@@ -480,17 +466,16 @@ export const updateFileHandler = async (c: HonoContext) => {
       return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
     }
 
-    const user = c.get('user');
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
+    // Validate user_id in update data for data isolation
+    const validatedUpdateData = validateUserIdInUpdateData(c, validation.data);
 
-    // Update file metadata in database
+    // Update file metadata in database with data isolation
+    const userId = getUserIdFromContext(c);
     const { data: updatedFile, error } = await c.get('supabase')
       .from('files')
-      .update(validation.data)
+      .update(validatedUpdateData)
       .eq('file_id', id)
-      .eq('folders.created_by', user.id) // Ensure user owns the folder
+      .eq('user_id', userId) // Ensure user owns the file
       .select('*')
       .single();
 

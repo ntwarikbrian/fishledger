@@ -12,7 +12,6 @@ import {
   deleteWorker,
   getWorkerPermissions,
   updateWorkerPermissions,
-  authenticateWorker,
   updateWorkerIdCard
 } from '../handlers/workers';
 import { authenticate, apiRateLimit, requestId, requestLogger, enforceDataIsolation } from '../middleware';
@@ -24,18 +23,7 @@ const workerRouter = new Hono();
 workerRouter.use('*', requestId);
 workerRouter.use('*', requestLogger);
 
-/**
- * @route POST /workers/auth
- * @desc Authenticate worker with email and password
- * @access Public
- * @body {
- *   email: string,
- *   password: string
- * }
- */
-workerRouter.post('/auth', apiRateLimit(), authenticateWorker);
-
-// Apply authentication and data isolation middleware to all other routes
+// Apply authentication and data isolation middleware to all routes
 workerRouter.use('*', authenticate); // Require authentication for all other worker routes
 workerRouter.use('*', enforceDataIsolation); // Ensure data isolation between users
 workerRouter.use('*', apiRateLimit());

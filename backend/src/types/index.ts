@@ -23,6 +23,7 @@ export interface Env extends Environment {
 export interface Variables {
   supabase: SupabaseClient<Database>;
   user?: AuthenticatedUser;
+  worker?: AuthenticatedWorker;
   requestId: string;
   startTime: number;
 }
@@ -49,6 +50,7 @@ export interface AuthenticatedUser {
 }
 
 export type UserRole = 'admin' | 'manager' | 'employee';
+export type WorkerRole = 'manager' | 'employee' | 'cashier' | 'inventory_manager';
 
 export interface JWTPayload {
   userId: string;
@@ -64,6 +66,69 @@ export interface RefreshTokenPayload {
   tokenVersion: number;
   iat: number;
   exp: number;
+}
+
+// Worker Authentication Types
+export interface AuthenticatedWorker {
+  id: string; // worker_id
+  email: string;
+  fullName: string;
+  role: WorkerRole;
+  businessId: string; // user_id of the business owner
+  isActive: boolean;
+  permissions?: WorkerPermissions;
+}
+
+export interface WorkerJWTPayload {
+  workerId: string;
+  email: string;
+  fullName: string;
+  role: WorkerRole;
+  businessId: string; // user_id for data isolation
+  iat: number;
+  exp: number;
+}
+
+export interface WorkerRefreshTokenPayload {
+  workerId: string;
+  businessId: string;
+  tokenVersion: number;
+  iat: number;
+  exp: number;
+}
+
+export interface WorkerPermissions {
+  products: {
+    view: boolean;
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+  };
+  sales: {
+    view: boolean;
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+  };
+  inventory: {
+    view: boolean;
+    manage: boolean;
+    audit: boolean;
+  };
+  reports: {
+    view: boolean;
+    generate: boolean;
+  };
+  transactions: {
+    view: boolean;
+    manage: boolean;
+  };
+  expenses: {
+    view: boolean;
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+  };
 }
 
 // API Response types
@@ -137,6 +202,40 @@ export interface ProductFilters extends FilterParams {
   lowStock?: boolean;
   priceMin?: number;
   priceMax?: number;
+}
+
+// Worker Authentication Request/Response Types
+export interface WorkerLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface WorkerLoginResponse {
+  success: boolean;
+  message: string;
+  data: {
+    worker: Omit<AuthenticatedWorker, 'isActive'>;
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  };
+  timestamp: string;
+  requestId: string;
+}
+
+export interface WorkerRefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface WorkerProfileResponse {
+  success: boolean;
+  data: {
+    worker: AuthenticatedWorker;
+    permissions: WorkerPermissions;
+    recentLoginHistory: string[];
+  };
+  timestamp: string;
+  requestId: string;
 }
 
 // User types

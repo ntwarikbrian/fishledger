@@ -7,8 +7,11 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import type {
   JWTPayload,
+  WorkerJWTPayload,
   RefreshTokenPayload,
+  WorkerRefreshTokenPayload,
   AuthenticatedUser,
+  AuthenticatedWorker,
   Environment,
 } from '../types/index';
 
@@ -318,4 +321,123 @@ export function isTokenCloseToExpiration(exp: number, thresholdMinutes = 5): boo
   const now = Math.floor(Date.now() / 1000);
   const threshold = thresholdMinutes * 60;
   return (exp - now) <= threshold;
+}
+
+// ============================================================================
+// WORKER AUTHENTICATION UTILITIES
+// ============================================================================
+
+/**
+ * Generates a JWT access token for a worker
+ * @param worker - Authenticated worker data
+ * @param env - Environment configuration
+ * @returns Signed JWT token
+ */
+export function generateWorkerAccessToken(worker: AuthenticatedWorker, env: Environment): string {
+  const payload: WorkerJWTPayload = {
+    workerId: worker.id,
+    email: worker.email,
+    fullName: worker.fullName,
+    role: worker.role,
+    businessId: worker.businessId,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + parseExpirationTime(env.JWT_EXPIRES_IN),
+  };
+
+  try {
+    return jwt.sign(payload, env.JWT_SECRET, {
+      algorithm: 'HS256',
+    });
+  } catch (error) {
+    throw new Error(`Failed to generate worker access token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generates a refresh token for a worker
+ * @param worker - Authenticated worker data
+ * @param env - Environment configuration
+ * @param tokenVersion - Token version for invalidation (default: 1)
+ * @returns Signed refresh token
+ */
+export function generateWorkerRefreshToken(
+  worker: AuthenticatedWorker,
+  env: Environment,
+  tokenVersion = 1
+): string {
+  const payload: WorkerRefreshTokenPayload = {
+    workerId: worker.id,
+    businessId: worker.businessId,
+    tokenVersion,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + parseExpirationTime(env.JWT_REFRESH_EXPIRES_IN || '7d'),
+  };
+
+  try {
+    return jwt.sign(payload, env.JWT_REFRESH_SECRET || env.JWT_SECRET, {
+      algorithm: 'HS256',
+    });
+  } catch (error) {
+    throw new Error(`Failed to generate worker refresh token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Verifies and decodes a worker JWT access token
+ * @param token - JWT token to verify
+ * @param env - Environment configuration
+ * @returns Decoded worker JWT payload
+ * @throws Error if token is invalid or expired
+ */
+export function verifyWorkerAccessToken(token: string, env: Environment): WorkerJWTPayload {
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET, {
+      algorithms: ['HS256'],
+    }) as WorkerJWTPayload;
+
+    // Additional validation for worker tokens
+    if (!decoded.workerId || !decoded.email || !decoded.role || !decoded.businessId) {
+      throw new Error('Invalid worker token payload');
+    }
+
+    return decoded;
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new Error('Invalid worker token');
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new Error('Worker token expired');
+    }
+    throw new Error(`Worker token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Verifies and decodes a worker refresh token
+ * @param token - Refresh token to verify
+ * @param env - Environment configuration
+ * @returns Decoded worker refresh token payload
+ * @throws Error if token is invalid or expired
+ */
+export function verifyWorkerRefreshToken(token: string, env: Environment): WorkerRefreshTokenPayload {
+  try {
+    const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET || env.JWT_SECRET, {
+      algorithms: ['HS256'],
+    }) as WorkerRefreshTokenPayload;
+
+    // Additional validation for worker refresh tokens
+    if (!decoded.workerId || !decoded.businessId || typeof decoded.tokenVersion !== 'number') {
+      throw new Error('Invalid worker refresh token payload');
+    }
+
+    return decoded;
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new Error('Invalid worker refresh token');
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new Error('Worker refresh token expired');
+    }
+    throw new Error(`Worker refresh token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }

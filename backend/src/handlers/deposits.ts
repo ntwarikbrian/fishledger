@@ -40,8 +40,8 @@ const createDepositSchema = z.object({
     required_error: 'Deposit type is required',
   }),
   account_name: z.string().min(1, 'Account name is required').max(255),
-  account_number: z.string().max(50).optional(),
-  to_recipient: z.string().max(100).optional(),
+  account_number: z.string().max(50).nullable().optional(),
+  to_recipient: z.string().max(100).nullable().optional(),
 });
 
 const updateDepositSchema = z.object({
@@ -93,7 +93,7 @@ export const getDepositsHandler = async (c: HonoContext) => {
         updated_at,
         created_by
       `)
-      .eq('created_by', user.id);
+      .eq('user_id', user.id);
 
     // Apply deposit type filter
     if (deposit_type) {
@@ -109,7 +109,7 @@ export const getDepositsHandler = async (c: HonoContext) => {
     const { count: totalCount, error: countError } = await c.get('supabase')
       .from('deposits')
       .select('deposit_id', { count: 'exact', head: true })
-      .eq('created_by', user.id);
+      .eq('user_id', user.id);
 
     if (countError) {
       throw new Error(`Failed to get deposit count: ${countError.message}`);
@@ -172,7 +172,7 @@ export const getDepositHandler = async (c: HonoContext) => {
         created_by
       `)
       .eq('deposit_id', id)
-      .eq('created_by', user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (error && error.code === 'PGRST116') {
@@ -218,6 +218,7 @@ export const createDepositHandler = async (c: HonoContext) => {
     const { data: newDeposit, error } = await c.get('supabase')
       .from('deposits')
       .insert({
+        user_id: user.id, // Data isolation
         date_time: new Date().toISOString(),
         deposit_type: depositData.deposit_type,
         account_name: depositData.account_name,
@@ -268,13 +269,31 @@ export const createDepositHandler = async (c: HonoContext) => {
  */
 export const createDepositWithImageHandler = async (c: HonoContext) => {
   try {
+    console.log('🏦 createDepositWithImageHandler started');
     const user = c.get('user');
     if (!user) {
+      console.log('❌ User not authenticated');
       return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
     }
 
+    console.log('👤 User authenticated:', user.id);
+
     // Parse form data
+    console.log('📝 Parsing form data...');
     const formData = await c.req.formData();
+
+    // Log all form data entries for debugging
+    console.log('📋 Form data entries:');
+    for (const [key, value] of formData.entries()) {
+      // Type guard for File objects
+      if (value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value) {
+        const file = value as File;
+        console.log(`  ${key}: File(${file.name}, ${file.size} bytes, ${file.type})`);
+      } else {
+        console.log(`  ${key}: ${value}`);
+      }
+    }
+
     const amount = parseFloat(formData.get('amount') as string);
     const deposit_type = formData.get('deposit_type') as string;
     const account_name = formData.get('account_name') as string;
@@ -282,7 +301,19 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
     const to_recipient = formData.get('to_recipient') as string || null;
     const image = formData.get('image') as File | null;
 
+    console.log('📊 Parsed data:', {
+      amount,
+      deposit_type,
+      account_name,
+      account_number,
+      to_recipient,
+      hasImage: !!image,
+      imageSize: image?.size,
+      imageType: image?.type
+    });
+
     // Validate required fields
+    console.log('🔍 Validating deposit data...');
     const validation = createDepositSchema.safeParse({
       amount,
       deposit_type,
@@ -292,6 +323,7 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
     });
 
     if (!validation.success) {
+      console.log('❌ Validation failed:', validation.error.errors);
       const errors = validation.error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
@@ -299,20 +331,31 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
       return c.json(createValidationErrorResponse(errors, c.get('requestId')), 400);
     }
 
+    console.log('✅ Validation passed');
+
     const depositData = validation.data;
 
     let imageUrl = null;
 
     // Handle image upload if provided
+    console.log('🖼️ Checking for image upload...');
     if (image && image.size > 0) {
+      console.log('📸 Image found, validating...');
+
       // Validate file
+      console.log('🔍 Validating file type:', image.type);
       if (!validateFileType(image.type)) {
+        console.log('❌ Invalid file type:', image.type);
         return c.json(createErrorResponse('Invalid file type', 400, { error: 'Image file type not supported' }, c.get('requestId')), 400);
       }
 
+      console.log('📏 Validating file size:', image.size);
       if (!validateFileSize(image.size)) {
+        console.log('❌ File too large:', image.size);
         return c.json(createErrorResponse('File too large', 400, { error: 'Image file size exceeds 10MB limit' }, c.get('requestId')), 400);
       }
+
+      console.log('✅ File validation passed');
 
       // Check if Cloudinary is configured
       if (c.env.CLOUDINARY_CLOUD_NAME && c.env.CLOUDINARY_API_KEY && c.env.CLOUDINARY_API_SECRET) {
@@ -344,20 +387,26 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
     }
 
     // Create deposit in the deposits table with image
+    console.log('💾 Creating deposit in database...');
+    const depositInsertData = {
+      user_id: user.id, // Data isolation
+      date_time: new Date().toISOString(),
+      deposit_type: depositData.deposit_type,
+      account_name: depositData.account_name,
+      account_number: depositData.account_number || null,
+      to_recipient: depositData.to_recipient || null,
+      amount: depositData.amount,
+      deposit_image_url: imageUrl,
+      approval: 'pending', // Default approval status
+      created_by: user.id,
+      updated_by: user.id,
+    };
+
+    console.log('📊 Deposit insert data:', depositInsertData);
+
     const { data: newDeposit, error } = await c.get('supabase')
       .from('deposits')
-      .insert({
-        date_time: new Date().toISOString(),
-        deposit_type: depositData.deposit_type,
-        account_name: depositData.account_name,
-        account_number: depositData.account_number || null,
-        to_recipient: depositData.to_recipient || null,
-        amount: depositData.amount,
-        deposit_image_url: imageUrl,
-        approval: 'pending', // Default approval status
-        created_by: user.id,
-        updated_by: user.id,
-      })
+      .insert(depositInsertData)
       .select(`
         deposit_id,
         date_time,
@@ -374,10 +423,14 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
       `)
       .single();
 
+    console.log('📊 Database result:', { newDeposit, error });
+
     if (error) {
+      console.log('❌ Database error:', error);
       throw new Error(`Failed to create deposit: ${error.message}`);
     }
 
+    console.log('✅ Deposit created successfully');
     return c.json({
       success: true,
       message: 'Deposit created successfully',
@@ -387,7 +440,7 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
     }, 201);
 
   } catch (error) {
-    console.error('Create deposit with image error:', error);
+    console.error('💥 Create deposit with image error:', error);
     return c.json(createErrorResponse('Failed to create deposit', 500, { error: error instanceof Error ? error.message : 'Unknown error' }, c.get('requestId')), 500);
   }
 };

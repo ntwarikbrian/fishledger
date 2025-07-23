@@ -9,6 +9,7 @@ import {
   createErrorResponse,
   createValidationErrorResponse,
 } from '../utils/response';
+import { getUserIdFromContext } from '../middleware/data-isolation';
 
 // Validation schemas
 const createAuditSchema = z.object({
@@ -60,10 +61,12 @@ export const createAuditHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
     }
 
-    // Insert audit record
+    // Insert audit record with data isolation
+    const currentUserId = getUserIdFromContext(c);
     const { data: newAudit, error } = await c.get('supabase')
       .from('sales_audit')
       .insert({
+        user_id: currentUserId, // Add user_id for data isolation
         sale_id: auditData.sale_id,
         audit_type: auditData.audit_type,
         boxes_change: auditData.boxes_change,
@@ -119,22 +122,11 @@ export const getAuditsHandler = async (c: HonoContext) => {
     const offset = (page - 1) * limit;
     console.log('Validated params:', { page, limit, sale_id, audit_type, approval_status }); // Debug log
 
-    // Test if sales_audit table exists and is accessible
-    console.log('Testing sales_audit table access...'); // Debug log
+    // Get current user for data isolation
+    const userId = getUserIdFromContext(c);
+    console.log('Current user ID for data isolation:', userId); // Debug log
 
-    // First, try a simple count query to test table access
-    const { count: tableCount, error: tableError } = await c.get('supabase')
-      .from('sales_audit')
-      .select('*', { count: 'exact', head: true });
-
-    if (tableError) {
-      console.error('sales_audit table access error:', tableError);
-      return c.json(createErrorResponse('sales_audit table not accessible', 500, { tableError }, c.get('requestId')), 500);
-    }
-
-    console.log('sales_audit table accessible, total records:', tableCount);
-
-    // Build query with basic data first, then we'll enrich it
+    // Build query with data isolation - only show audits that belong to the current user
     let query_builder = c.get('supabase')
       .from('sales_audit')
       .select(`
@@ -154,7 +146,8 @@ export const getAuditsHandler = async (c: HonoContext) => {
         new_values,
         created_at,
         updated_at
-      `, { count: 'exact' });
+      `, { count: 'exact' })
+      .eq('user_id', userId); // Apply data isolation filter
 
     // Apply filters
     if (sale_id) {
@@ -263,15 +256,21 @@ export const getAuditsHandler = async (c: HonoContext) => {
  */
 export const approveAuditHandler = async (c: HonoContext) => {
   try {
+    console.log('🔍 approveAuditHandler started');
     const auditId = c.req.param('id');
+    console.log('📋 Audit ID:', auditId);
+
     const body = await c.req.json();
+    console.log('📝 Request body:', body);
 
     if (!auditId) {
+      console.log('❌ No audit ID provided');
       return c.json(createErrorResponse('Audit ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
     const validation = approveAuditSchema.safeParse(body);
     if (!validation.success) {
+      console.log('❌ Validation failed:', validation.error);
       const errors = validation.error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
@@ -281,36 +280,53 @@ export const approveAuditHandler = async (c: HonoContext) => {
 
     const { approval_reason } = validation.data;
     const userId = c.get('user')?.id;
+    console.log('👤 User ID:', userId);
 
     if (!userId) {
+      console.log('❌ User not authenticated');
       return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
     }
 
-    // Get full audit record with all details
+    // Get full audit record with data isolation - only allow approving own audit records
+    const currentUserId = getUserIdFromContext(c);
+    console.log('🔒 Current user ID for data isolation:', currentUserId);
+
+    console.log('🔍 Fetching audit record...');
     const { data: auditRecord, error: fetchError } = await c.get('supabase')
       .from('sales_audit')
       .select('*')
       .eq('audit_id', auditId)
+      .eq('user_id', currentUserId) // Apply data isolation filter
       .single();
 
+    console.log('📊 Audit record fetch result:', { auditRecord, fetchError });
+
     if (fetchError || !auditRecord) {
+      console.log('❌ Audit record not found');
       return c.json(createErrorResponse('Audit record not found', 404, undefined, c.get('requestId')), 404);
     }
 
     if (auditRecord.approval_status !== 'pending') {
+      console.log('❌ Audit record already processed:', auditRecord.approval_status);
       return c.json(createErrorResponse('Audit record has already been processed', 400, undefined, c.get('requestId')), 400);
     }
 
+    console.log('⚙️ Executing audit type:', auditRecord.audit_type);
     // Execute the actual sale changes based on audit type
     let executionResult = null;
 
     if (auditRecord.audit_type === 'deletion') {
+      console.log('🗑️ Executing sale deletion...');
       executionResult = await executeSaleDeletion(c, auditRecord);
     } else if (auditRecord.audit_type === 'quantity_change' || auditRecord.audit_type === 'payment_method_change') {
+      console.log('📝 Executing sale update...');
       executionResult = await executeSaleUpdate(c, auditRecord);
     }
 
+    console.log('📊 Execution result:', executionResult);
+
     if (!executionResult || !executionResult.success) {
+      console.log('❌ Execution failed:', executionResult?.error);
       return c.json(createErrorResponse(
         `Failed to execute ${auditRecord.audit_type}: ${executionResult?.error || 'Unknown error'}`,
         500,
@@ -319,6 +335,7 @@ export const approveAuditHandler = async (c: HonoContext) => {
       ), 500);
     }
 
+    console.log('✅ Execution successful, updating audit record...');
     // Update audit record with approval after successful execution
     const { data: updatedAudit, error: updateError } = await c.get('supabase')
       .from('sales_audit')
@@ -332,11 +349,14 @@ export const approveAuditHandler = async (c: HonoContext) => {
       .select()
       .single();
 
+    console.log('📊 Audit update result:', { updatedAudit, updateError });
+
     if (updateError) {
-      console.error('Failed to approve audit record:', updateError);
+      console.error('❌ Failed to approve audit record:', updateError);
       return c.json(createErrorResponse('Failed to approve audit record', 500, undefined, c.get('requestId')), 500);
     }
 
+    console.log('✅ Audit approval completed successfully');
     return c.json({
       success: true,
       data: {
@@ -349,7 +369,7 @@ export const approveAuditHandler = async (c: HonoContext) => {
     });
 
   } catch (error) {
-    console.error('Error in approveAuditHandler:', error);
+    console.error('💥 Error in approveAuditHandler:', error);
     return c.json(createErrorResponse('Internal server error', 500, undefined, c.get('requestId')), 500);
   }
 };
@@ -382,11 +402,13 @@ export const rejectAuditHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
     }
 
-    // Check if audit record exists and is pending
+    // Check if audit record exists and is pending with data isolation
+    const currentUserId = getUserIdFromContext(c);
     const { data: existingAudit, error: fetchError } = await c.get('supabase')
       .from('sales_audit')
       .select('audit_id, approval_status')
       .eq('audit_id', auditId)
+      .eq('user_id', currentUserId) // Apply data isolation filter
       .single();
 
     if (fetchError || !existingAudit) {
@@ -438,6 +460,7 @@ export const createAuditRecord = async (
   auditType: 'quantity_change' | 'payment_method_change' | 'deletion',
   reason: string,
   performedBy: string,
+  userId: string, // Add userId parameter for data isolation
   options: {
     boxesChange?: number;
     kgChange?: number;
@@ -469,6 +492,7 @@ export const createAuditRecord = async (
     }
 
     const auditData = {
+      user_id: userId, // Add user_id for data isolation
       sale_id: saleId,
       audit_type: auditType,
       boxes_change: boxesChange,
@@ -569,11 +593,15 @@ const executeSaleDeletion = async (c: HonoContext, auditRecord: any) => {
  */
 const executeSaleUpdate = async (c: HonoContext, auditRecord: any) => {
   try {
+    console.log('🔧 executeSaleUpdate started');
     const saleId = auditRecord.sale_id;
     const oldValues = auditRecord.old_values;
     const newValues = auditRecord.new_values;
 
+    console.log('📊 Sale update data:', { saleId, oldValues, newValues });
+
     if (!oldValues || !newValues) {
+      console.log('❌ Missing sale data in audit record');
       return { success: false, error: 'No sale data found in audit record' };
     }
 

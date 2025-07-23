@@ -25,6 +25,17 @@ export {
   validateUserIdInUpdateData,
 } from './data-isolation';
 
+// Worker authentication middleware
+export {
+  authenticateWorker,
+  optionalWorkerAuth,
+  requireWorkerRole,
+  enforceWorkerDataIsolation,
+  getWorkerIdFromContext,
+  getBusinessIdFromWorkerContext,
+  createWorkerFilteredQuery,
+} from './worker-auth';
+
 // CORS middleware
 export {
   createCorsMiddleware,

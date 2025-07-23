@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { HonoContext, PaginationParams } from '../types/index';
+import type { HonoContext } from '../types/index';
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -31,7 +31,6 @@ import {
   createUserFilteredQuery,
   addUserIdToInsertData,
   validateUserIdInUpdateData,
-  validateResourceOwnership,
 } from '../middleware/data-isolation';
 
 // Validation schemas
@@ -112,7 +111,7 @@ export const getExpensesHandler = async (c: HonoContext) => {
         description,
         budget
       ),
-      users (
+      added_by_user:users!added_by (
         user_id,
         owner_name,
         business_name
@@ -199,7 +198,7 @@ export const getExpenseHandler = async (c: HonoContext) => {
         description,
         budget
       ),
-      users (
+      added_by_user:users!added_by (
         user_id,
         owner_name,
         business_name
@@ -463,9 +462,8 @@ export const deleteExpenseHandler = async (c: HonoContext) => {
  */
 export const getExpenseCategoriesHandler = async (c: HonoContext) => {
   try {
-    const { data: categories, error } = await c.get('supabase')
-      .from('expense_categories')
-      .select('*')
+    // Use data isolation to ensure user can only access their own categories
+    const { data: categories, error } = await createUserFilteredQuery(c, 'expense_categories', '*')
       .order('category_name', { ascending: true });
 
     if (error) {
@@ -508,9 +506,8 @@ export const getExpenseCategoryHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    const { data: category, error } = await c.get('supabase')
-      .from('expense_categories')
-      .select('*')
+    // Use data isolation to ensure user can only access their own categories
+    const { data: category, error } = await createUserFilteredQuery(c, 'expense_categories', '*')
       .eq('category_id', id)
       .single();
 
@@ -565,10 +562,11 @@ export const createExpenseCategoryHandler = async (c: HonoContext) => {
 
     const categoryData = validation.data;
 
-    // Check if category name already exists
-    const { data: existingCategory } = await c.get('supabase')
-      .from('expense_categories')
-      .select('category_id')
+    // Get user ID from context (set by data isolation middleware)
+    const userId = getUserIdFromContext(c);
+
+    // Check if category name already exists for this user (with data isolation)
+    const { data: existingCategory } = await createUserFilteredQuery(c, 'expense_categories', 'category_id')
       .eq('category_name', categoryData.category_name)
       .single();
 
@@ -576,11 +574,12 @@ export const createExpenseCategoryHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Category name already exists', 409, { error: 'An expense category with this name already exists' }, c.get('requestId')), 409);
     }
 
-    // Create category
+    // Create category with user ID
     const { data: newCategory, error } = await c.get('supabase')
       .from('expense_categories')
       .insert({
         ...categoryData,
+        user_id: userId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -645,22 +644,27 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
 
     const updateData = validation.data;
 
-    // Check if category exists
-    const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', id, 'category_id');
-    if (!categoryExists) {
+    // Check if category exists and belongs to the user (data isolation)
+    const { data: existingCategory, error: checkError } = await createUserFilteredQuery(c, 'expense_categories', 'category_id, category_name')
+      .eq('category_id', id)
+      .single();
+
+    if (checkError && checkError.code === 'PGRST116') {
       return c.json(createNotFoundResponse('Expense Category', c.get('requestId')), 404);
     }
 
+    if (checkError || !existingCategory) {
+      throw new Error(`Failed to check expense category: ${checkError?.message || 'Category not found'}`);
+    }
+
     // Check if new name conflicts with existing category (if name is being updated)
-    if (updateData.category_name) {
-      const { data: existingCategory } = await c.get('supabase')
-        .from('expense_categories')
-        .select('category_id')
+    if (updateData.category_name && updateData.category_name !== (existingCategory as any).category_name) {
+      const { data: conflictingCategory } = await createUserFilteredQuery(c, 'expense_categories', 'category_id')
         .eq('category_name', updateData.category_name)
         .neq('category_id', id)
         .single();
 
-      if (existingCategory) {
+      if (conflictingCategory) {
         return c.json({
           success: false,
           error: 'Category name already exists',
@@ -671,7 +675,8 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
       }
     }
 
-    // Update category
+    // Update category with data isolation
+    const userId = getUserIdFromContext(c);
     const { data: updatedCategory, error } = await c.get('supabase')
       .from('expense_categories')
       .update({
@@ -679,6 +684,7 @@ export const updateExpenseCategoryHandler = async (c: HonoContext) => {
         updated_at: new Date().toISOString(),
       })
       .eq('category_id', id)
+      .eq('user_id', userId) // Ensure data isolation
       .select()
       .single();
 
@@ -722,9 +728,12 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
       }, 400);
     }
 
-    // Check if category exists
-    const categoryExists = await recordExists(c.get('supabase'), 'expense_categories', id, 'category_id');
-    if (!categoryExists) {
+    // Check if category exists and belongs to the user (data isolation)
+    const { data: existingCategory, error: categoryError } = await createUserFilteredQuery(c, 'expense_categories', 'category_id')
+      .eq('category_id', id)
+      .single();
+
+    if (categoryError && categoryError.code === 'PGRST116') {
       return c.json({
         success: false,
         error: 'Expense Category not found',
@@ -733,10 +742,12 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
       }, 404);
     }
 
-    // Check if category is being used by any expenses
-    const { data: expensesUsingCategory, error: checkError } = await c.get('supabase')
-      .from('expenses')
-      .select('expense_id')
+    if (categoryError || !existingCategory) {
+      throw new Error(`Failed to check expense category: ${categoryError?.message || 'Category not found'}`);
+    }
+
+    // Check if category is being used by any expenses (with data isolation)
+    const { data: expensesUsingCategory, error: checkError } = await createUserFilteredQuery(c, 'expenses', 'expense_id')
       .eq('category_id', id)
       .limit(1);
 
@@ -757,11 +768,13 @@ export const deleteExpenseCategoryHandler = async (c: HonoContext) => {
       }, 409);
     }
 
-    // Delete category
+    // Delete category with data isolation
+    const userId = getUserIdFromContext(c);
     const { error } = await c.get('supabase')
       .from('expense_categories')
       .delete()
-      .eq('category_id', id);
+      .eq('category_id', id)
+      .eq('user_id', userId); // Ensure data isolation
 
     if (error) {
       throw new Error(`Failed to delete expense category: ${error.message}`);
@@ -931,11 +944,15 @@ export const createExpenseWithReceiptHandler = async (c: HonoContext) => {
       }
     }
 
+    // Get user ID from context for data isolation
+    const userId = getUserIdFromContext(c);
+
     // Create expense with receipt URL
     const { data: newExpense, error } = await c.get('supabase')
       .from('expenses')
       .insert({
         ...expenseData,
+        user_id: userId,
         receipt_url: receiptUrl,
         added_by: user.id,
         created_at: new Date().toISOString(),

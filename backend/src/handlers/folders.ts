@@ -18,6 +18,12 @@ import {
   applySearch,
   getTotalCount,
 } from '../utils/db';
+import {
+  getUserIdFromContext,
+  createUserFilteredQuery,
+  addUserIdToInsertData,
+  validateUserIdInUpdateData,
+} from '../middleware/data-isolation';
 
 // Validation schemas - Updated to match database schema
 const createFolderSchema = z.object({
@@ -54,28 +60,21 @@ export const getFoldersHandler = async (c: HonoContext) => {
     }
 
     const { page, limit, sortBy, sortOrder, search } = validation.data;
-    const user = c.get('user');
 
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Build query for folders created by the authenticated user
-    let query = c.get('supabase')
-      .from('folders')
-      .select('*')
-      .eq('created_by', user.id);
+    // Build query with data isolation - only get folders for the authenticated user
+    let query = createUserFilteredQuery(c, 'folders', '*');
 
     // Apply search if provided
     if (search) {
       query = applySearch(query, search, ['folder_name', 'description']);
     }
 
-    // Get total count for pagination - Use direct query since folders table is not in getTotalCount
+    // Get total count for pagination using data isolation
+    const userId = getUserIdFromContext(c);
     const { count: totalCount, error: countError } = await c.get('supabase')
       .from('folders')
       .select('*', { count: 'exact', head: true })
-      .eq('created_by', user.id);
+      .eq('user_id', userId);
 
     if (countError) {
       throw new Error(`Failed to get folder count: ${countError.message}`);
@@ -115,17 +114,9 @@ export const getFolderHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const user = c.get('user');
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Get folder from database - only folders created by the authenticated user
-    const { data: folder, error } = await c.get('supabase')
-      .from('folders')
-      .select('*')
+    // Use data isolation to ensure user can only access their own folders
+    const { data: folder, error } = await createUserFilteredQuery(c, 'folders', '*')
       .eq('folder_id', id)
-      .eq('created_by', user.id)
       .single();
 
     if (error && error.code === 'PGRST116') {
@@ -172,23 +163,20 @@ export const createFolderHandler = async (c: HonoContext) => {
     const folderData = validation.data;
     console.log('📁 Folder data after validation:', folderData);
 
+    // Get user ID from context for data isolation
+    const userId = getUserIdFromContext(c);
     const user = c.get('user');
     console.log('👤 User from context:', user ? { id: user.id, email: user.email } : 'NO USER');
 
-    if (!user) {
-      console.log('❌ User not authenticated');
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Create folder in database
-    const insertData = {
+    // Create folder with data isolation - automatically adds user_id
+    const insertData = addUserIdToInsertData(c, {
       ...folderData,
-      created_by: user.id,
+      created_by: userId,
       file_count: 0,
       total_size: 0,
       // Mark Workers ID Image folder as permanent
       is_permanent: folderData.folder_name === 'Workers ID Image',
-    };
+    });
     console.log('💾 Data to insert:', insertData);
 
     const { data: newFolder, error } = await c.get('supabase')
@@ -240,18 +228,13 @@ export const updateFolderHandler = async (c: HonoContext) => {
     }
 
     const updateData = validation.data;
-    const user = c.get('user');
 
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
+    // Validate user_id in update data for data isolation
+    const validatedUpdateData = validateUserIdInUpdateData(c, updateData);
 
-    // Check if folder exists and belongs to user
-    const { error: checkError } = await c.get('supabase')
-      .from('folders')
-      .select('folder_id')
+    // Check if folder exists and belongs to user using data isolation
+    const { error: checkError } = await createUserFilteredQuery(c, 'folders', 'folder_id')
       .eq('folder_id', id)
-      .eq('created_by', user.id)
       .single();
 
     if (checkError && checkError.code === 'PGRST116') {
@@ -262,12 +245,13 @@ export const updateFolderHandler = async (c: HonoContext) => {
       throw new Error(`Failed to check folder existence: ${checkError.message}`);
     }
 
-    // Update folder in database
+    // Update folder in database with data isolation
+    const userId = getUserIdFromContext(c);
     const { data: updatedFolder, error } = await c.get('supabase')
       .from('folders')
-      .update(updateData)
+      .update(validatedUpdateData)
       .eq('folder_id', id)
-      .eq('created_by', user.id) // Ensure user can only update their own folders
+      .eq('user_id', userId) // Ensure user can only update their own folders
       .select('*')
       .single();
 
@@ -294,17 +278,9 @@ export const deleteFolderHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Folder ID is required', 400, undefined, c.get('requestId')), 400);
     }
 
-    const user = c.get('user');
-    if (!user) {
-      return c.json(createErrorResponse('User not authenticated', 401, undefined, c.get('requestId')), 401);
-    }
-
-    // Check if folder exists and belongs to user
-    const { data: folder, error: checkError } = await c.get('supabase')
-      .from('folders')
-      .select('folder_id, file_count, is_permanent')
+    // Check if folder exists and belongs to user using data isolation
+    const { data: folder, error: checkError } = await createUserFilteredQuery(c, 'folders', 'folder_id, file_count, is_permanent')
       .eq('folder_id', id)
-      .eq('created_by', user.id)
       .single();
 
     if (checkError && checkError.code === 'PGRST116') {
@@ -325,12 +301,13 @@ export const deleteFolderHandler = async (c: HonoContext) => {
       return c.json(createErrorResponse('Cannot delete folder with files', 400, { error: 'Folder must be empty before deletion' }, c.get('requestId')), 400);
     }
 
-    // Delete folder from database
+    // Delete folder from database with data isolation
+    const userId = getUserIdFromContext(c);
     const { error: deleteError } = await c.get('supabase')
       .from('folders')
       .delete()
       .eq('folder_id', id)
-      .eq('created_by', user.id);
+      .eq('user_id', userId);
 
     if (deleteError) {
       throw new Error(`Failed to delete folder: ${deleteError.message}`);

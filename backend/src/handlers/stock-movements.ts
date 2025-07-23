@@ -11,10 +11,8 @@ import {
   throwNotFoundError,
 } from '../middleware/error-handler';
 import {
-  getUserIdFromContext,
-  createUserFilteredQuery,
   addUserIdToInsertData,
-  validateUserIdInUpdateData
+  getUserIdFromContext,
 } from '../middleware/data-isolation';
 
 // Validation schemas
@@ -82,7 +80,10 @@ const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
 
   const { page, limit, sortBy, sortOrder, product_id, movement_type, dateFrom, dateTo } = validation.data!;
 
-  // Build query
+  // Get current user for data isolation
+  const userId = getUserIdFromContext(c);
+
+  // Build query with data isolation
   let query = c.get('supabase')
     .from('stock_movements')
     .select(`
@@ -106,14 +107,15 @@ const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
           name
         )
       ),
-      users (
+      users!performed_by (
         user_id,
         owner_name,
         business_name
       )
-    `);
+    `)
+    .eq('user_id', userId); // Apply data isolation filter
 
-  // Apply filters
+  // Apply additional filters
   if (product_id) {
     query = query.eq('product_id', product_id);
   }
@@ -143,10 +145,11 @@ const getStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
     throw new Error(`Failed to fetch stock movements: ${error.message}`);
   }
 
-  // Get total count for pagination
+  // Get total count for pagination with data isolation
   let countQuery = c.get('supabase')
     .from('stock_movements')
-    .select('*', { count: 'exact', head: true });
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId); // Apply data isolation filter
 
   if (product_id) {
     countQuery = countQuery.eq('product_id', product_id);
@@ -271,6 +274,9 @@ const getProductStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
     throwNotFoundError('Product');
   }
 
+  // Get current user for data isolation
+  const userId = getUserIdFromContext(c);
+
   const { data: movements, error } = await c.get('supabase')
     .from('stock_movements')
     .select(`
@@ -282,13 +288,14 @@ const getProductStockMovementsHandler = asyncHandler(async (c: HonoContext) => {
       reason,
       status,
       created_at,
-      users (
+      users!performed_by (
         user_id,
         owner_name,
         business_name
       )
     `)
     .eq('product_id', productId)
+    .eq('user_id', userId) // Apply data isolation filter
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -326,11 +333,13 @@ const getStockSummaryHandler = asyncHandler(async (c: HonoContext) => {
     return; // This line will never be reached, but helps TypeScript understand
   }
 
-  // Get stock movement summary
+  // Get stock movement summary with data isolation
+  const userId = getUserIdFromContext(c);
   const { data: movements, error: movementsError } = await c.get('supabase')
     .from('stock_movements')
     .select('movement_type, box_change, kg_change')
-    .eq('product_id', productId);
+    .eq('product_id', productId)
+    .eq('user_id', userId); // Apply data isolation filter
 
   if (movementsError) {
     throw new Error(`Failed to fetch stock movements: ${movementsError.message}`);
@@ -378,13 +387,15 @@ const approveProductEditHandler = asyncHandler(async (c: HonoContext) => {
     throwValidationError('Movement ID is required');
   }
 
-  // Get the pending movement
+  // Get the pending movement with data isolation
+  const userId = getUserIdFromContext(c);
   const { data: movement, error: fetchError } = await c.get('supabase')
     .from('stock_movements')
     .select('*')
     .eq('movement_id', movementId)
     .eq('movement_type', 'product_edit')
     .eq('status', 'pending')
+    .eq('user_id', userId) // Apply data isolation filter
     .single();
 
   if (fetchError || !movement) {
