@@ -511,24 +511,24 @@ const AddProductTab: React.FC<AddProductTabProps> = ({
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700 text-sm px-4">
                   <Plus className="mr-1 h-3 w-3" />
-                  Add Product
+                  {t("inventory.addProduct.addProduct")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
                 <DialogHeader className="pb-3">
-                  <DialogTitle className="text-lg">Add New Fish Product</DialogTitle>
+                  <DialogTitle className="text-lg">{t("inventory.addProduct.title")}</DialogTitle>
                   <DialogDescription className="text-sm">
-                    Create a new fish product with pricing and inventory details.
+                    {t("inventory.addProduct.description")}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmitProduct} className="space-y-3">
                   {/* Basic Information */}
                   <div className="space-y-2">
                     <div className="space-y-1">
-                      <Label htmlFor="productName" className="text-sm font-medium">Product Name *</Label>
+                      <Label htmlFor="productName" className="text-sm font-medium">{t("inventory.addProduct.productNameLabel")}</Label>
                       <Input
                         id="productName"
-                        placeholder="e.g., Atlantic Salmon"
+                        placeholder={t("inventory.addProduct.productNamePlaceholder")}
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         className="h-8 text-sm"
@@ -537,13 +537,13 @@ const AddProductTab: React.FC<AddProductTabProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <Label htmlFor="category" className="text-sm font-medium">Category *</Label>
+                      <Label htmlFor="category" className="text-sm font-medium">{t("inventory.addProduct.categoryLabel")}</Label>
                       <Select
                         value={formData.category_id}
                         onValueChange={(value) => handleInputChange('category_id', value)}
                       >
                         <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder={isLoadingCategories ? "Loading..." : "Select category"} />
+                          <SelectValue placeholder={isLoadingCategories ? t("common.loading") : t("inventory.addProduct.categoryPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((category) => (
@@ -559,7 +559,7 @@ const AddProductTab: React.FC<AddProductTabProps> = ({
                   {/* Inventory Quantities */}
                   <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-1">
-                      <Label htmlFor="boxedQuantity" className="text-xs font-medium">Boxed Qty</Label>
+                      <Label htmlFor="boxedQuantity" className="text-xs font-medium">{t("inventory.addProduct.boxQuantityLabel")}</Label>
                       <Input
                         id="boxedQuantity"
                         type="number"

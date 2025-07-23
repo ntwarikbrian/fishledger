@@ -74,14 +74,18 @@ const Settings: React.FC = () => {
   const [settings, setSettings] = useState({
     language: i18n.language,
     currency: currency,
-    theme: localStorage.getItem('theme') || 'light',
-    autoReporting: true,
-    emailNotifications: true,
-    smsNotifications: false,
-    lowStockAlerts: true,
-    dailyReports: true,
-    weeklyReports: true,
-    monthlyReports: false
+    // Email configuration
+    emailAddress: '',
+    emailName: '',
+    appPassword: '',
+    emailHost: 'smtp.gmail.com',
+    emailPort: 587,
+    useTls: true,
+    // WhatsApp configuration
+    whapiApikey: '',
+    instanceId: '',
+    whapiPhoneNumber: '',
+    providerUrl: '',
   });
 
   // Update settings when currency changes from context
@@ -354,103 +358,15 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Automatic Reporting Section */}
+        {/* Language & Currency Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Automatic Reporting
+              <Globe className="h-5 w-5" />
+              Language & Currency
             </CardTitle>
             <CardDescription>
-              Configure automatic report generation and delivery
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">Enable Automatic Reporting</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Automatically generate and send reports
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.autoReporting}
-                  onCheckedChange={(checked) => handleSettingsChange('autoReporting', checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Report Frequency</Label>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm">Daily Reports</Label>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Daily sales and inventory summary
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.dailyReports}
-                      onCheckedChange={(checked) => handleSettingsChange('dailyReports', checked)}
-                      disabled={!settings.autoReporting}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm">Weekly Reports</Label>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Weekly performance and analytics
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.weeklyReports}
-                      onCheckedChange={(checked) => handleSettingsChange('weeklyReports', checked)}
-                      disabled={!settings.autoReporting}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm">Monthly Reports</Label>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Comprehensive monthly business report
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.monthlyReports}
-                      onCheckedChange={(checked) => handleSettingsChange('monthlyReports', checked)}
-                      disabled={!settings.autoReporting}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="flex justify-end">
-              <Button onClick={handleSaveSettings} className="flex items-center gap-2">
-                <Save className="h-4 w-4" />
-                Save Report Settings
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Language, Currency & Theme Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Language, Currency & Theme
-            </CardTitle>
-            <CardDescription>
-              Customize your language, currency, and appearance preferences
+              Customize your language and currency preferences
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -500,25 +416,6 @@ const Settings: React.FC = () => {
                 )}
               </div>
 
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Theme
-                </Label>
-                <Select
-                  value={settings.theme}
-                  onValueChange={(value) => handleSettingsChange('theme', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select theme" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">☀️ Light</SelectItem>
-                    <SelectItem value="dark">🌙 Dark</SelectItem>
-                    <SelectItem value="system">💻 System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <Separator />
@@ -532,72 +429,149 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Notification Settings Section */}
+        {/* Email Configuration Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notification Settings
+              <Mail className="h-5 w-5" />
+              Email Configuration
             </CardTitle>
             <CardDescription>
-              Manage how you receive notifications and alerts
+              Configure email settings for sending automated messages and reports
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">Email Notifications</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Receive notifications via email
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.emailNotifications}
-                  onCheckedChange={(checked) => handleSettingsChange('emailNotifications', checked)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="emailAddress">Email Address</Label>
+                <Input
+                  id="emailAddress"
+                  type="email"
+                  placeholder="your-email@gmail.com"
+                  value={settings.emailAddress || ''}
+                  onChange={(e) => handleSettingsChange('emailAddress', e.target.value)}
                 />
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">SMS Notifications</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Receive notifications via SMS (Coming Soon)
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.smsNotifications}
-                  onCheckedChange={(checked) => handleSettingsChange('smsNotifications', checked)}
-                  disabled
+              <div className="space-y-3">
+                <Label htmlFor="emailName">Display Name</Label>
+                <Input
+                  id="emailName"
+                  placeholder="Your Business Name"
+                  value={settings.emailName || ''}
+                  onChange={(e) => handleSettingsChange('emailName', e.target.value)}
                 />
               </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">Low Stock Alerts</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Get notified when inventory is running low
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.lowStockAlerts}
-                  onCheckedChange={(checked) => handleSettingsChange('lowStockAlerts', checked)}
+              <div className="space-y-3">
+                <Label htmlFor="appPassword">App Password</Label>
+                <Input
+                  id="appPassword"
+                  type="password"
+                  placeholder="Your app-specific password"
+                  value={settings.appPassword || ''}
+                  onChange={(e) => handleSettingsChange('appPassword', e.target.value)}
                 />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="emailHost">Email Host</Label>
+                <Input
+                  id="emailHost"
+                  placeholder="smtp.gmail.com"
+                  value={settings.emailHost}
+                  onChange={(e) => handleSettingsChange('emailHost', e.target.value)}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="emailPort">Email Port</Label>
+                <Input
+                  id="emailPort"
+                  type="number"
+                  placeholder="587"
+                  value={settings.emailPort}
+                  onChange={(e) => handleSettingsChange('emailPort', parseInt(e.target.value))}
+                />
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="useTls">Use TLS Encryption</Label>
+                  <Switch
+                    id="useTls"
+                    checked={settings.useTls}
+                    onCheckedChange={(checked) => handleSettingsChange('useTls', checked)}
+                  />
+                </div>
               </div>
             </div>
-
             <Separator />
-
             <div className="flex justify-end">
               <Button onClick={handleSaveSettings} className="flex items-center gap-2">
                 <Save className="h-4 w-4" />
-                Save Notification Settings
+                Save Email Settings
               </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* WhatsApp Configuration Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5" />
+              WhatsApp Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure WhatsApp settings for sending automated messages via WHAPI
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="whapiApikey">WHAPI API Key</Label>
+                <Input
+                  id="whapiApikey"
+                  type="password"
+                  placeholder="Your WHAPI API key"
+                  value={settings.whapiApikey || ''}
+                  onChange={(e) => handleSettingsChange('whapiApikey', e.target.value)}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="instanceId">Instance ID</Label>
+                <Input
+                  id="instanceId"
+                  placeholder="Your WHAPI instance ID"
+                  value={settings.instanceId || ''}
+                  onChange={(e) => handleSettingsChange('instanceId', e.target.value)}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="whapiPhoneNumber">WhatsApp Phone Number</Label>
+                <Input
+                  id="whapiPhoneNumber"
+                  placeholder="+1234567890"
+                  value={settings.whapiPhoneNumber || ''}
+                  onChange={(e) => handleSettingsChange('whapiPhoneNumber', e.target.value)}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="providerUrl">Provider URL</Label>
+                <Input
+                  id="providerUrl"
+                  placeholder="https://gate.whapi.cloud"
+                  value={settings.providerUrl || ''}
+                  onChange={(e) => handleSettingsChange('providerUrl', e.target.value)}
+                />
+              </div>
+            </div>
+            <Separator />
+            <div className="flex justify-end">
+              <Button onClick={handleSaveSettings} className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Save WhatsApp Settings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
     </AppLayout>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import WorkerDashboard from "@/pages/WorkerDashboard";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -7,6 +8,7 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -33,7 +35,25 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     );
   }
 
-  // User is authenticated, render the protected content
+  // If user is a worker and trying to access the main dashboard, show worker dashboard instead
+  if (userType === "worker" && location.pathname === "/") {
+    return <WorkerDashboard />;
+  }
+
+  // If user is a worker trying to access admin-only routes, redirect to worker dashboard
+  if (userType === "worker" && location.pathname !== "/") {
+    // List of admin-only routes that workers should not access
+    const adminOnlyRoutes = [
+      "/inventory", "/sales", "/customers", "/transactions", 
+      "/staff", "/expenses", "/documents", "/reports", "/settings", "/help"
+    ];
+    
+    if (adminOnlyRoutes.some(route => location.pathname.startsWith(route))) {
+      return <WorkerDashboard />;
+    }
+  }
+
+  // User is authenticated and authorized, render the protected content
   return <>{children}</>;
 };
 

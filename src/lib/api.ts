@@ -560,7 +560,7 @@ export const contactsApi = {
     if (params?.sort_order) searchParams.append('sort_order', params.sort_order);
 
     const queryString = searchParams.toString();
-    const url = queryString ? `/contacts?${queryString}` : '/contacts';
+    const url = queryString ? `/api/contacts?${queryString}` : '/api/contacts';
 
     return apiRequest<{
       data: Contact[];

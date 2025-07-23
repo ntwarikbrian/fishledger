@@ -186,25 +186,17 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- Stores business contact information (suppliers/customers)
 -- =====================================================
 
--- Contacts table for business contact information
+-- Contacts table for business contact information (simplified for messaging system integration)
 CREATE TABLE IF NOT EXISTS contacts (
     contact_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Data isolation: contacts belong to specific user
-    company_name VARCHAR(200),
-    contact_name VARCHAR(200) NOT NULL,
-    email VARCHAR(255),
-    phone_number VARCHAR(20),
-    contact_type VARCHAR(20) NOT NULL CHECK (contact_type IN ('supplier', 'customer')),
-    address TEXT,
-    email_verified BOOLEAN DEFAULT FALSE,
-    preferred_contact_method VARCHAR(20) DEFAULT 'email' CHECK (preferred_contact_method IN ('email', 'phone', 'both')),
-    email_notifications BOOLEAN DEFAULT TRUE,
-    last_contacted TIMESTAMP WITH TIME ZONE,
-    total_messages_sent INTEGER DEFAULT 0,
-    notes TEXT,
-    added_by UUID NOT NULL REFERENCES users(user_id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    contact_name VARCHAR(200) NOT NULL, -- Contact person name (required)
+    email VARCHAR(255), -- Contact email address for messaging
+    phone_number VARCHAR(20), -- Contact phone number
+    contact_type VARCHAR(20) NOT NULL CHECK (contact_type IN ('supplier', 'customer')), -- Business relationship type
+    added_by UUID NOT NULL REFERENCES users(user_id), -- User who added this contact
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, -- When contact was created
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- When contact was last updated
 );
 -- =====================================================
 -- 6. MESSAGES TABLE
@@ -530,41 +522,7 @@ CREATE TABLE IF NOT EXISTS message_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- 10. MESSAGE TEMPLATES TABLE
--- Stores reusable message templates for different scenarios
--- =====================================================
-
--- Message templates table for reusable message templates
-CREATE TABLE IF NOT EXISTS message_templates (
-    template_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(user_id), -- Owner of this template
-
-    -- Template Information
-    template_name VARCHAR(200) NOT NULL, -- Name/title of the template
-    template_category VARCHAR(50) NOT NULL CHECK (template_category IN ('inventory', 'promotion', 'notification', 'order', 'general')), -- Category of template
-    template_type VARCHAR(20) DEFAULT 'email' CHECK (template_type IN ('email', 'internal')), -- Type of template
-
-    -- Template Content
-    subject_template VARCHAR(200), -- Subject line template with placeholders
-    content_template TEXT NOT NULL, -- Message content template with placeholders
-
-    -- Template Settings
-    is_active BOOLEAN DEFAULT TRUE, -- Whether template is active/available
-    is_default BOOLEAN DEFAULT FALSE, -- Whether this is the default template for its category
-    use_signature BOOLEAN DEFAULT TRUE, -- Whether to append user's signature
-
-    -- Usage Statistics
-    usage_count INTEGER DEFAULT 0, -- How many times this template has been used
-    last_used TIMESTAMP WITH TIME ZONE, -- When this template was last used
-
-    -- Template Variables/Placeholders Documentation
-    available_variables JSONB, -- JSON array of available placeholder variables
-
-    -- Timestamps
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Note: message_templates table removed as per migration 003
 
 -- =====================================================
 -- 13. SALES TABLE
@@ -1328,39 +1286,32 @@ COMMENT ON COLUMN deposits.updated_by IS 'User who last updated the deposit reco
 
 -- =====================================================
 -- USER SETTINGS TABLE
--- Stores user preferences and application settings
+-- Stores user preferences, email credentials, and WhatsApp settings
 -- =====================================================
 
--- User settings table for storing user preferences
+-- User settings table for storing user preferences and messaging credentials
 CREATE TABLE IF NOT EXISTS user_settings (
     setting_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE, -- Owner of these settings
-
-    -- Currency Settings
+    
+    -- Basic Settings
     currency VARCHAR(3) DEFAULT 'USD' CHECK (currency IN ('USD', 'RWF')), -- User's preferred currency
-
-    -- Language & Localization Settings
     language VARCHAR(5) DEFAULT 'en' CHECK (language IN ('en', 'rw')), -- User's preferred language
-    timezone VARCHAR(50) DEFAULT 'UTC', -- User's timezone
-    date_format VARCHAR(20) DEFAULT 'MM/DD/YYYY', -- Preferred date format
-
-    -- Theme & Display Settings
-    theme VARCHAR(10) DEFAULT 'light' CHECK (theme IN ('light', 'dark', 'system')), -- UI theme preference
-
-    -- Notification Settings
-    email_notifications BOOLEAN DEFAULT TRUE, -- Enable email notifications
-    sms_notifications BOOLEAN DEFAULT FALSE, -- Enable SMS notifications
-    low_stock_alerts BOOLEAN DEFAULT TRUE, -- Enable low stock alerts
-    daily_reports BOOLEAN DEFAULT TRUE, -- Enable daily reports
-    weekly_reports BOOLEAN DEFAULT TRUE, -- Enable weekly reports
-    monthly_reports BOOLEAN DEFAULT FALSE, -- Enable monthly reports
-    auto_reporting BOOLEAN DEFAULT TRUE, -- Enable automatic reporting
-
-    -- Business Settings
-    business_hours_start TIME DEFAULT '08:00:00', -- Business start time
-    business_hours_end TIME DEFAULT '18:00:00', -- Business end time
-    working_days INTEGER[] DEFAULT ARRAY[1,2,3,4,5], -- Working days (1=Monday, 7=Sunday)
-
+    
+    -- Email Configuration for Sending Messages
+    email_address VARCHAR(255), -- Email address for sending emails
+    email_name VARCHAR(200), -- Display name for outgoing emails
+    app_password VARCHAR(255), -- App password for email authentication (encrypted)
+    email_host VARCHAR(255) DEFAULT 'smtp.gmail.com', -- SMTP server host
+    email_port INTEGER DEFAULT 587, -- SMTP server port
+    use_tls BOOLEAN DEFAULT TRUE, -- Use TLS encryption for email
+    
+    -- WhatsApp Integration via WHAPI
+    whapi_apikey VARCHAR(255), -- WHAPI API key for WhatsApp messaging
+    instance_id VARCHAR(100), -- WHAPI instance ID
+    whapi_phone_number VARCHAR(20), -- Phone number associated with WHAPI
+    provider_url VARCHAR(500), -- WHAPI provider URL
+    
     -- Audit fields
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1388,23 +1339,23 @@ CREATE TRIGGER trigger_update_user_settings_updated_at
     EXECUTE FUNCTION update_user_settings_updated_at();
 
 -- Comments for documentation
-COMMENT ON TABLE user_settings IS 'Stores user preferences and application settings';
+COMMENT ON TABLE user_settings IS 'Stores user preferences, messaging credentials, and application settings';
 COMMENT ON COLUMN user_settings.setting_id IS 'Unique identifier for each setting record';
 COMMENT ON COLUMN user_settings.user_id IS 'User who owns these settings';
 COMMENT ON COLUMN user_settings.currency IS 'User preferred currency (USD or RWF)';
 COMMENT ON COLUMN user_settings.language IS 'User preferred language (en or rw)';
-COMMENT ON COLUMN user_settings.timezone IS 'User timezone for date/time display';
-COMMENT ON COLUMN user_settings.theme IS 'UI theme preference (light, dark, or system)';
-COMMENT ON COLUMN user_settings.email_notifications IS 'Enable/disable email notifications';
-COMMENT ON COLUMN user_settings.sms_notifications IS 'Enable/disable SMS notifications';
-COMMENT ON COLUMN user_settings.low_stock_alerts IS 'Enable/disable low stock alerts';
-COMMENT ON COLUMN user_settings.daily_reports IS 'Enable/disable daily reports';
-COMMENT ON COLUMN user_settings.weekly_reports IS 'Enable/disable weekly reports';
-COMMENT ON COLUMN user_settings.monthly_reports IS 'Enable/disable monthly reports';
-COMMENT ON COLUMN user_settings.auto_reporting IS 'Enable/disable automatic reporting';
-COMMENT ON COLUMN user_settings.business_hours_start IS 'Business operating start time';
-COMMENT ON COLUMN user_settings.business_hours_end IS 'Business operating end time';
-COMMENT ON COLUMN user_settings.working_days IS 'Array of working days (1=Monday, 7=Sunday)';
+COMMENT ON COLUMN user_settings.email_address IS 'Email address for sending emails';
+COMMENT ON COLUMN user_settings.email_name IS 'Display name for outgoing emails';
+COMMENT ON COLUMN user_settings.app_password IS 'App password for email authentication (encrypted)';
+COMMENT ON COLUMN user_settings.email_host IS 'SMTP server hostname';
+COMMENT ON COLUMN user_settings.email_port IS 'SMTP server port number';
+COMMENT ON COLUMN user_settings.use_tls IS 'Whether to use TLS encryption for email';
+COMMENT ON COLUMN user_settings.whapi_apikey IS 'WHAPI API key for WhatsApp messaging';
+COMMENT ON COLUMN user_settings.instance_id IS 'WHAPI instance ID';
+COMMENT ON COLUMN user_settings.whapi_phone_number IS 'Phone number associated with WHAPI';
+COMMENT ON COLUMN user_settings.provider_url IS 'WHAPI provider URL';
+COMMENT ON COLUMN user_settings.created_at IS 'Timestamp when record was created';
+COMMENT ON COLUMN user_settings.updated_at IS 'Timestamp when record was last updated';
 
 -- =====================================================
 -- FOLDERS TABLE FUNCTIONS

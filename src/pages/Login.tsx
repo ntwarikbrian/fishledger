@@ -80,12 +80,23 @@ const Login = () => {
         });
 
         if (response.success && response.data) {
-          localStorage.setItem("userType", "worker");
-          localStorage.setItem("workerId", workerId);
-          localStorage.setItem("userEmail", response.data.user.email);
-          localStorage.setItem("businessName", businessName);
+          // Worker login response has different structure: response.data.worker instead of response.data.user
+          const workerData = response.data.worker || response.data.user;
+          
+          if (workerData && workerData.email) {
+            localStorage.setItem("userType", "worker");
+            localStorage.setItem("workerId", workerId);
+            localStorage.setItem("userEmail", workerData.email);
+            localStorage.setItem("workerFullName", workerData.fullName || workerData.full_name || "");
+            localStorage.setItem("businessName", businessName);
+            localStorage.setItem("workerRole", workerData.role || "employee");
+            localStorage.setItem("businessId", workerData.businessId || "");
 
-          navigate("/");
+            navigate("/");
+          } else {
+            console.error("Worker data structure issue:", response.data);
+            setError("Login successful but worker data is incomplete. Please try again.");
+          }
         } else {
           setError(response.message || "Worker login failed");
         }

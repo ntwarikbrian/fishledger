@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import Dashboard from "./pages/Index";
+import WorkerDashboard from "./pages/WorkerDashboard";
 import ProductInventory from "./pages/ProductInventory";
 import Sales from "./pages/Sales";
 import Customers from "./pages/Customers";
