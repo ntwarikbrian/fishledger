@@ -12,21 +12,33 @@ export interface UserSettings {
   settingId: string;
   currency: Currency;
   language: 'en' | 'rw';
-  timezone: string;
-  dateFormat: string;
-  theme: 'light' | 'dark' | 'system';
-  emailNotifications: boolean;
-  smsNotifications: boolean;
-  lowStockAlerts: boolean;
-  dailyReports: boolean;
-  weeklyReports: boolean;
-  monthlyReports: boolean;
-  autoReporting: boolean;
-  businessHoursStart: string;
-  businessHoursEnd: string;
-  workingDays: number[];
-  createdAt: string;
-  updatedAt: string;
+  timezone?: string;
+  dateFormat?: string;
+  theme?: 'light' | 'dark' | 'system';
+  emailNotifications?: boolean;
+  smsNotifications?: boolean;
+  lowStockAlerts?: boolean;
+  dailyReports?: boolean;
+  weeklyReports?: boolean;
+  monthlyReports?: boolean;
+  autoReporting?: boolean;
+  businessHoursStart?: string;
+  businessHoursEnd?: string;
+  workingDays?: number[];
+  // Email credentials
+  emailAddress?: string;
+  emailName?: string;
+  appPassword?: string;
+  emailHost?: string;
+  emailPort?: number;
+  useTls?: boolean;
+  // WhatsApp credentials
+  whapiApikey?: string;
+  instanceId?: string;
+  whapiPhoneNumber?: string;
+  providerUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface UpdateSettingsRequest {
@@ -45,6 +57,18 @@ export interface UpdateSettingsRequest {
   business_hours_start?: string;
   business_hours_end?: string;
   working_days?: number[];
+  // Email credentials - using snake_case to match backend expectations
+  email_address?: string;
+  email_name?: string;
+  app_password?: string;
+  email_host?: string;
+  email_port?: number;
+  use_tls?: boolean;
+  // WhatsApp credentials - using snake_case to match backend expectations
+  whapi_apikey?: string;
+  instance_id?: string;
+  whapi_phone_number?: string;
+  provider_url?: string;
 }
 
 export interface ApiResponse<T> {
@@ -66,11 +90,16 @@ class SettingsService {
    * Get authentication headers
    */
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('token');
-    return {
+    const token = localStorage.getItem('auth_token');
+    console.log('Auth token from localStorage:', token ? 'Token exists' : 'No token found');
+    
+    const headers = {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
     };
+    
+    console.log('Request headers:', headers);
+    return headers;
   }
 
   /**
@@ -78,16 +107,30 @@ class SettingsService {
    */
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      try {
+        const errorData = await response.json();
+        console.error('Response error data:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      } catch (jsonError) {
+        console.error('Failed to parse error response as JSON:', jsonError);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
     }
 
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.error || 'API request failed');
-    }
+    try {
+      const data = await response.json();
+      console.log('API response data:', data);
+      
+      if (!data.success) {
+        console.error('API reported failure:', data);
+        throw new Error(data.error || 'API request failed');
+      }
 
-    return data.data;
+      return data.data;
+    } catch (jsonError) {
+      console.error('Failed to parse success response as JSON:', jsonError);
+      throw new Error('Failed to parse API response');
+    }
   }
 
   /**
@@ -112,12 +155,34 @@ class SettingsService {
    */
   async updateSettings(updates: UpdateSettingsRequest): Promise<UserSettings> {
     try {
+      console.log('Making API request to update settings:', {
+        url: `${this.apiConfig.baseUrl}${this.apiConfig.endpoints.settings.update}`,
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: updates
+      });
+      
       const response = await fetch(`${this.apiConfig.baseUrl}${this.apiConfig.endpoints.settings.update}`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(updates),
       });
 
+      // Log response status
+      console.log('API response status:', response.status, response.statusText);
+      
+      // If response is not ok, log the response body for debugging
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.error('Parsed error response:', errorJson);
+        } catch (e) {
+          console.error('Could not parse error response as JSON');
+        }
+      }
+      
       return await this.handleResponse<UserSettings>(response);
     } catch (error) {
       console.error('Failed to update settings:', error);

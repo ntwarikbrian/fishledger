@@ -6,9 +6,10 @@
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/index';
 import {
-  sendEmailHandler,
+  sendMessageHandler,
   getMessagesHandler,
   getMessageHandler,
+  getDeliveryMethodsHandler,
 } from '../handlers/messages';
 import { authenticate, apiRateLimit, enforceDataIsolation } from '../middleware';
 
@@ -26,13 +27,16 @@ messages.use('*', apiRateLimit());
  * Message management routes
  */
 
-// POST /messages/send - Send email to contacts using saved credentials
-messages.post('/send', sendEmailHandler);
+// POST /messages/send - Send messages to contacts using saved credentials (email or WhatsApp)
+messages.post('/send', sendMessageHandler);
 
 // GET /messages - Get message history
 messages.get('/', getMessagesHandler);
 
 // GET /messages/:id - Get single message by ID
 messages.get('/:id', getMessageHandler);
+
+// GET /messages/delivery-methods - Get available delivery methods
+messages.get('/delivery-methods', getDeliveryMethodsHandler);
 
 export { messages };

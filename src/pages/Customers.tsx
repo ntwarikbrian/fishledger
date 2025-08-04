@@ -67,6 +67,19 @@ const Customers = () => {
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [availableDeliveryMethods, setAvailableDeliveryMethods] = useState<Array<{
+    id: string;
+    name: string;
+    icon: string;
+    enabled: boolean;
+    requiresSubject: boolean;
+    disabledReason?: string;
+  }>>([
+    { id: 'email', name: 'Email', icon: '📧', enabled: true, requiresSubject: true },
+    { id: 'whatsapp', name: 'WhatsApp', icon: '📱', enabled: true, requiresSubject: false },
+    { id: 'sms', name: 'SMS', icon: '💬', enabled: true, requiresSubject: false },
+  ]);
+  const [loadingDeliveryMethods, setLoadingDeliveryMethods] = useState(true);
 
   // Real data state
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -101,10 +114,35 @@ const Customers = () => {
     contact_type: "customer"
   });
 
-  // Fetch contacts on component mount
+  // Fetch contacts and delivery methods on component mount
   useEffect(() => {
     fetchContacts();
+    fetchDeliveryMethods();
   }, []);
+  
+  // Fetch available delivery methods
+  const fetchDeliveryMethods = async () => {
+    try {
+      setLoadingDeliveryMethods(true);
+      const response = await messagingService.getDeliveryMethods();
+      
+      if (response.success && response.data) {
+        setAvailableDeliveryMethods(response.data);
+        
+        // Set default delivery method to the first enabled method
+        const enabledMethod = response.data.find(method => method.enabled);
+        if (enabledMethod) {
+          setDeliveryMethod(enabledMethod.id as DeliveryMethod);
+        }
+      } else {
+        console.error('Failed to fetch delivery methods:', response.message);
+      }
+    } catch (error) {
+      console.error('Error fetching delivery methods:', error);
+    } finally {
+      setLoadingDeliveryMethods(false);
+    }
+  };
 
   const fetchContacts = async (showToast = true) => {
     try {
@@ -251,19 +289,29 @@ const Customers = () => {
   };
 
   const handleSendMessage = async () => {
-    if (selectedContacts.length === 0 || !message.trim() || !messageSubject.trim()) {
-      toast.error("Please select contacts, enter a subject, and write a message");
+    // Check if the selected delivery method requires a subject
+    const requiresSubject = !availableDeliveryMethods.length || 
+      availableDeliveryMethods.find(m => m.id === deliveryMethod)?.requiresSubject;
+    
+    // Validate form based on delivery method requirements
+    if (selectedContacts.length === 0 || !message.trim()) {
+      toast.error("Please select contacts and write a message");
+      return;
+    }
+    
+    if (requiresSubject && !messageSubject.trim()) {
+      toast.error(`Please enter a subject for your ${deliveryMethod} message`);
       return;
     }
 
     setIsSendingMessage(true);
 
     try {
-      console.log('📨 Sending message to contacts:', selectedContacts);
+      console.log(`📨 Sending ${deliveryMethod} message to contacts:`, selectedContacts);
 
       const result = await messagingService.sendMessageToContacts(
         selectedContacts,
-        messageSubject,
+        messageSubject, // This will be empty for WhatsApp but that's handled by the backend
         message,
         deliveryMethod
       );
@@ -1221,44 +1269,52 @@ const Customers = () => {
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Delivery Method
                     </label>
-                    <Select value={deliveryMethod} onValueChange={(value: DeliveryMethod) => setDeliveryMethod(value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select delivery method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="email">
-                          <div className="flex items-center gap-2">
-                            <span>📧</span>
-                            <span>Email</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="sms" disabled>
-                          <div className="flex items-center gap-2">
-                            <span>📱</span>
-                            <span>SMS (Coming Soon)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="whatsapp" disabled>
-                          <div className="flex items-center gap-2">
-                            <span>💬</span>
-                            <span>WhatsApp (Coming Soon)</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {loadingDeliveryMethods ? (
+                      <div className="flex items-center gap-2 h-10 px-3 border rounded-md">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        <span className="text-gray-500">Loading delivery methods...</span>
+                      </div>
+                    ) : (
+                      <Select value={deliveryMethod} onValueChange={(value: DeliveryMethod) => setDeliveryMethod(value)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select delivery method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableDeliveryMethods.map((method) => (
+                            <SelectItem 
+                              key={method.id} 
+                              value={method.id as DeliveryMethod}
+                              disabled={!method.enabled}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span>{method.icon}</span>
+                                <span>{method.name}</span>
+                                {!method.enabled && (
+                                  <span className="text-xs text-gray-400 ml-1">({method.disabledReason})</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Message Subject
-                    </label>
-                    <Input
-                      placeholder="Enter message subject..."
-                      value={messageSubject}
-                      onChange={(e) => setMessageSubject(e.target.value)}
-                      className="w-full"
-                    />
-                  </div>
+                  {/* Only show subject field if the selected delivery method requires it */}
+                  {(!availableDeliveryMethods.length || 
+                    availableDeliveryMethods.find(m => m.id === deliveryMethod)?.requiresSubject) && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Message Subject
+                      </label>
+                      <Input
+                        placeholder="Enter message subject..."
+                        value={messageSubject}
+                        onChange={(e) => setMessageSubject(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1310,7 +1366,12 @@ const Customers = () => {
                     </Button>
                     <Button
                       onClick={handleSendMessage}
-                      disabled={selectedContacts.length === 0 || !message.trim() || !messageSubject.trim() || isSendingMessage}
+                      disabled={
+                        selectedContacts.length === 0 || 
+                        !message.trim() || 
+                        ((!availableDeliveryMethods.length || availableDeliveryMethods.find(m => m.id === deliveryMethod)?.requiresSubject) && !messageSubject.trim()) || 
+                        isSendingMessage
+                      }
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                     >
                       {isSendingMessage ? (
@@ -1321,7 +1382,10 @@ const Customers = () => {
                       ) : (
                         <>
                           <Send className="h-4 w-4 mr-2" />
-                          Send {deliveryMethod === 'email' ? 'Email' : deliveryMethod.toUpperCase()}
+                          Send {deliveryMethod === 'email' ? 'Email' : 
+                               deliveryMethod === 'whatsapp' ? 'WhatsApp' :
+                               deliveryMethod === 'sms' ? 'SMS' :
+                               deliveryMethod}
                         </>
                       )}
                     </Button>

@@ -85,11 +85,12 @@ export interface MessageStats {
  * Delivery method info interface
  */
 export interface DeliveryMethodInfo {
-  method: DeliveryMethod;
+  id: string;
   name: string;
-  description: string;
-  available: boolean;
   icon: string;
+  enabled: boolean;
+  requiresSubject: boolean;
+  disabledReason?: string;
 }
 
 /**
@@ -299,14 +300,3 @@ AquaManage Team`;
 
 // Create and export service instance
 export const messagingService = new MessagingService();
-
-// Export types for use in components
-export type {
-  SendMessageRequest,
-  MessageSendResult,
-  Message,
-  MessageStats,
-  DeliveryMethodInfo,
-  TestEmailRequest,
-  EmailTestResult,
-};

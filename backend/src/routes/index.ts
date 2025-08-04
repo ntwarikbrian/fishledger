@@ -27,6 +27,7 @@ import upload from './upload';
 import { reports } from './report.routes';
 import { settings } from './settings.routes';
 import { workerRouter } from './worker.routes';
+import { messages } from './messages.routes';
  
 
 /**
@@ -37,6 +38,7 @@ export function createApiRoutes() {
 
   // Mount route modules
   api.route('/auth', auth);
+  api.route('/messages', messages);
   api.route('/users', users);
   api.route('/products', products);
   api.route('/categories', categories);

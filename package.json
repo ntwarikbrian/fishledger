@@ -42,6 +42,7 @@
     "@radix-ui/react-tooltip": "^1.1.4",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@tanstack/react-query": "^5.56.2",
+    "caniuse-lite": "^1.0.30001727",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.7.0",
     "clsx": "^2.1.1",

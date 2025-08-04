@@ -116,7 +116,7 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
 
       // Try to save to backend (if user is authenticated)
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('auth_token');
         if (token) {
           const response = await fetch('/api/settings', {
             method: 'PUT',

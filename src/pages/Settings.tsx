@@ -38,6 +38,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { toast } from "sonner";
 import { useCurrency, CURRENCIES, type Currency } from '@/contexts/CurrencyContext';
+import { settingsService } from '@/services/settingsService';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -109,11 +110,14 @@ const Settings: React.FC = () => {
   // const [isSaving, setIsSaving] = useState(false);
 
   // Handle settings change (keeping only settings functionality)
-  const handleSettingsChange = async (field: string, value: string | boolean) => {
+  const handleSettingsChange = async (field: string, value: string | boolean | number) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
     }));
+
+    // Save all settings to localStorage
+    localStorage.setItem(`setting_${field}`, JSON.stringify(value));
 
     // Apply changes immediately for some settings
     if (field === 'language') {
@@ -137,6 +141,8 @@ const Settings: React.FC = () => {
           ...prev,
           currency: currency // revert to previous currency
         }));
+        // Also revert in localStorage
+        localStorage.setItem(`setting_${field}`, JSON.stringify(currency));
       }
     }
   };
@@ -147,26 +153,71 @@ const Settings: React.FC = () => {
   // Save settings
   const handleSaveSettings = async () => {
     try {
-      // Save settings to localStorage or API
-      Object.entries(settings).forEach(([key, value]) => {
-        localStorage.setItem(`setting_${key}`, JSON.stringify(value));
-      });
+      // Prepare payload for backend using snake_case to match backend expectations
+      const payload = {
+        // Email credentials
+        email_address: settings.emailAddress,
+        email_name: settings.emailName,
+        app_password: settings.appPassword,
+        email_host: settings.emailHost,
+        email_port: settings.emailPort,
+        use_tls: settings.useTls,
+        // WhatsApp credentials
+        whapi_apikey: settings.whapiApikey,
+        instance_id: settings.instanceId,
+        whapi_phone_number: settings.whapiPhoneNumber,
+        provider_url: settings.providerUrl,
+      };
       
-      toast.success("Settings saved successfully!");
+      console.log('Sending settings payload:', payload);
+      
+      // Send settings to backend
+      const updatedSettings = await settingsService.updateSettings(payload);
+      
+      console.log('Received updated settings from API:', updatedSettings);
+      
+      // Update local state with the response from the server
+      if (updatedSettings) {
+        // Update settings state with values from API response
+        setSettings(prev => ({
+          ...prev,
+          // Email configuration
+          emailAddress: updatedSettings.emailAddress || prev.emailAddress,
+          emailName: updatedSettings.emailName || prev.emailName,
+          appPassword: updatedSettings.appPassword || prev.appPassword,
+          emailHost: updatedSettings.emailHost || prev.emailHost,
+          emailPort: updatedSettings.emailPort || prev.emailPort,
+          useTls: updatedSettings.useTls !== undefined ? updatedSettings.useTls : prev.useTls,
+          // WhatsApp configuration
+          whapiApikey: updatedSettings.whapiApikey || prev.whapiApikey,
+          instanceId: updatedSettings.instanceId || prev.instanceId,
+          whapiPhoneNumber: updatedSettings.whapiPhoneNumber || prev.whapiPhoneNumber,
+          providerUrl: updatedSettings.providerUrl || prev.providerUrl,
+        }));
+        
+        // Save all settings to localStorage
+        Object.entries(settings).forEach(([key, value]) => {
+          localStorage.setItem(`setting_${key}`, JSON.stringify(value));
+        });
+      }
+      
+      toast.success('Settings saved to database successfully!');
     } catch (error) {
-      toast.error("Failed to save settings. Please try again.");
+      console.error('Settings update error:', error);
+      toast.error('Failed to save settings to database. Please try again.');
     }
   };
 
-  // Load settings on component mount
+  // Load settings from API and localStorage on component mount
   useEffect(() => {
+    // First try to load from localStorage for immediate display
     const loadedSettings = { ...settings };
     Object.keys(settings).forEach(key => {
       const saved = localStorage.getItem(`setting_${key}`);
       if (saved) {
         try {
           const parsedValue = JSON.parse(saved);
-          (loadedSettings as any)[key] = parsedValue;
+(loadedSettings as any)[key] = parsedValue;
         } catch (e) {
           // Ignore parsing errors
           console.warn(`Failed to parse setting ${key}:`, e);
@@ -174,6 +225,35 @@ const Settings: React.FC = () => {
       }
     });
     setSettings(loadedSettings);
+    
+    // Then fetch from API to get the latest settings
+    const fetchSettings = async () => {
+      try {
+        const apiSettings = await settingsService.getSettings();
+        
+        // Update settings state with values from API
+        setSettings(prev => ({
+          ...prev,
+          // Email configuration
+          emailAddress: apiSettings.emailAddress || prev.emailAddress,
+          emailName: apiSettings.emailName || prev.emailName,
+          appPassword: apiSettings.appPassword || prev.appPassword,
+          emailHost: apiSettings.emailHost || prev.emailHost,
+          emailPort: apiSettings.emailPort || prev.emailPort,
+          useTls: apiSettings.useTls !== undefined ? apiSettings.useTls : prev.useTls,
+          // WhatsApp configuration
+          whapiApikey: apiSettings.whapiApikey || prev.whapiApikey,
+          instanceId: apiSettings.instanceId || prev.instanceId,
+          whapiPhoneNumber: apiSettings.whapiPhoneNumber || prev.whapiPhoneNumber,
+          providerUrl: apiSettings.providerUrl || prev.providerUrl,
+        }));
+      } catch (error) {
+        console.error('Failed to fetch settings from API:', error);
+        // Don't show error toast here as we already have settings from localStorage
+      }
+    };
+    
+    fetchSettings();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

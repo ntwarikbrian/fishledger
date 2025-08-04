@@ -1,0 +1,55 @@
+📨 Sending email message to contacts: ['c3917fcc-e1d1-47b9-8ad8-0b6964d81453']
+client.ts:203 API Client - Making request: POST http://localhost:8787/api/messages/send
+client.ts:219  POST http://localhost:8787/api/messages/send 400 (Bad Request)
+requestFn @ client.ts:219
+withRetry @ client.ts:161
+makeRequest @ client.ts:235
+post @ client.ts:275
+sendMessage @ messaging.ts:122
+sendMessageToContacts @ messaging.ts:183
+handleSendMessage @ Customers.tsx:312
+callCallback2 @ chunk-R6S4VRB5.js?v=d30ddb90:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=d30ddb90:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=d30ddb90:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=d30ddb90:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=d30ddb90:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=d30ddb90:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=d30ddb90:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=d30ddb90:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=d30ddb90:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=d30ddb90:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=d30ddb90:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=d30ddb90:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=d30ddb90:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=d30ddb90:5472
+dispatchDiscreteEvent @ chunk-R6S4VRB5.js?v=d30ddb90:5449
+client.ts:110 API Client - Raw response text: {}
+client.ts:122 API Client - Response status: 400 Data: {}
+client.ts:136 API Client - Response not OK: 400 {}
+handleResponse @ client.ts:136
+await in handleResponse
+makeRequest @ client.ts:236
+await in makeRequest
+post @ client.ts:275
+sendMessage @ messaging.ts:122
+sendMessageToContacts @ messaging.ts:183
+handleSendMessage @ Customers.tsx:312
+callCallback2 @ chunk-R6S4VRB5.js?v=d30ddb90:3674
+invokeGuardedCallbackDev @ chunk-R6S4VRB5.js?v=d30ddb90:3699
+invokeGuardedCallback @ chunk-R6S4VRB5.js?v=d30ddb90:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-R6S4VRB5.js?v=d30ddb90:3736
+executeDispatch @ chunk-R6S4VRB5.js?v=d30ddb90:7014
+processDispatchQueueItemsInOrder @ chunk-R6S4VRB5.js?v=d30ddb90:7034
+processDispatchQueue @ chunk-R6S4VRB5.js?v=d30ddb90:7043
+dispatchEventsForPlugins @ chunk-R6S4VRB5.js?v=d30ddb90:7051
+(anonymous) @ chunk-R6S4VRB5.js?v=d30ddb90:7174
+batchedUpdates$1 @ chunk-R6S4VRB5.js?v=d30ddb90:18913
+batchedUpdates @ chunk-R6S4VRB5.js?v=d30ddb90:3579
+dispatchEventForPluginEventSystem @ chunk-R6S4VRB5.js?v=d30ddb90:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-R6S4VRB5.js?v=d30ddb90:5478
+dispatchEvent @ chunk-R6S4VRB5.js?v=d30ddb90:5472
+dispatchDiscreteEvent @ chunk-R6S4VRB5.js?v=d30ddb90:5449
+Customers.tsx:340 ❌ Error sending message: ApiClientError: HTTP 400
+    at ApiClient.handleResponse (client.ts:138:13)
+    at async ApiClient.makeRequest (client.ts:236:14)
+    at async handleSendMessage (Customers.tsx:312:22)

@@ -304,6 +304,14 @@ export const getApiInfo = () => {
 };
 
 /**
+ * Get API configuration - used by services to access API endpoints
+ * @returns The API configuration object
+ */
+export const getApiConfig = (): ApiConfig => {
+  return apiConfig;
+};
+
+/**
  * Log API configuration (for development)
  */
 export const logApiConfig = (): void => {
