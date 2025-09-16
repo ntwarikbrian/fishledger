@@ -226,7 +226,7 @@ const Navbar = () => {
             <DropdownMenuItem>{t('common.profile', 'Profile')}</DropdownMenuItem>
             <DropdownMenuItem>{t('common.settings', 'Settings')}</DropdownMenuItem>
             <DropdownMenuSeparator />
-('common.logout', 'Log out')}</DropdownMenuItem>
+            <DropdownMenuItem>{t('common.logout', 'Log out')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
