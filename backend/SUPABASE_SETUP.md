@@ -97,12 +97,12 @@ For **Cloudflare Workers**, set up secrets:
 
 ```bash
 cd backend
-npx wrangler login
-npx wrangler secret put SUPABASE_URL
-npx wrangler secret put SUPABASE_ANON_KEY
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put JWT_REFRESH_SECRET
+pnpm dlx wrangler login
+pnpm dlx wrangler secret put SUPABASE_URL
+pnpm dlx wrangler secret put SUPABASE_ANON_KEY
+pnpm dlx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+pnpm dlx wrangler secret put JWT_SECRET
+pnpm dlx wrangler secret put JWT_REFRESH_SECRET
 ```
 
 For **local development**, create `.env` file:
@@ -118,8 +118,8 @@ Run the connection test script:
 
 ```bash
 cd scripts
-npm install
-npm run test:supabase
+pnpm install
+pnpm run test:supabase
 ```
 
 ### 5. Deploy and Test
@@ -128,7 +128,7 @@ Deploy your Cloudflare Worker:
 
 ```bash
 cd backend
-npm run deploy
+pnpm run deploy
 ```
 
 Test the health endpoint:

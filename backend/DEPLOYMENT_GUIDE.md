@@ -133,7 +133,7 @@ CREATE TABLE stock_movements (
 1. **Start the development server**:
    ```bash
    cd backend
-   npm run dev
+   pnpm run dev
    ```
 
 2. **Test the health endpoint**:
@@ -162,7 +162,7 @@ CREATE TABLE stock_movements (
 
 3. **Deploy**:
    ```bash
-   npm run deploy
+   pnpm run deploy
    ```
 
 ### 4. Frontend Integration

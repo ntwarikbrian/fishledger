@@ -24,7 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "pnpm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]

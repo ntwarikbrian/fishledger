@@ -97,7 +97,7 @@ backend/
 
 ### Prerequisites
 - Node.js 18+
-- npm
+- pnpm
 - Cloudflare account
 - Supabase account
 
@@ -105,12 +105,12 @@ backend/
 
 1. **Install dependencies**:
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Install Wrangler CLI globally**:
    ```bash
-   npm install -g wrangler
+   pnpm install -g wrangler
    ```
 
 3. **Login to Cloudflare**:
@@ -131,24 +131,24 @@ backend/
 
 1. **Start development server**:
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 2. **Run type checking**:
    ```bash
-   npm run type-check
+   pnpm run type-check
    ```
 
 3. **Run linting**:
    ```bash
-   npm run lint
+   pnpm run lint
    ```
 
 ### Deployment
 
 1. **Deploy to Cloudflare Workers**:
    ```bash
-   npm run deploy
+   pnpm run deploy
    ```
 
 ## Environment Variables

@@ -68,7 +68,7 @@ This scalable SaaS platform is built with cutting-edge technologies:
 - **Cloudinary** for professional file and image management
 
 ### **DevOps & Performance**
-- **npm** package management across all services
+- **pnpm** package management across all services
 - **TypeScript** compilation and type checking
 - **Environment-based Configuration** for different deployment stages
 - **Comprehensive Error Handling** with user-friendly feedback
@@ -86,7 +86,7 @@ This scalable SaaS platform is built with cutting-edge technologies:
 ### Prerequisites
 
 - **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
-- **npm** package manager (comes with Node.js)
+- **pnpm** package manager (install with: npm install -g pnpm)
 - **Supabase Account** - [Sign up here](https://supabase.com)
 - **Cloudinary Account** - [Sign up here](https://cloudinary.com)
 - **Cloudflare Account** (for deployment) - [Sign up here](https://cloudflare.com)
@@ -100,11 +100,11 @@ cd scalable-saas
 
 # 2. Install client dependencies
 cd client
-npm install
+pnpm install
 
 # 3. Install backend dependencies
 cd ../backend
-npm install
+pnpm install
 
 # 4. Set up environment variables (see Environment Setup below)
 
@@ -114,29 +114,29 @@ npm install
 
 # Terminal 1 - Backend (Hono + Cloudflare Workers)
 cd backend
-npm run dev  # API at http://localhost:8787
+pnpm run dev  # API at http://localhost:8787
 
 # Terminal 2 - Frontend (React + Vite)
 cd client
-npm run dev  # App at http://localhost:5173
+pnpm run dev  # App at http://localhost:5173
 ```
 
 ### 🔧 Development Commands
 
 ```bash
 # Backend development
-cd backend; npm run dev
+cd backend; pnpm run dev
 
 # Frontend development
-cd client; npm run dev
+cd client; pnpm run dev
 
 # Type checking
-cd client; npm run type-check
-cd backend; npm run type-check
+cd client; pnpm run type-check
+cd backend; pnpm run type-check
 
 # Build for production
-cd client; npm run build
-cd backend; npm run build
+cd client; pnpm run build
+cd backend; pnpm run build
 ```
 
 ### ⚙️ Environment Setup
@@ -274,7 +274,7 @@ database/
 ### **DevOps & Tools**
 | Tool | Purpose |
 |------|---------|
-| **npm** | Package management |
+| **pnpm** | Package management |
 | **Wrangler** | Cloudflare Workers CLI |
 | **ESLint** | Code linting |
 | **Prettier** | Code formatting |
@@ -338,34 +338,34 @@ scalable-saas/
 
 ### **Client Scripts** (`cd client`)
 ```bash
-npm run dev          # Start development server (http://localhost:5173)
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
+pnpm run dev          # Start development server (http://localhost:5173)
+pnpm run build        # Build for production
+pnpm run preview      # Preview production build
+pnpm run lint         # Run ESLint
+pnpm run type-check   # TypeScript type checking
 ```
 
 ### **Backend Scripts** (`cd backend`)
 ```bash
-npm run dev          # Start development server (http://localhost:8787)
-npm run build        # Build for production
-npm run deploy       # Deploy to Cloudflare Workers
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
+pnpm run dev          # Start development server (http://localhost:8787)
+pnpm run build        # Build for production
+pnpm run deploy       # Deploy to Cloudflare Workers
+pnpm run lint         # Run ESLint
+pnpm run type-check   # TypeScript type checking
 ```
 
 ### **Development Workflow**
 ```bash
 # Start both servers simultaneously
 # Terminal 1
-cd backend && npm run dev
+cd backend && pnpm run dev
 
 # Terminal 2
-cd client && npm run dev
+cd client && pnpm run dev
 
 # Production build
-cd client && npm run build
-cd backend && npm run build
+cd client && pnpm run build
+cd backend && pnpm run build
 ```
 
 ## 🚀 Deployment
@@ -375,13 +375,13 @@ cd backend && npm run build
 ```bash
 # Build the client
 cd client
-npm run build
+pnpm run build
 
 # Deploy to Vercel
-npx vercel --prod
+pnpm dlx vercel --prod
 
 # Or deploy to Netlify
-npm install -g netlify-cli
+pnpm install -g netlify-cli
 netlify deploy --prod --dir=dist
 ```
 
@@ -390,10 +390,10 @@ netlify deploy --prod --dir=dist
 ```bash
 # Deploy to Cloudflare Workers
 cd backend
-npm run deploy
+pnpm run deploy
 
 # Or using Wrangler directly
-npx wrangler deploy
+pnpm dlx wrangler deploy
 ```
 
 ### **Environment Variables for Production**
@@ -410,10 +410,10 @@ VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 Set up using Wrangler CLI:
 ```bash
 cd backend
-npx wrangler secret put SUPABASE_URL
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put CLOUDINARY_API_SECRET
+pnpm dlx wrangler secret put SUPABASE_URL
+pnpm dlx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+pnpm dlx wrangler secret put JWT_SECRET
+pnpm dlx wrangler secret put CLOUDINARY_API_SECRET
 # ... etc
 ```
 
@@ -466,8 +466,8 @@ We welcome contributions! Please follow these steps:
    - Follow the existing code style
 4. **Test your changes**
    ```bash
-   cd client && npm run type-check
-   cd backend && npm run type-check
+   cd client && pnpm run type-check
+   cd backend && pnpm run type-check
    ```
 5. **Commit your changes**
    ```bash
