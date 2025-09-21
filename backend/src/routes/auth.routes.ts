@@ -13,6 +13,11 @@ import {
   profileHandler,
 } from '../handlers/auth';
 import {
+  googleAuthHandler,
+  googleCallbackHandler,
+  googleVerifyHandler,
+} from '../handlers/googleAuth';
+import {
   authenticateWorker,
   refreshWorkerToken,
   getWorkerProfile,
@@ -40,6 +45,19 @@ auth.post('/register', authRateLimit, registerHandler);
 
 // POST /auth/refresh - Refresh access token
 auth.post('/refresh', authRateLimit, refreshTokenHandler);
+
+/**
+ * Google OAuth routes for admin authentication
+ */
+
+// GET /auth/google - Start Google OAuth flow
+auth.get('/google', authRateLimit, googleAuthHandler);
+
+// POST /auth/google/callback - Handle Google OAuth callback
+auth.post('/google/callback', authRateLimit, googleCallbackHandler);
+
+// POST /auth/google/verify - Verify Google ID token
+auth.post('/google/verify', authRateLimit, googleVerifyHandler);
 
 /**
  * Worker authentication routes

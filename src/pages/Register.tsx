@@ -89,6 +89,19 @@ const Register = () => {
   usePageTitle('auth.registerTitle', 'Register');
 
   const navigate = useNavigate();
+
+  // Redirect admin users to login with Google OAuth
+  React.useEffect(() => {
+    // Show a message and redirect to login for Google OAuth
+    setTimeout(() => {
+      navigate('/login', { 
+        state: { 
+          message: 'Business owners now sign up automatically with Google. Please use the Admin tab to sign in with Google.',
+          tab: 'admin'
+        }
+      });
+    }, 3000);
+  }, [navigate]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   

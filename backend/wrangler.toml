@@ -39,6 +39,9 @@ EMAIL_FROM = "automatedinventorymessage@gmail.com"
 CLOUDINARY_CLOUD_NAME = "dji23iymw"
 CLOUDINARY_API_KEY = "162843632338622"
 CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0"
+GOOGLE_CLIENT_ID = "your_google_client_id_here"
+GOOGLE_CLIENT_SECRET = "your_google_client_secret_here"
+GOOGLE_REDIRECT_URI = "http://localhost:8080/api/auth/google/callback"
 
 # Development environment (for local testing)
 [env.development]

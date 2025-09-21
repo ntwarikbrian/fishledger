@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { authAPI } from "@/services/api";
 import { CompactLanguageSwitcher } from "@/components/ui/language-switcher";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const Login = () => {
   const { t } = useTranslation();
@@ -81,7 +82,7 @@ const Login = () => {
 
         if (response.success && response.data) {
           // Worker login response has different structure: response.data.worker instead of response.data.user
-          const workerData = response.data.worker || response.data.user;
+          const workerData = (response.data as any).worker || response.data.user;
           
           if (workerData && workerData.email) {
             localStorage.setItem("userType", "worker");
@@ -234,53 +235,35 @@ const Login = () => {
                 </TabsTrigger>
               </TabsList>
 
+              {/* Admin Google OAuth */}
+              <TabsContent value="admin" className="space-y-4 mt-0">
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Business owners, sign in with your Google account
+                    </p>
+                  </div>
+                  
+                  <GoogleSignInButton 
+                    onSuccess={() => {
+                      // Navigation handled by GoogleSignInButton
+                    }}
+                    onError={(error) => {
+                      setError(error);
+                    }}
+                    className="h-12 text-sm font-medium"
+                  />
+                  
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Secure authentication via Google OAuth
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Worker Login Form */}
               <form onSubmit={handleLogin} className="space-y-4">
-                <TabsContent value="admin" className="space-y-4 mt-0">
-                  {/* Admin Login Fields */}
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Email Address
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="admin@company.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="password" className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </TabsContent>
-
                 <TabsContent value="worker" className="space-y-4 mt-0">
                   {/* Worker Login Fields */}
                   <div className="space-y-1">

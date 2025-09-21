@@ -55,10 +55,6 @@ localPort = 8080
 externalPort = 8080
 exposeLocalhost = true
 
-[[ports]]
-localPort = 32945
-externalPort = 3000
-
 [deployment]
 deploymentTarget = "autoscale"
 run = ["pnpm", "run", "preview"]
