@@ -22,10 +22,12 @@ server/dist
 
 # Environment variables
 .env
-.env.local
+.local.env
 .env.development.local
 .env.test.local
 .env.production.local
+backend/.env
+backend/.env.local
 *.local
 
 # Allow .env.production (contains only URLs, no secrets)
