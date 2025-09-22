@@ -8,6 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Dependencies
+
+# Environment files
+.env
+*.env
+local.env
+.env.local
+.env.*.local
 node_modules
 */node_modules
 server/node_modules

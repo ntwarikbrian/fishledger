@@ -20,13 +20,13 @@ command = ""
 [vars]
 ENVIRONMENT = "development"
 LOG_LEVEL = "debug"
-SUPABASE_URL = "https://irxbpmlcqvmivlafoivt.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNjIwNjUsImV4cCI6MjA3MzkzODA2NX0.a0i_Edhu8SANJzAdTV2nx6FLoaJJ1n-sNUBsugFJwgY"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODM2MjA2NSwiZXhwIjoyMDczOTM4MDY1fQ.dps-iEltfrpKWAUl0fiEUWcNSZxFd0Oaec-J-OyDB70"
-JWT_SECRET = "your_super_secret_jwt_key_here_make_it_at_least_32_characters_long"
-JWT_EXPIRES_IN = "7d"
-JWT_REFRESH_SECRET = "your_refresh_secret_here_also_make_it_32_characters_long"
-JWT_REFRESH_EXPIRES_IN = "30d"
+
+# These values will be overridden by environment variables in production
+# Use wrangler secret to set these in production:
+# wrangler secret put SUPABASE_URL
+# wrangler secret put SUPABASE_ANON_KEY
+# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# etc.
 CORS_ORIGIN = "http://localhost:5000,http://localhost:8080,http://localhost:5173,http://localhost:3000,https://local-fishing-frontend.pages.dev,https://local-fishing-frontend-preview.pages.dev"
 MAX_FILE_SIZE = "10485760"
 RATE_LIMIT_WINDOW_MS = "900000"
