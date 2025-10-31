@@ -4,7 +4,7 @@ A Cloudflare Workers backend built with TypeScript for the Local Fishing invento
 
 ## Features
 
-- **Authentication & Authorization**: JWT-based authentication with role-based access control
+- **Authentication & Authorization**: Clerk-based authentication for admins (Google OAuth via Clerk), JWT-based for worker users, role-based access control
 - **User Management**: Complete CRUD operations for user accounts
 - **Product Management**: Inventory management with stock tracking
 - **Sales Management**: Transaction processing and sales tracking
@@ -19,7 +19,9 @@ A Cloudflare Workers backend built with TypeScript for the Local Fishing invento
 - **Runtime**: Cloudflare Workers
 - **Language**: TypeScript
 - **Database**: PostgreSQL (Supabase)
-- **Authentication**: JWT tokens
+- **Authentication**:
+  - **Admins:** Clerk (Sign in with Google via Clerk, managed session tokens, enforced with backend Clerk middleware)
+  - **Workers:** JWT tokens (traditional email/password)
 - **Validation**: Zod schema validation
 - **Password Hashing**: bcryptjs
 
@@ -39,6 +41,7 @@ backend/
 │   │   └── stock-movements.ts
 │   ├── middleware/       # Middleware functions
 │   │   ├── auth.ts
+│   │   ├── clerk.ts   # Clerk middleware for admin endpoints
 │   │   └── cors.ts
 │   ├── types/           # TypeScript type definitions
 │   │   └── index.ts
@@ -56,186 +59,46 @@ backend/
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - User logout
-- `GET /api/auth/profile` - Get current user profile
+### Admin Authentication (Clerk)
+- All admin endpoints require a valid Clerk session token in the Authorization header
+- Authentication is enforced using Clerk middleware in Hono
+- Admin sign-in is managed via Clerk's "Sign in with Google" (or other SSO options Clerk offers)
 
-### Users
-- `GET /api/users` - Get all users (paginated)
-- `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create new user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user (soft delete)
+### Worker Authentication (JWT)
+- Worker endpoints use traditional JWT authentication
+- Endpoints:
+  - `POST /api/auth/worker-login` - Worker login
+  - `POST /api/auth/worker-refresh` - Token refresh
+  - `GET /api/auth/worker-verify` - Token verification
 
-### Products
-- `GET /api/products` - Get all products (paginated, filterable)
-- `GET /api/products/:id` - Get product by ID
-- `POST /api/products` - Create new product
-- `PUT /api/products/:id` - Update product
-- `DELETE /api/products/:id` - Delete product (soft delete)
-- `GET /api/products/low-stock` - Get products with low stock
+(Other endpoints remain unchanged)
 
-### Sales
-- `GET /api/sales` - Get all sales (paginated, filterable)
-- `GET /api/sales/:id` - Get sale by ID
-- `POST /api/sales` - Create new sale
-- `PUT /api/sales/:id` - Update sale
+## Authentication & Authorization
 
-### Stock Movements
-- `GET /api/stock-movements` - Get all stock movements (paginated, filterable)
-- `POST /api/stock-movements` - Create new stock movement
-- `GET /api/products/:productId/stock-movements` - Get stock movements for a product
-- `GET /api/products/:productId/stock-summary` - Get stock summary for a product
-
-### Health Check
-- `GET /health` - Application health status
-
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+
-- pnpm
-- Cloudflare account
-- Supabase account
-
-### Installation
-
-1. **Install dependencies**:
-   ```bash
-   pnpm install
-   ```
-
-2. **Install Wrangler CLI globally**:
-   ```bash
-   pnpm install -g wrangler
-   ```
-
-3. **Login to Cloudflare**:
-   ```bash
-   wrangler login
-   ```
-
-4. **Configure environment variables**:
-   Update `wrangler.toml` with your environment variables or use Wrangler secrets:
-   ```bash
-   wrangler secret put SUPABASE_URL
-   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-   wrangler secret put JWT_SECRET
-   # ... add other secrets
-   ```
-
-### Development
-
-1. **Start development server**:
-   ```bash
-   pnpm run dev
-   ```
-
-2. **Run type checking**:
-   ```bash
-   pnpm run type-check
-   ```
-
-3. **Run linting**:
-   ```bash
-   pnpm run lint
-   ```
-
-### Deployment
-
-1. **Deploy to Cloudflare Workers**:
-   ```bash
-   pnpm run deploy
-   ```
+- Clerk-based authentication secures all admin routes:
+  - Clerk's React SDK on the frontend handles session and token issuance
+  - Backend Clerk middleware verifies incoming requests and extracts the authorized user's information and role
+  - Only users with the `admin` role (as provisioned by Clerk) can access protected admin routes
+- Worker endpoints follow previous JWT authentication, verified using backend JWT logic
 
 ## Environment Variables
 
-The following environment variables are required:
+### Admin (Clerk)
+- `CLERK_SECRET_KEY` - Clerk backend secret (for validation)
 
 ### Database
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Supabase anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 
-### Authentication
-- `JWT_SECRET` - Secret for signing JWT tokens (min 32 characters)
-- `JWT_EXPIRES_IN` - JWT token expiration time (default: 7d)
-- `JWT_REFRESH_SECRET` - Secret for refresh tokens (min 32 characters)
-- `JWT_REFRESH_EXPIRES_IN` - Refresh token expiration (default: 30d)
+## Setup and Usage
 
-### CORS
-- `CORS_ORIGIN` - Allowed origins (comma-separated)
+1. Set up Clerk in your Clerk dashboard; set publishable and secret keys in your frontend and backend environments
+2. Frontend uses Clerk components for login and session management (see frontend README for details)
+3. Backend uses Clerk middleware for admin route protection
+4. All other setup and deployment instructions are unchanged
 
-### Rate Limiting
-- `RATE_LIMIT_WINDOW_MS` - Rate limit window in milliseconds
-- `RATE_LIMIT_MAX_REQUESTS` - Maximum requests per window
-
-### Email (Optional)
-- `EMAIL_HOST` - SMTP host
-- `EMAIL_PORT` - SMTP port
-- `EMAIL_USER` - SMTP username
-- `EMAIL_PASSWORD` - SMTP password
-- `EMAIL_FROM` - From email address
-
-### File Upload (Optional)
-- `CLOUDINARY_CLOUD_NAME` - Cloudinary cloud name
-- `CLOUDINARY_API_KEY` - Cloudinary API key
-- `CLOUDINARY_API_SECRET` - Cloudinary API secret
-
-## Database Schema
-
-The backend expects the following database tables:
-
-- `users` - User accounts and profiles
-- `products` - Product catalog and inventory
-- `sales` - Sales transactions
-- `stock_movements` - Inventory movement tracking
-
-Refer to the database schema files in the `database/` directory of the main project.
-
-## Authentication & Authorization
-
-The API uses JWT-based authentication with the following roles:
-- `admin` - Full access to all resources
-- `manager` - Access to most resources except user management
-- `employee` - Limited access to basic operations
-
-## Error Handling
-
-All API responses follow a consistent format:
-
-**Success Response**:
-```json
-{
-  "success": true,
-  "data": {...},
-  "message": "Operation successful",
-  "timestamp": "2025-07-10T19:47:00.000Z",
-  "requestId": "req_1720647420000_abc123"
-}
-```
-
-**Error Response**:
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "timestamp": "2025-07-10T19:47:00.000Z",
-  "requestId": "req_1720647420000_abc123"
-}
-```
-
-## Contributing
-
-1. Follow TypeScript best practices
-2. Add comprehensive error handling
-3. Include JSDoc comments for all functions
-4. Write tests for new features
-5. Follow the existing code structure and patterns
-
-## License
-
-MIT License
+## Notes
+- Database and user provisioning is automatic for admins via Clerk's first login
+- No admin passwords are present or needed for Clerk users
+- Worker authentication continues via the established legacy endpoints until all users fully migrate to Clerk

@@ -24,11 +24,11 @@
   "author": "Local Fishing Team",
   "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.75.1",
+    "@supabase/supabase-js": "^2.77.0",
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.7.0",
+    "cloudinary": "^2.8.0",
     "date-fns": "^3.6.0",
-    "hono": "^4.10.1",
+    "hono": "^4.10.3",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
     "pdfkit": "^0.17.2",
@@ -36,7 +36,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251011.0",
+    "@cloudflare/workers-types": "^4.20251014.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/pdfmake": "^0.2.12",
