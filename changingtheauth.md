@@ -1,54 +1,102 @@
 Step 1 – Setup Frontend (React)
 
-Install Clerk React SDK
+Install Supabase Client Libraries
 
-pnpm add @clerk/clerk-react
+pnpm add @supabase/supabase-js @supabase/auth-ui-react @supabase/auth-ui-shared
 
 
-Add environment variable .env.local in src/
+Add environment variables (.env.local)
 
-VITE_CLERK_PUBLISHABLE_KEY=pk_live_XXXX
+VITE_SUPABASE_URL=your_project_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
 VITE_API_URL=http://localhost:8080
 
 
-Wrap App with ClerkProvider
+Create Supabase client
+
+// src/lib/supabase.ts
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+
+Wrap App with a small Auth provider
 
 // src/main.tsx or src/App.tsx
-import { ClerkProvider, SignedIn, SignedOut, UserButton, SignInButton } from "@clerk/clerk-react";
-import Dashboard from "./pages/Dashboard";
-import LoginPage from "./pages/LoginPage";
+import React from 'react'
+import { supabase } from './lib/supabase'
+import Dashboard from './pages/Dashboard'
+import LoginPage from './pages/LoginPage'
 
-<ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
-  <SignedIn>
-    <UserButton />
-    <Dashboard />
-  </SignedIn>
-  <SignedOut>
-    <LoginPage />
-  </SignedOut>
-</ClerkProvider>
+function App() {
+  const [session, setSession] = React.useState(null)
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  return session?.user ? <Dashboard /> : <LoginPage />
+}
+
+export default App
 
 
-Replace old login page with Clerk SignIn component
-Google OAuth login for admins and email/password for workers is handled automatically by Clerk.
+Replace old login page with Supabase Auth UI (optional)
 
-Remove any old Google OAuth buttons or password login logic.
+// Example in LoginPage.tsx
+import { Auth } from '@supabase/auth-ui-react'
+import { supabase } from '../lib/supabase'
+
+export default function LoginPage() {
+  return <Auth supabaseClient={supabase} />
+}
+
 Step 2 – Setup Backend (Hono + Cloudflare Workers)
 
-Install Clerk backend SDK
+Install Supabase helper library
 
 cd backend
-pnpm add @clerk/backend
+pnpm add @supabase/supabase-js
 
 
-Create Clerk middleware
+Create Supabase Auth middleware
 
-// backend/src/middleware/clerk.ts
-import { clerkMiddleware, getAuth } from "@clerk/backend";
-import { Hono } from "hono";
+// backend/src/middleware/auth.ts
+import { createClient } from '@supabase/supabase-js'
+import { Hono } from 'hono'
 
-const app = new Hono();
-app.use("*", clerkMiddleware());
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
 
-export { app, getAuth };
+const app = new Hono()
+
+app.use(async (c, next) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const token = authHeader.split(' ')[1]
+  const { data, error } = await supabase.auth.getUser(token)
+
+  if (error || !data.user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  c.set('user', data.user)
+  await next()
+})
+
+export { app }
 

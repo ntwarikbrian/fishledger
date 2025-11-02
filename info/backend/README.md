@@ -4,7 +4,7 @@ A Cloudflare Workers backend built with TypeScript for the Local Fishing invento
 
 ## Features
 
-- **Authentication & Authorization**: Clerk-based authentication for admins (Google OAuth via Clerk), JWT-based for worker users, role-based access control
+- **Authentication & Authorization**: Supabase Auth for all users (Google OAuth and email/password), role-based access control
 - **User Management**: Complete CRUD operations for user accounts
 - **Product Management**: Inventory management with stock tracking
 - **Sales Management**: Transaction processing and sales tracking
@@ -20,7 +20,7 @@ A Cloudflare Workers backend built with TypeScript for the Local Fishing invento
 - **Language**: TypeScript
 - **Database**: PostgreSQL (Supabase)
 - **Authentication**:
-  - **Admins:** Clerk (Sign in with Google via Clerk, managed session tokens, enforced with backend Clerk middleware)
+  - **Admins:** Supabase Auth (Sign in with Google/Email, managed session tokens, enforced with backend Supabase middleware)
   - **Workers:** JWT tokens (traditional email/password)
 - **Validation**: Zod schema validation
 - **Password Hashing**: bcryptjs
@@ -41,7 +41,7 @@ backend/
 │   │   └── stock-movements.ts
 │   ├── middleware/       # Middleware functions
 │   │   ├── auth.ts
-│   │   ├── clerk.ts   # Clerk middleware for admin endpoints
+│   │   ├── auth.ts    # Supabase Auth middleware for protected endpoints
 │   │   └── cors.ts
 │   ├── types/           # TypeScript type definitions
 │   │   └── index.ts
@@ -59,10 +59,10 @@ backend/
 
 ## API Endpoints
 
-### Admin Authentication (Clerk)
-- All admin endpoints require a valid Clerk session token in the Authorization header
-- Authentication is enforced using Clerk middleware in Hono
-- Admin sign-in is managed via Clerk's "Sign in with Google" (or other SSO options Clerk offers)
+### Admin Authentication (Supabase Auth)
+- All admin endpoints require a valid Supabase JWT in the Authorization header
+- Authentication is enforced using Supabase Auth middleware in Hono
+- Admin sign-in is managed via Supabase Auth UI (Google SSO, email/password)
 
 ### Worker Authentication (JWT)
 - Worker endpoints use traditional JWT authentication
@@ -75,16 +75,17 @@ backend/
 
 ## Authentication & Authorization
 
-- Clerk-based authentication secures all admin routes:
-  - Clerk's React SDK on the frontend handles session and token issuance
-  - Backend Clerk middleware verifies incoming requests and extracts the authorized user's information and role
-  - Only users with the `admin` role (as provisioned by Clerk) can access protected admin routes
+- Supabase Auth secures all protected routes:
+  - Supabase Client on the frontend handles session and token management
+  - Backend Supabase middleware verifies incoming requests and extracts the authorized user's information and role
+  - Only users with the appropriate role (set in Supabase) can access protected routes
 - Worker endpoints follow previous JWT authentication, verified using backend JWT logic
 
 ## Environment Variables
 
-### Admin (Clerk)
-- `CLERK_SECRET_KEY` - Clerk backend secret (for validation)
+### Admin (Supabase Auth)
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_SERVICE_KEY` - Supabase service role key for backend operations
 
 ### Database
 - `SUPABASE_URL` - Supabase project URL
@@ -93,12 +94,12 @@ backend/
 
 ## Setup and Usage
 
-1. Set up Clerk in your Clerk dashboard; set publishable and secret keys in your frontend and backend environments
-2. Frontend uses Clerk components for login and session management (see frontend README for details)
-3. Backend uses Clerk middleware for admin route protection
+1. Set up project in your Supabase dashboard; configure URL and API keys in frontend and backend environments
+2. Frontend uses Supabase Auth UI components for login and session management (see frontend README for details)
+3. Backend uses Supabase Auth middleware for route protection
 4. All other setup and deployment instructions are unchanged
 
 ## Notes
-- Database and user provisioning is automatic for admins via Clerk's first login
-- No admin passwords are present or needed for Clerk users
-- Worker authentication continues via the established legacy endpoints until all users fully migrate to Clerk
+- Database and user provisioning is handled through Supabase Auth
+- Passwords are securely managed by Supabase Auth for all users
+- All authentication is unified through Supabase Auth with role-based access control

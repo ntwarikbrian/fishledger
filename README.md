@@ -66,8 +66,7 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
 - **Cloudflare Workers** (serverless global backend)
 - **Hono** (TS-first web framework for Workers)
 - **Zod** (validation)
-- **Clerk** (admin authentication: SSO/JWT)
-- **JWT (legacy)** (worker authentication)
+- **Supabase Auth** (authentication: SSO/JWT)
 - **bcryptjs** (password hashing)
 - **Supabase client** (database interaction)
 - **Wrangler CLI** (deploy/manage Workers)
@@ -115,7 +114,7 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
 │   │   ├── config/       # Env and third-party config
 │   │   ├── routes/       # API registrations
 │   │   ├── handlers/     # Request orchestration
-│   │   ├── middleware/   # Clerk, Auth, CORS, etc
+│   │   ├── middleware/   # Supabase Auth, CORS, etc
 │   │   ├── services/     # Domain logic
 │   │   ├── types/        # Backend TS types
 │   │   ├── utils/        # Pure helpers
@@ -128,7 +127,7 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
 │   ├── migrations/       # Time-stamped upgrade scripts
 │   └── seeds/            # Optional sample data
 ├── info/                 # Reference documentation
-│   ├── authentication.md # Auth flows (Clerk + legacy)
+│   ├── authentication.md # Auth flows (Supabase Auth)
 │   └── backend/          # Backend guides
 ├── package.json          # (optional) Monorepo scripts
 ├── tailwind.config.ts    # Tailwind/shadcn configuration
