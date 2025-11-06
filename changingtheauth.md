@@ -1,102 +1,94 @@
-Step 1 – Setup Frontend (React)
+implement Google OAuth manually, end-to-end:
+✅ Frontend → Backend (Hono) → Database (your own users table).
+✅ No Supabase or third-party auth provider.
+✅ You want to store and manage users yourself (e.g. in PostgreSQL, MySQL, etc).
 
-Install Supabase Client Libraries
+Let’s go step-by-step so you can actually build this locally and scale it later.
 
-pnpm add @supabase/supabase-js @supabase/auth-ui-react @supabase/auth-ui-shared
+🧭 Overview of what we’ll build
 
+Frontend: Add a “Sign in with Google” button that hits your backend.
 
-Add environment variables (.env.local)
+Backend (Hono):
 
-VITE_SUPABASE_URL=your_project_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
-VITE_API_URL=http://localhost:8080
+Create /auth/google → redirects to Google login.
 
+Create /auth/google/callback → Google redirects back here with a code.
 
-Create Supabase client
+Exchange the code for user info via Google’s OAuth API.
 
-// src/lib/supabase.ts
-import { createClient } from '@supabase/supabase-js'
+Store or update the user in your DB.
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+Generate and return a signed JWT session token.
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+# 🧩 STEP 1: Create OAuth credentials in Google Cloud
 
+Go to Google Cloud Console → Credentials
+.
 
-Wrap App with a small Auth provider
+Create a new OAuth Client ID:
 
-// src/main.tsx or src/App.tsx
-import React from 'react'
-import { supabase } from './lib/supabase'
-import Dashboard from './pages/Dashboard'
-import LoginPage from './pages/LoginPage'
+Application type: Web Application
 
-function App() {
-  const [session, setSession] = React.useState(null)
+Authorized redirect URI:
 
-  React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => listener.subscription.unsubscribe()
-  }, [])
-
-  return session?.user ? <Dashboard /> : <LoginPage />
-}
-
-export default App
+http://localhost:8787/auth/google/callback
 
 
-Replace old login page with Supabase Auth UI (optional)
+(use your Hono backend dev URL)
 
-// Example in LoginPage.tsx
-import { Auth } from '@supabase/auth-ui-react'
-import { supabase } from '../lib/supabase'
+Copy your:
 
-export default function LoginPage() {
-  return <Auth supabaseClient={supabase} />
-}
+Client ID
 
-Step 2 – Setup Backend (Hono + Cloudflare Workers)
+Client Secret
 
-Install Supabase helper library
+⚙️ STEP 2: Setup .env
 
-cd backend
-pnpm add @supabase/supabase-js
+In your project root:
 
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
+JWT_SECRET=super-secret-key
 
-Create Supabase Auth middleware
+STEP 5: Frontend setup
 
-// backend/src/middleware/auth.ts
-import { createClient } from '@supabase/supabase-js'
-import { Hono } from 'hono'
+In your React (or other) frontend:
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
-
-const app = new Hono()
-
-app.use(async (c, next) => {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, 401)
+Add Login Button
+function Login() {
+  const handleLogin = () => {
+    window.location.href = 'http://localhost:8787/auth/google'
   }
 
-  const token = authHeader.split(' ')[1]
-  const { data, error } = await supabase.auth.getUser(token)
+  return (
+    <button onClick={handleLogin}>
+      Sign in with Google
+    </button>
+  )
+}
 
-  if (error || !data.user) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
+Handle Redirect
 
-  c.set('user', data.user)
-  await next()
-})
+If you redirected users back to /dashboard?token=..., grab the token and store it:
 
-export { app }
+STEP 6: Protected requests
 
+For future API calls, include the JWT:
+
+✅ Final Flow
+
+User clicks “Sign in with Google”.
+
+Redirect to Google OAuth.
+
+Google redirects back with a code.
+
+Backend exchanges the code → gets user info.
+
+Upsert user into DB.
+
+Create JWT and redirect user to frontend.
+
+Frontend stores token → uses it for API calls.
