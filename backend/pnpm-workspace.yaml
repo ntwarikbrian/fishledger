@@ -1,0 +1,7 @@
+ignoredBuiltDependencies:
+  - sharp
+
+onlyBuiltDependencies:
+  - core-js
+  - esbuild
+  - workerd
