@@ -229,6 +229,26 @@ const apiClient = new ApiClient(API_BASE_URL);
 
 // Authentication API
 export const authAPI = {
+  // Send OTP for email verification
+  sendOtp: async (data: { email: string; businessName: string }): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/api/auth/send-otp', data);
+      return response;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to send OTP');
+    }
+  },
+
+  // Verify OTP
+  verifyOtp: async (data: { email: string; otp: string }): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/api/auth/verify-otp', data);
+      return response;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to verify OTP');
+    }
+  },
+
   // Register new user
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     try {

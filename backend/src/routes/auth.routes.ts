@@ -11,6 +11,8 @@ import {
   refreshTokenHandler,
   logoutHandler,
   profileHandler,
+  sendOtpHandler,
+  verifyOtpHandler,
 } from '../handlers/auth';
 import {
   authenticateWorker,
@@ -31,6 +33,12 @@ const auth = new Hono<{ Bindings: Env; Variables: Variables }>();
 /**
  * Public authentication routes
  */
+
+// POST /auth/send-otp - Send OTP for email verification
+auth.post('/send-otp', authRateLimit, sendOtpHandler);
+
+// POST /auth/verify-otp - Verify OTP
+auth.post('/verify-otp', authRateLimit, verifyOtpHandler);
 
 // POST /auth/login - User login
 auth.post('/login', authRateLimit, loginHandler);

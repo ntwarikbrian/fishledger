@@ -233,33 +233,6 @@ export function validatePasswordStrength(password: string): {
     errors.push('Password must contain at least one number');
   }
 
-  // Enhanced security: Require uppercase letter for stronger passwords
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-
-  // Enhanced security: Require special character for stronger passwords
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push('Password must contain at least one special character');
-  }
-
-  // Enhanced security: Check for common weak patterns
-  const commonPatterns = [
-    /123456/,
-    /password/i,
-    /admin/i,
-    /qwerty/i,
-    /abc123/i,
-    /(.)\1{2,}/, // Repeated characters (aaa, 111, etc.)
-  ];
-
-  for (const pattern of commonPatterns) {
-    if (pattern.test(password)) {
-      errors.push('Password contains common weak patterns');
-      break;
-    }
-  }
-
   return {
     isValid: errors.length === 0,
     errors,

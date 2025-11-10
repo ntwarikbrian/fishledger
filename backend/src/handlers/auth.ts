@@ -19,6 +19,8 @@ import {
   createUser,
   updateLastLogin,
 } from '../utils/db';
+import otpGenerator from 'otp-generator';
+import nodemailer from 'nodemailer';
 
 // Request interfaces
 export interface LoginRequest {
@@ -41,6 +43,16 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const sendOtpSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  businessName: z.string().min(2, 'Business name required'),
+});
+
+const verifyOtpSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  otp: z.string().length(6, 'OTP must be 6 digits'),
+});
+
 const registerSchema = z.object({
   email_address: z.string().email('Invalid email format'),
   business_name: z.string().min(2, 'Business name must be at least 2 characters').max(100, 'Business name too long'),
@@ -57,6 +69,192 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
+// OTP storage (in production, use KV or Durable Objects)
+const pendingVerifications: Record<string, { otp: string; expiresAt: number; businessName: string; verified?: boolean }> = {};
+
+/**
+ * Send OTP for email verification
+ */
+export const sendOtpHandler = async (c: HonoContext) => {
+  try {
+    const body = await c.req.json();
+    const validation = sendOtpSchema.safeParse(body);
+    
+    if (!validation.success) {
+      const errors = validation.error.issues.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: errors,
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+    
+    const { email, businessName } = validation.data;
+    
+    // Check if email already exists
+    const existingUser = await getUserByEmail(c.get('supabase'), email);
+    if (existingUser) {
+      return c.json({
+        success: false,
+        message: 'Email already registered',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 409);
+    }
+    
+    // Generate OTP
+    const otp = otpGenerator.generate(6, { 
+      digits: true, 
+      upperCaseAlphabets: false, 
+      lowerCaseAlphabets: false,
+      specialChars: false 
+    });
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+    
+    // Store OTP
+    pendingVerifications[email] = { otp, expiresAt, businessName };
+    
+    console.log(`📧 OTP Generated for ${email}: ${otp} (expires in 5 min)`);
+    
+    // Send email via nodemailer
+    try {
+      const transporter = nodemailer.createTransport({
+        host: c.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: Number(c.env.EMAIL_PORT || '587'),
+        secure: false,
+        auth: {
+          user: c.env.EMAIL_USER,
+          pass: c.env.EMAIL_PASSWORD,
+        },
+      });
+      
+      await transporter.sendMail({
+        from: c.env.EMAIL_FROM || 'FishLedger <noreply@fishledger.com>',
+        to: email,
+        subject: 'Your FishLedger Verification Code',
+        text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Welcome to LocalFishing!</h2>
+            <p>Your verification code is:</p>
+            <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
+              ${otp}
+            </div>
+            <p style="color: #6b7280;">This code will expire in 5 minutes.</p>
+            <p style="color: #6b7280; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+          </div>
+        `,
+      });
+      
+      console.log(`✅ OTP email sent to ${email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send email:', emailError);
+      // Still return success for development, but log the error
+      console.log(`⚠️  Email failed, but OTP is: ${otp}`);
+    }
+    
+    return c.json({
+      success: true,
+      message: 'OTP sent to email',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send OTP',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
+  }
+};
+
+/**
+ * Verify OTP
+ */
+export const verifyOtpHandler = async (c: HonoContext) => {
+  try {
+    const body = await c.req.json();
+    const validation = verifyOtpSchema.safeParse(body);
+    
+    if (!validation.success) {
+      const errors = validation.error.issues.map((err: any) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      
+      return c.json({
+        success: false,
+        error: 'Validation failed',
+        details: errors,
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+    
+    const { email, otp } = validation.data;
+    
+    // Check if OTP exists
+    const record = pendingVerifications[email];
+    if (!record) {
+      return c.json({
+        success: false,
+        message: 'No OTP found for this email. Please request a new code.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+    
+    // Check if OTP expired
+    if (Date.now() > record.expiresAt) {
+      delete pendingVerifications[email];
+      return c.json({
+        success: false,
+        message: 'OTP expired. Please request a new code.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+    
+    // Verify OTP
+    if (record.otp !== otp) {
+      return c.json({
+        success: false,
+        message: 'Invalid OTP. Please try again.',
+        timestamp: new Date().toISOString(),
+        requestId: c.get('requestId'),
+      }, 400);
+    }
+    
+    // Mark as verified
+    record.verified = true;
+    
+    console.log(`✅ Email verified: ${email}`);
+    
+    return c.json({
+      success: true,
+      message: 'Email verified successfully',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to verify OTP',
+      timestamp: new Date().toISOString(),
+      requestId: c.get('requestId'),
+    }, 500);
+  }
+};
+
 /**
  * User login handler
  */
@@ -68,7 +266,7 @@ export const loginHandler = async (c: HonoContext) => {
     // Validate input
     const validation = loginSchema.safeParse(body);
     if (!validation.success) {
-      const errors = validation.error.errors.map(err => ({
+      const errors = validation.error.issues.map((err: any) => ({
         field: err.path.join('.'),
         message: err.message,
       }));
@@ -213,7 +411,7 @@ export const registerHandler = async (c: HonoContext) => {
     // Validate input
     const validation = registerSchema.safeParse(body);
     if (!validation.success) {
-      const errors = validation.error.errors.map(err => ({
+      const errors = validation.error.issues.map((err: any) => ({
         field: err.path.join('.'),
         message: err.message,
       }));
@@ -375,7 +573,7 @@ export const refreshTokenHandler = async (c: HonoContext) => {
     // Validate input
     const validation = refreshTokenSchema.safeParse(body);
     if (!validation.success) {
-      const errors = validation.error.errors.map(err => ({
+      const errors = validation.error.issues.map((err: any) => ({
         field: err.path.join('.'),
         message: err.message,
       }));

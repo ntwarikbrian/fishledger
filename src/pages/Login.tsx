@@ -113,41 +113,41 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
         {/* Language Switcher */}
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-4 sm:mb-6">
           <CompactLanguageSwitcher />
         </div>
 
         {/* Logo and Title */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-              <Fish className="h-8 w-8 text-white" />
+        <div className="text-center mb-4 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-blue-600 rounded-lg sm:rounded-xl shadow-lg">
+              <Fish className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
               LocalFishing
             </h1>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             {t('auth.welcomeBack', 'Welcome back to your fish business')}
           </p>
         </div>
 
         {/* Login Form */}
         <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+          <CardHeader className="text-center pb-3 sm:pb-4 pt-4 sm:pt-6">
+            <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
               {t('common.welcome', 'Welcome Back')}
             </CardTitle>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
               {t('auth.signInToAccount', 'Sign in to your account')}
             </p>
           </CardHeader>
-          <CardContent className="px-6 pb-6">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
             <Tabs value={loginType} onValueChange={(value) => setLoginType(value as "admin" | "worker")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6 h-9 sm:h-10 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <TabsTrigger value="admin" className="h-8 text-xs font-medium rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-gray-600 data-[state=active]:shadow-sm data-[state=active]:text-gray-900 dark:data-[state=active]:text-white transition-all">
                   Admin
                 </TabsTrigger>
@@ -157,7 +157,7 @@ const Login = () => {
               </TabsList>
 
               {/* Admin Login Form */}
-              <TabsContent value="admin" className="space-y-4 mt-0">
+              <TabsContent value="admin" className="space-y-3 sm:space-y-4 mt-0">
                 <div className="space-y-1">
                   <Label htmlFor="adminEmail" className="text-xs font-medium text-gray-600 dark:text-gray-400">
                     Email Address
@@ -203,8 +203,8 @@ const Login = () => {
               </TabsContent>
 
               {/* Worker Login Form */}
-              <form onSubmit={handleLogin} className="space-y-4">
-                <TabsContent value="worker" className="space-y-4 mt-0">
+              <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
+                <TabsContent value="worker" className="space-y-3 sm:space-y-4 mt-0">
                   {/* Worker Login Fields */}
                   <div className="space-y-1">
                     <Label htmlFor="businessName" className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -313,8 +313,8 @@ const Login = () => {
         </Card>
 
         {/* Registration Link */}
-        <div className="text-center mt-8">
-          <p className="text-gray-500 dark:text-gray-400">
+        <div className="text-center mt-4 sm:mt-8 mb-4">
+          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
             Don't have an account?{" "}
             <button
               onClick={() => navigate("/register")}
