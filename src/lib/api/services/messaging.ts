@@ -262,7 +262,7 @@ Please let us know your availability and pricing.
 Thank you for your continued partnership.
 
 Best regards,
-AquaManage Team`;
+FishLedger Team`;
 
     return this.sendMessageToContacts(supplierContactIds, subject, content, 'email');
   }
@@ -292,7 +292,7 @@ We will notify you when your order is ready for pickup/delivery.
 Thank you for choosing us!
 
 Best regards,
-AquaManage Team`;
+FishLedger Team`;
 
     return this.sendMessageToContacts([customerContactId], subject, content, 'email');
   }

@@ -372,10 +372,10 @@ export const createDepositWithImageHandler = async (c: HonoContext) => {
           const uniqueFilename = generateUniqueFilename(image.name, 'deposit_proof');
 
           const cloudinaryResult = await uploadToCloudinary(fileBuffer, {
-            folder: 'local-fishing/deposits',
+            folder: 'fishledger/deposits',
             public_id: uniqueFilename,
             resource_type: 'auto',
-            tags: ['deposit', 'proof', 'local-fishing'],
+            tags: ['deposit', 'proof', 'fishledger'],
           });
 
           imageUrl = cloudinaryResult.secure_url;

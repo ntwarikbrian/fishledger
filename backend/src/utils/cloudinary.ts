@@ -100,7 +100,7 @@ export async function uploadToCloudinary(
     const timestamp = Math.round(Date.now() / 1000);
     const params: Record<string, any> = {
       timestamp,
-      folder: options.folder || 'local-fishing',
+      folder: options.folder || 'fishledger',
       overwrite: options.overwrite || false,
     };
 

@@ -1,4 +1,4 @@
-# Scalable SaaS Platform - LocalFishing
+# Scalable SaaS Platform - FishLedger
 
 ## Project Overview
 

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "LocalFishing",
+    "appName": "FishLedger",
     "appSubtitle": "Sisitemu yo gucuruza amafi",
     "welcome": "Murakaza neza",
     "hello": "Muraho",
@@ -926,8 +926,8 @@
     "failed": "Ntibyakunze"
   },
   "auth": {
-    "loginTitle": "Injira muri LocalFishing",
-    "registerTitle": "Iyandikishe muri LocalFishing",
+    "loginTitle": "Injira muri FishLedger",
+    "registerTitle": "Iyandikishe muri FishLedger",
     "systemDescription": "Sisitemu yo gucuruza amafi",
     "welcomeBack": "Murakaza neza mu bucuruzi bwanyu bw'amafi",
     "signInToAccount": "Injira muri konti yawe",

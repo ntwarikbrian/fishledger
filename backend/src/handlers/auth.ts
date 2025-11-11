@@ -141,7 +141,7 @@ export const sendOtpHandler = async (c: HonoContext) => {
         text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Welcome to LocalFishing!</h2>
+            <h2 style="color: #2563eb;">Welcome to FishLedger!</h2>
             <p>Your verification code is:</p>
             <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
               ${otp}

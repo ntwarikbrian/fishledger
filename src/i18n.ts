@@ -7,7 +7,7 @@ import enTranslation from './locales/en/translation.json';
 import rwTranslation from './locales/rw/translation.json';
 
 /**
- * i18n Configuration for LocalFishing Application
+ * i18n Configuration for FishLedger Application
  * Supports English (en) and Kinyarwanda (rw) languages
  */
 i18n

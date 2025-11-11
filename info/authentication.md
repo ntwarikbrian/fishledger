@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the authentication system for the LocalFishing Management System using Supabase Auth for all users, providing a unified authentication experience for both admin users and workers.
+This document outlines the authentication system for the FishLedger Management System using Supabase Auth for all users, providing a unified authentication experience for both admin users and workers.
 
 ---
 

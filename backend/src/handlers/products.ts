@@ -14,7 +14,7 @@ import {
   validateUserIdInUpdateData
 } from '../middleware/data-isolation';
 
-// Request interfaces - Updated to match LocalFishing database schema
+// Request interfaces - Updated to match FishLedger database schema
 export interface CreateProductRequest {
   name: string;
   category_id: string; // Required in schema
@@ -53,7 +53,7 @@ export interface ProductFilters {
   price_max?: number;
 }
 
-// Validation schemas - Updated to match LocalFishing database schema
+// Validation schemas - Updated to match FishLedger database schema
 const createProductSchema = z.object({
   name: z.string().min(1, 'Product name is required').max(200, 'Product name too long'),
   category_id: z.string().uuid('Invalid category ID'),

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "LocalFishing",
+    "appName": "FishLedger",
     "appSubtitle": "Fish Management System",
     "welcome": "Welcome back",
     "hello": "Hello",
@@ -901,8 +901,8 @@
     "failed": "Failed"
   },
   "auth": {
-    "loginTitle": "Login to LocalFishing",
-    "registerTitle": "Register for LocalFishing",
+    "loginTitle": "Login to FishLedger",
+    "registerTitle": "Register for FishLedger",
     "systemDescription": "Fish Business Management System",
     "welcomeBack": "Welcome back to your fish business",
     "signInToAccount": "Sign in to your account",

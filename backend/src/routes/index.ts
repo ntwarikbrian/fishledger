@@ -72,7 +72,7 @@ export function createHealthRoutes() {
   health.get('/health', (c) => {
     return c.json({
       success: true,
-      message: 'LocalFishing Backend is running',
+      message: 'FishLedger Backend is running',
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
       version: '1.0.0',
@@ -84,7 +84,7 @@ export function createHealthRoutes() {
   health.get('/', (c) => {
     return c.json({
       success: true,
-      message: 'LocalFishing Backend API',
+      message: 'FishLedger Backend API',
       timestamp: new Date().toISOString(),
       requestId: c.get('requestId'),
       version: '1.0.0',

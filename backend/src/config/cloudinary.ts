@@ -131,7 +131,7 @@ export class CloudinaryService {
       // Default upload options
       const defaultOptions = {
         resource_type: 'auto' as const,
-        folder: 'local-fishing',
+        folder: 'fishledger',
         quality: 'auto:good',
         format: 'auto',
         unique_filename: true,
@@ -313,7 +313,7 @@ export class CloudinaryService {
    * @returns Promise with list of files
    */
   public async listFiles(
-    folder: string = 'local-fishing',
+    folder: string = 'fishledger',
     resourceType: 'image' | 'video' | 'raw' = 'image',
     maxResults: number = 50
   ): Promise<any> {
@@ -392,11 +392,11 @@ export function generateUniqueFilename(originalName: string, prefix?: string): s
  * Default Cloudinary folders for different file types
  */
 export const CLOUDINARY_FOLDERS = {
-  PRODUCTS: 'local-fishing/products',
-  USERS: 'local-fishing/users',
-  RECEIPTS: 'local-fishing/receipts',
-  DOCUMENTS: 'local-fishing/documents',
-  TEMP: 'local-fishing/temp',
+  PRODUCTS: 'fishledger/products',
+  USERS: 'fishledger/users',
+  RECEIPTS: 'fishledger/receipts',
+  DOCUMENTS: 'fishledger/documents',
+  TEMP: 'fishledger/temp',
 } as const;
 
 /**

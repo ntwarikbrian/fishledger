@@ -127,7 +127,7 @@ const Login = () => {
               <Fish className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-              LocalFishing
+              FishLedger
             </h1>
           </div>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">

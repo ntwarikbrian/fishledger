@@ -104,7 +104,7 @@ export const useDeposits = () => {
 
     const finalUrl = apiMode === 'workers'
       ? (isProduction
-          ? 'https://local-fishing-backend.your-username.workers.dev/api'
+          ? 'https://fishledger-backend.your-username.workers.dev/api'
           : 'http://localhost:8787/api')
       : (isProduction
           ? 'https://your-production-api.com/api'

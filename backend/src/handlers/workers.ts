@@ -197,7 +197,7 @@ export async function createWorker(c: Context): Promise<Response> {
         const frontFilename = generateUniqueFilename(id_card_front.name, 'worker_id_front');
 
         frontUpload = await uploadToCloudinary(frontBuffer, {
-          folder: 'local-fishing/workers/id-cards',
+          folder: 'fishledger/workers/id-cards',
           public_id: frontFilename,
           resource_type: 'image',
           tags: ['worker', 'id-card', 'front']
@@ -214,7 +214,7 @@ export async function createWorker(c: Context): Promise<Response> {
         const backFilename = generateUniqueFilename(id_card_back.name, 'worker_id_back');
 
         backUpload = await uploadToCloudinary(backBuffer, {
-          folder: 'local-fishing/workers/id-cards',
+          folder: 'fishledger/workers/id-cards',
           public_id: backFilename,
           resource_type: 'image',
           tags: ['worker', 'id-card', 'back']
@@ -1198,7 +1198,7 @@ export async function updateWorkerIdCard(c: Context): Promise<Response> {
       const filename = generateUniqueFilename(idCardFile.name, `worker_id_${cardType}`);
 
       uploadResult = await uploadToCloudinary(fileBuffer, {
-        folder: 'local-fishing/workers/id-cards',
+        folder: 'fishledger/workers/id-cards',
         public_id: filename,
         resource_type: 'image',
         tags: ['worker', 'id-card', cardType]

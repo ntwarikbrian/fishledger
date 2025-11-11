@@ -1,6 +1,6 @@
-# AquaManage Database Schema
+# FishLedger Database Schema
 
-This directory contains the complete database schema for the AquaManage Fish Selling Management System. The database is designed for PostgreSQL and includes comprehensive tables, relationships, security policies, and business logic.
+This directory contains the complete database schema for the FishLedger Fish Selling Management System. The database is designed for PostgreSQL and includes comprehensive tables, relationships, security policies, and business logic.
 
 ## Database Structure Overview
 
@@ -99,18 +99,18 @@ database/
 
 2. **Create Database**
    ```sql
-   CREATE DATABASE aquamanage;
+   CREATE DATABASE fishledger;
    ```
 
 3. **Run Main Schema**
    ```bash
-   psql -d aquamanage -f database/main.sql
+   psql -d fishledger -f database/main.sql
    ```
 
 4. **Or run individual schemas** (in dependency order):
    ```bash
-   psql -d aquamanage -f database/schemas/users.sql
-   psql -d aquamanage -f database/schemas/workers.sql
+   psql -d fishledger -f database/schemas/users.sql
+   psql -d fishledger -f database/schemas/workers.sql
    # ... continue with other schemas
    ```
 
@@ -133,7 +133,7 @@ database/
 
 ### Local Mode
 - Uses local PostgreSQL database
-- Connection string: `postgresql://username:password@localhost:5432/aquamanage`
+- Connection string: `postgresql://username:password@localhost:5432/fishledger`
 
 ### Deployed Mode (Supabase)
 - Uses Supabase hosted PostgreSQL

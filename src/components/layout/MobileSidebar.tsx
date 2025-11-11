@@ -72,7 +72,7 @@ const MobileSidebar = () => {
         <div className="flex h-14 items-center justify-between px-4 border-b">
           <div className="flex items-center gap-3">
             <Fish className="h-6 w-6 text-blue-600" />
-            <span className="text-xl font-semibold">LocalFishing</span>
+            <span className="text-xl font-semibold">FishLedger</span>
           </div>
           <Button
             variant="ghost"

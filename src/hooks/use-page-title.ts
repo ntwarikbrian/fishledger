@@ -13,7 +13,7 @@ export const usePageTitle = (titleKey: string, fallback?: string) => {
     const translatedTitle = t(titleKey, fallback || titleKey);
     
     // Set the document title with the app name
-    const appName = t('common.appName', 'LocalFishing');
+    const appName = t('common.appName', 'FishLedger');
     document.title = `${translatedTitle} - ${appName}`;
 
     // Cleanup function to reset title when component unmounts
@@ -30,7 +30,7 @@ export const useSimplePageTitle = (title: string) => {
   const { t } = useTranslation();
 
   useEffect(() => {
-    const appName = t('common.appName', 'LocalFishing');
+    const appName = t('common.appName', 'FishLedger');
     document.title = `${title} - ${appName}`;
 
     return () => {
@@ -46,7 +46,7 @@ export const useDefaultPageTitle = () => {
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
-    const appName = t('common.appName', 'LocalFishing');
+    const appName = t('common.appName', 'FishLedger');
     const subtitle = t('common.appSubtitle', 'Fish Management System');
     document.title = `${appName} - ${subtitle}`;
   }, [t, i18n.language]);

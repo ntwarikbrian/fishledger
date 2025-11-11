@@ -267,10 +267,10 @@ export const uploadSingleFileHandler = async (c: HonoContext) => {
     const uniqueFilename = generateUniqueFilename(file.name, 'document');
 
     const cloudinaryResult = await uploadToCloudinary(fileBuffer, {
-      folder: 'local-fishing/documents',
+      folder: 'fishledger/documents',
       public_id: uniqueFilename,
       resource_type: 'auto',
-      tags: ['document', 'local-fishing'],
+      tags: ['document', 'fishledger'],
     });
 
     // Insert file record into database with data isolation

@@ -1,10 +1,10 @@
-# Supabase Setup Guide for LocalFishing Backend
+# Supabase Setup Guide for FishLedger Backend
 
-This guide explains how to set up and configure Supabase for the LocalFishing backend with Cloudflare Workers.
+This guide explains how to set up and configure Supabase for the FishLedger backend with Cloudflare Workers.
 
 ## 🎯 Overview
 
-The LocalFishing backend uses Supabase as the PostgreSQL database provider with the following features:
+The FishLedger backend uses Supabase as the PostgreSQL database provider with the following features:
 
 - **Dual Client Support**: Service role and anonymous clients with automatic fallback
 - **Enhanced Error Handling**: Comprehensive error categorization and retry logic

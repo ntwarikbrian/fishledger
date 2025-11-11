@@ -915,10 +915,10 @@ export const createTransactionWithImageHandler = async (c: HonoContext) => {
           const uniqueFilename = generateUniqueFilename(image.name, 'transaction_proof');
 
           const cloudinaryResult = await uploadToCloudinary(fileBuffer, {
-            folder: 'local-fishing/transactions',
+            folder: 'fishledger/transactions',
             public_id: uniqueFilename,
             resource_type: 'auto',
-            tags: ['transaction', 'proof', 'local-fishing'],
+            tags: ['transaction', 'proof', 'fishledger'],
           });
 
           imageUrl = cloudinaryResult.secure_url;

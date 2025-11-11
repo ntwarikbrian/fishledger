@@ -26,7 +26,7 @@ const Help = () => {
   const helpCategories = [
     {
       title: "Getting Started",
-      description: "Learn the basics of using LocalFishing",
+      description: "Learn the basics of using FishLedger",
       icon: Book,
       color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
       articles: [
@@ -103,7 +103,7 @@ const Help = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{t('common.help', 'Help')}</h1>
             <p className="text-muted-foreground">
-              Find answers, tutorials, and get support for LocalFishing
+              Find answers, tutorials, and get support for FishLedger
             </p>
           </div>
           <Badge variant="secondary" className="text-sm">
@@ -185,7 +185,7 @@ const Help = () => {
                 <Mail className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="font-medium">Email Support</p>
-                  <p className="text-sm text-muted-foreground">support@localfishing.com</p>
+                  <p className="text-sm text-muted-foreground">support@fishledger.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 border rounded-lg">

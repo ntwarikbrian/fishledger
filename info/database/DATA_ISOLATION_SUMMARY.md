@@ -1,7 +1,7 @@
 # Data Isolation Implementation Summary
 
 ## Overview
-This document summarizes the comprehensive data isolation implementation that ensures complete separation of data between different admin/business accounts in the AquaManage system.
+This document summarizes the comprehensive data isolation implementation that ensures complete separation of data between different admin/business accounts in the FishLedger system.
 
 ## Problem Statement
 The original system had critical security flaws:

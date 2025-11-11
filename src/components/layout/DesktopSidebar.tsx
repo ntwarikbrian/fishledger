@@ -60,7 +60,7 @@ const DesktopSidebar = () => {
         ) : (
           <div className="flex items-center gap-3 w-full">
             <Fish className="h-6 w-6 text-blue-600" />
-            <span className="text-xl font-semibold">LocalFishing</span>
+            <span className="text-xl font-semibold">FishLedger</span>
             <SidebarTrigger className="h-8 w-8 ml-auto">
               <MenuIcon className="h-4 w-4" />
             </SidebarTrigger>

@@ -20,7 +20,7 @@ const getApiBaseUrl = (): string => {
 
   if (apiMode === 'workers') {
     return isProduction
-      ? 'https://local-fishing-backend.your-username.workers.dev'
+      ? 'https://fishledger-backend.your-username.workers.dev'
       : 'http://localhost:8787';
   } else {
     return isProduction

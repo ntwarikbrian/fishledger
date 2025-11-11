@@ -915,10 +915,10 @@ export const createExpenseWithReceiptHandler = async (c: HonoContext) => {
           console.log('📤 Uploading to Cloudinary with filename:', uniqueFilename);
 
           const cloudinaryResult = await uploadToCloudinary(fileBuffer, {
-            folder: 'local-fishing/expenses',
+            folder: 'fishledger/expenses',
             public_id: uniqueFilename,
             resource_type: 'auto',
-            tags: ['expense', 'receipt', 'local-fishing'],
+            tags: ['expense', 'receipt', 'fishledger'],
           });
 
           receiptUrl = cloudinaryResult.secure_url;

@@ -1,6 +1,6 @@
 /**
  * Supabase configuration and client setup for Cloudflare Workers
- * Provides type-safe database access and authentication for LocalFishing system
+ * Provides type-safe database access and authentication for FishLedger system
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -11,7 +11,7 @@ let globalSupabaseClient: SupabaseClient<Database> | null = null;
 let globalClientConfig: { env: Environment; usingServiceRole: boolean } | null = null;
 let globalConnectionStatus: { healthy: boolean; lastChecked: number; error?: string } | null = null;
 
-// Database table types for LocalFishing system - matches your actual schema
+// Database table types for FishLedger system - matches your actual schema
 export interface Database {
   public: {
     Tables: {
@@ -768,8 +768,8 @@ export function createSupabaseClient(env: Environment): SupabaseClient<Database>
         },
         global: {
           headers: {
-            'User-Agent': 'localfishing-backend/1.0.0',
-            'X-Client-Info': 'localfishing-cloudflare-workers',
+            'User-Agent': 'fishledger-backend/1.0.0',
+            'X-Client-Info': 'fishledger-cloudflare-workers',
           },
         },
         db: {
@@ -806,8 +806,8 @@ export function createSupabaseAnonClient(env: Environment): SupabaseClient<Datab
         },
         global: {
           headers: {
-            'User-Agent': 'localfishing-backend/1.0.0',
-            'X-Client-Info': 'localfishing-cloudflare-workers-anon',
+            'User-Agent': 'fishledger-backend/1.0.0',
+            'X-Client-Info': 'fishledger-cloudflare-workers-anon',
           },
         },
         db: {

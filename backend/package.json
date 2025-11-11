@@ -1,5 +1,5 @@
 {
-  "name": "local-fishing-backend",
+  "name": "fishledger-backend",
   "version": "1.0.0",
   "description": "Cloudflare Workers backend for Local Fishing inventory management system",
   "main": "src/index.ts",

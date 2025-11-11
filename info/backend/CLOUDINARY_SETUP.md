@@ -128,7 +128,7 @@ const response = await fetch('/api/upload/base64', {
   body: JSON.stringify({
     data: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...',
     filename: 'image.jpg',
-    folder: 'local-fishing/products'
+    folder: 'fishledger/products'
   })
 });
 ```
@@ -241,7 +241,7 @@ const results = await uploadService.uploadMultipleFiles(files, options);
 The system uses organized folder structure in Cloudinary:
 
 ```
-local-fishing/
+fishledger/
 ├── products/          # Product images
 ├── users/            # User avatars and profiles
 ├── receipts/         # Receipt and document images

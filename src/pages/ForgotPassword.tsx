@@ -75,7 +75,7 @@ const ForgotPassword = () => {
                 <Fish className="h-12 w-12 text-white" />
               </div>
               <div>
-                <h1 className="text-5xl font-bold mb-2">AquaManage</h1>
+                <h1 className="text-5xl font-bold mb-2">FishLedger</h1>
                 <p className="text-purple-100 text-xl">Secure Account Recovery</p>
               </div>
             </div>
@@ -145,7 +145,7 @@ const ForgotPassword = () => {
                   <Fish className="h-8 w-8 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  AquaManage
+                  FishLedger
                 </h1>
               </div>
               <p className="text-gray-600 dark:text-gray-400">
@@ -227,7 +227,7 @@ const ForgotPassword = () => {
               <Fish className="h-12 w-12 text-white" />
             </div>
             <div>
-              <h1 className="text-5xl font-bold mb-2">AquaManage</h1>
+              <h1 className="text-5xl font-bold mb-2">FishLedger</h1>
               <p className="text-purple-100 text-xl">Secure Account Recovery</p>
             </div>
           </div>
@@ -297,7 +297,7 @@ const ForgotPassword = () => {
                 <Fish className="h-8 w-8 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                AquaManage
+                FishLedger
               </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
