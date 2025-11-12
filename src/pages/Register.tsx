@@ -18,7 +18,8 @@ import {
   EyeOff,
   CheckCircle,
   Phone,
-  Shield
+  Shield,
+  Users
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { CompactLanguageSwitcher } from "@/components/ui/language-switcher";
@@ -29,6 +30,7 @@ import PhoneInput from 'react-phone-number-input';
 import { isPossiblePhoneNumber } from 'libphonenumber-js';
 import 'react-phone-number-input/style.css';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import PostRegistrationSetup from "@/components/auth/PostRegistrationSetup";
 
 type RegistrationStep = 1 | 2 | 3 | 4;
 
@@ -42,6 +44,7 @@ const Register = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPostRegistrationSetup, setShowPostRegistrationSetup] = useState(false);
 
   // Form data
   const [businessName, setBusinessName] = useState("");
@@ -198,8 +201,9 @@ const Register = () => {
       });
 
       if (response.success) {
-        toast.success("Account created successfully! Please login.");
-        navigate("/login");
+        // Instead of navigating to login, show the post-registration setup
+        setShowPostRegistrationSetup(true);
+        toast.success("Account created successfully!");
       } else {
         setError(response.message || "Registration failed");
       }
@@ -212,6 +216,11 @@ const Register = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSetupComplete = () => {
+    setShowPostRegistrationSetup(false);
+    // User will be navigated to dashboard from the PostRegistrationSetup component
   };
 
   return (
@@ -238,6 +247,7 @@ const Register = () => {
                 {currentStep === 2 && "Email Verification"}
                 {currentStep === 3 && "Owner Information"}
                 {currentStep === 4 && "Account Security"}
+                {showPostRegistrationSetup && "Account Setup"}
               </p>
             </div>
           </div>
@@ -249,6 +259,7 @@ const Register = () => {
               {currentStep === 2 && "Verify Your Email Address"}
               {currentStep === 3 && "Owner Information"}
               {currentStep === 4 && "Secure Your Account"}
+              {showPostRegistrationSetup && "Customize Your Experience"}
             </h2>
             
             <p className="text-green-100 text-lg leading-relaxed mb-8">
@@ -256,6 +267,7 @@ const Register = () => {
               {currentStep === 2 && "We'll send a verification code to your email to confirm your identity."}
               {currentStep === 3 && "Provide your personal information and contact details."}
               {currentStep === 4 && "Create a strong password to protect your business account."}
+              {showPostRegistrationSetup && "Set your preferences to get the most out of FishLedger."}
             </p>
           </div>
 
@@ -283,7 +295,9 @@ const Register = () => {
 
             <div className="flex items-start gap-4">
               <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-            
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
               </div>
               <div>
                 <h3 className="font-semibold text-lg mb-2">Real-time Analytics</h3>
@@ -293,7 +307,7 @@ const Register = () => {
 
             <div className="flex items-start gap-4">
               <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-              
+                <Users className="h-6 w-6 text-white" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg mb-2">Team Management</h3>
@@ -322,6 +336,7 @@ const Register = () => {
               {currentStep === 2 && "Email Verification"}
               {currentStep === 3 && "Owner Information"}
               {currentStep === 4 && "Account Security"}
+              {showPostRegistrationSetup && "Account Setup"}
             </p>
           </div>
 
@@ -689,6 +704,15 @@ const Register = () => {
           </div>
         </div>
       </div>
+
+      {/* Post Registration Setup Popup */}
+      {showPostRegistrationSetup && (
+        <PostRegistrationSetup 
+          isOpen={showPostRegistrationSetup}
+          onComplete={handleSetupComplete}
+          businessName={businessName}
+        />
+      )}
     </div>
   );
 };
