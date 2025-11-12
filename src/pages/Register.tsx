@@ -215,389 +215,478 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-md">
-        {/* Language Switcher */}
-        <div className="flex justify-end mb-4 sm:mb-6">
-          <CompactLanguageSwitcher />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 flex">
+      {/* Left Side - Branding (Larger) */}
+      <div className="hidden lg:flex lg:w-3/5 xl:w-2/3 bg-gradient-to-br from-green-600 to-teal-700 p-12 flex-col justify-center relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-32 h-32 bg-white rounded-full"></div>
+          <div className="absolute bottom-32 right-16 w-24 h-24 bg-white rounded-full"></div>
+          <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-white rounded-full"></div>
         </div>
-
-        {/* Logo and Title */}
-        <div className="text-center mb-4 sm:mb-8">
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="p-2 sm:p-3 bg-green-600 rounded-lg sm:rounded-xl shadow-lg">
-              <Fish className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+        
+        <div className="relative z-10 text-white">
+          {/* Logo and Title */}
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+              <Fish className="h-12 w-12 text-white" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-              FishLedger
-            </h1>
+            <div>
+              <h1 className="text-5xl font-bold mb-2">FishLedger</h1>
+              <p className="text-green-100 text-xl">
+                {currentStep === 1 && "Business Registration"}
+                {currentStep === 2 && "Email Verification"}
+                {currentStep === 3 && "Owner Information"}
+                {currentStep === 4 && "Account Security"}
+              </p>
+            </div>
           </div>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            {t('auth.createAccountToStart', 'Create your business account to get started')}
-          </p>
-        </div>
 
-        {/* Multi-Step Registration Form */}
-        <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-          <CardHeader className="text-center pb-4 sm:pb-6 pt-4 sm:pt-6">
-            <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
-              Create Account - Step {currentStep} of 4
-            </CardTitle>
-            <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
-              {currentStep === 1 && "Tell us about your business"}
-              {currentStep === 2 && "Verify your email address"}
-              {currentStep === 3 && "Owner information"}
-              {currentStep === 4 && "Secure your account"}
+          {/* Description based on current step */}
+          <div className="mb-12">
+            <h2 className="text-3xl font-semibold mb-6">
+              {currentStep === 1 && "Tell Us About Your Business"}
+              {currentStep === 2 && "Verify Your Email Address"}
+              {currentStep === 3 && "Owner Information"}
+              {currentStep === 4 && "Secure Your Account"}
+            </h2>
+            
+            <p className="text-green-100 text-lg leading-relaxed mb-8">
+              {currentStep === 1 && "Start by telling us the name of your fish business to get set up."}
+              {currentStep === 2 && "We'll send a verification code to your email to confirm your identity."}
+              {currentStep === 3 && "Provide your personal information and contact details."}
+              {currentStep === 4 && "Create a strong password to protect your business account."}
             </p>
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-            {/* Progress Indicator */}
-            <div className="mb-4 sm:mb-6">
-              <div className="flex items-center justify-between mb-2">
-                {[1, 2, 3, 4].map((step) => (
-                  <div
-                    key={step}
-                    className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm ${
-                      step < currentStep
-                        ? "bg-green-600 text-white"
-                        : step === currentStep
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-500"
-                    }`}
-                  >
-                    {step < currentStep ? (
-                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                    ) : (
-                      <span className="font-medium">{step}</span>
-                    )}
-                  </div>
-                ))}
+          </div>
+
+          {/* Features */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                <Shield className="h-6 w-6 text-white" />
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2">
-                <div
-                  className="bg-blue-600 h-1.5 sm:h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / 4) * 100}%` }}
-                />
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Secure Platform</h3>
+                <p className="text-green-100 text-sm">Enterprise-grade security to protect your business data.</p>
               </div>
             </div>
 
-            <form onSubmit={handleRegister} className="space-y-4 sm:space-y-6">
-              {/* Step 1: Business Name */}
-              {currentStep === 1 && (
-                <div className="space-y-2">
-                  <Label htmlFor="businessName" className="text-sm font-medium">
-                    Business Name
-                  </Label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="businessName"
-                      type="text"
-                      placeholder="Enter your business name"
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
-                      className="pl-10 h-11"
-                      autoFocus
-                      required
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                <Building className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Business Management</h3>
+                <p className="text-green-100 text-sm">Comprehensive tools to manage your fish business operations.</p>
+              </div>
+            </div>
 
-              {/* Step 2: Email with Verification */}
-              {currentStep === 2 && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-xs sm:text-sm font-medium">
-                      Email Address
-                    </Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+            
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Real-time Analytics</h3>
+                <p className="text-green-100 text-sm">Track sales and inventory with live data visualization.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+              
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Team Management</h3>
+                <p className="text-green-100 text-sm">Efficiently manage your team with role-based access control.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Registration Form (Smaller) */}
+      <div className="w-full lg:w-2/5 xl:w-1/3 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo (visible only on small screens) */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="p-3 bg-green-600 rounded-xl shadow-lg">
+                <Fish className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                FishLedger
+              </h1>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400">
+              {currentStep === 1 && "Business Registration"}
+              {currentStep === 2 && "Email Verification"}
+              {currentStep === 3 && "Owner Information"}
+              {currentStep === 4 && "Account Security"}
+            </p>
+          </div>
+
+          {/* Multi-Step Registration Form */}
+          <Card className="shadow-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex gap-1">
+                  <div className={`w-2 h-2 rounded-full ${currentStep >= 1 ? "bg-green-600" : "bg-gray-300"}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${currentStep >= 2 ? "bg-green-600" : "bg-gray-300"}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${currentStep >= 3 ? "bg-green-600" : "bg-gray-300"}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${currentStep >= 4 ? "bg-green-600" : "bg-gray-300"}`}></div>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Step {currentStep} of 4
+                </span>
+              </div>
+              
+              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+                Create Account
+              </CardTitle>
+              
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                {currentStep === 1 && "Tell us about your business"}
+                {currentStep === 2 && "Verify your email address"}
+                {currentStep === 3 && "Owner information"}
+                {currentStep === 4 && "Secure your account"}
+              </p>
+            </CardHeader>
+            
+            <CardContent className="px-6 pb-6">
+              <form onSubmit={handleRegister} className="space-y-4">
+                {/* Step 1: Business Name */}
+                {currentStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="businessName" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Business Name
+                      </Label>
+                      <div className="relative">
+                        <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
-                          id="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          value={email}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            setIsEmailVerified(false);
-                            setShowOtpInput(false);
-                            setOtp("");
-                          }}
-                          className="pl-9 sm:pl-10 h-9 sm:h-11 text-sm"
+                          id="businessName"
+                          type="text"
+                          placeholder="Enter your business name"
+                          value={businessName}
+                          onChange={(e) => setBusinessName(e.target.value)}
+                          className="pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                           autoFocus
                           required
-                          disabled={isEmailVerified}
                         />
-                        {isEmailVerified && (
-                          <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Email with Verification */}
+                {currentStep === 2 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="email" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Email Address
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => {
+                              setEmail(e.target.value);
+                              setIsEmailVerified(false);
+                              setShowOtpInput(false);
+                              setOtp("");
+                            }}
+                            className="pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                            autoFocus
+                            required
+                            disabled={isEmailVerified}
+                          />
+                          {isEmailVerified && (
+                            <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-600" />
+                          )}
+                        </div>
+                        {!isEmailVerified && (
+                          <Button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={isSendingOtp || !email}
+                            className="h-10 px-3 bg-green-600 hover:bg-green-700 text-xs whitespace-nowrap rounded-lg"
+                          >
+                            {isSendingOtp ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              </>
+                            ) : (
+                              <>
+                                <Shield className="h-4 w-4 mr-1" />
+                                <span className="hidden sm:inline">Verify</span>
+                                <span className="sm:hidden">Send</span>
+                              </>
+                            )}
+                          </Button>
                         )}
                       </div>
-                      {!isEmailVerified && (
-                        <Button
-                          type="button"
-                          onClick={handleSendOtp}
-                          disabled={isSendingOtp || !email}
-                          className="h-9 sm:h-11 px-3 sm:px-4 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm whitespace-nowrap"
-                        >
-                          {isSendingOtp ? (
-                            <>
-                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                            </>
-                          ) : (
-                            <>
-                              <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                              <span className="hidden sm:inline">Verify</span>
-                              <span className="sm:hidden">Send</span>
-                            </>
-                          )}
-                        </Button>
-                      )}
                     </div>
-                  </div>
 
-                  {/* OTP Input */}
-                  {showOtpInput && !isEmailVerified && (
-                    <div className="space-y-3 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <Mail className="h-4 w-4" />
-                        <p className="text-xs sm:text-sm font-medium">Check your email for the verification code</p>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="otp" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Enter 6-digit code
-                        </Label>
-                        <div className="flex justify-center">
-                          <InputOTP
-                            maxLength={6}
-                            value={otp}
-                            onChange={(value) => setOtp(value)}
+                    {/* OTP Input */}
+                    {showOtpInput && !isEmailVerified && (
+                      <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                          <Mail className="h-4 w-4" />
+                          <p className="text-xs font-medium">Check your email for the verification code</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="otp" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            Enter 6-digit code
+                          </Label>
+                          <div className="flex justify-center">
+                            <InputOTP
+                              maxLength={6}
+                              value={otp}
+                              onChange={(value) => setOtp(value)}
+                            >
+                              <InputOTPGroup>
+                                <InputOTPSlot index={0} className="h-12 w-10 text-lg" />
+                                <InputOTPSlot index={1} className="h-12 w-10 text-lg" />
+                                <InputOTPSlot index={2} className="h-12 w-10 text-lg" />
+                                <InputOTPSlot index={3} className="h-12 w-10 text-lg" />
+                                <InputOTPSlot index={4} className="h-12 w-10 text-lg" />
+                                <InputOTPSlot index={5} className="h-12 w-10 text-lg" />
+                              </InputOTPGroup>
+                            </InputOTP>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={handleVerifyOtp}
+                            disabled={isVerifyingOtp || otp.length !== 6}
+                            className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-xs rounded-lg"
                           >
-                            <InputOTPGroup>
-                              <InputOTPSlot index={0} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                              <InputOTPSlot index={1} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                              <InputOTPSlot index={2} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                              <InputOTPSlot index={3} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                              <InputOTPSlot index={4} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                              <InputOTPSlot index={5} className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg" />
-                            </InputOTPGroup>
-                          </InputOTP>
+                            {isVerifyingOtp ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Verifying...
+                              </>
+                            ) : (
+                              "Verify Code"
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={isSendingOtp}
+                            variant="outline"
+                            className="h-10 text-xs rounded-lg"
+                          >
+                            Resend
+                          </Button>
                         </div>
                       </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          onClick={handleVerifyOtp}
-                          disabled={isVerifyingOtp || otp.length !== 6}
-                          className="flex-1 h-9 sm:h-10 bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
-                        >
-                          {isVerifyingOtp ? (
-                            <>
-                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
-                              Verifying...
-                            </>
-                          ) : (
-                            "Verify Code"
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={handleSendOtp}
-                          disabled={isSendingOtp}
-                          variant="outline"
-                          className="h-9 sm:h-10 text-xs sm:text-sm"
-                        >
-                          Resend
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {isEmailVerified && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
-                        <CheckCircle className="h-4 w-4" />
-                        <p className="text-xs sm:text-sm font-medium">Email verified successfully!</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 3: Owner Name and Phone */}
-              {currentStep === 3 && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ownerName" className="text-sm font-medium">
-                      Owner's Full Name
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="ownerName"
-                        type="text"
-                        placeholder="John Doe"
-                        value={ownerName}
-                        onChange={(e) => setOwnerName(e.target.value)}
-                        className="pl-10 h-11"
-                        autoFocus
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber" className="text-sm font-medium">
-                      Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
-                    </Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 z-10" />
-                      <PhoneInput
-                        id="phoneNumber"
-                        international
-                        defaultCountry="RW"
-                        value={phoneNumber}
-                        onChange={(value) => setPhoneNumber(value || "")}
-                        className="phone-input-wrapper"
-                        placeholder="+250 788 123 456"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Include country code (e.g., +250 for Rwanda)
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Password */}
-              {currentStep === 4 && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-11"
-                        autoFocus
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                      Confirm Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 pr-10 h-11"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Password must be at least 8 characters long
-                  </p>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {error && (
-                <div className="p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                    <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Navigation Buttons */}
-              <div className="flex gap-2 sm:gap-3">
-                {currentStep > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex-1 h-9 sm:h-11 text-xs sm:text-sm"
-                  >
-                    <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Back
-                  </Button>
-                )}
-                
-                {currentStep < 4 ? (
-                  <Button
-                    type="button"
-                    onClick={handleNext}
-                    className="flex-1 h-9 sm:h-11 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
-                  >
-                    Next
-                    <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="flex-1 h-9 sm:h-11 bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
-                        <span className="hidden sm:inline">Creating Account...</span>
-                        <span className="sm:hidden">Creating...</span>
-                      </>
-                    ) : (
-                      "Create Account"
                     )}
-                  </Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
 
-        {/* Login Link */}
-        <div className="text-center mt-4 sm:mt-8 mb-4">
-          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-            Already have an account?{" "}
-            <button
-              onClick={() => navigate("/login")}
-              className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium transition-colors"
-            >
-              Sign in here
-            </button>
-          </p>
+                    {isEmailVerified && (
+                      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                          <CheckCircle className="h-4 w-4" />
+                          <p className="text-xs font-medium">Email verified successfully!</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 3: Owner Name and Phone */}
+                {currentStep === 3 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="ownerName" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Owner's Full Name
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="ownerName"
+                          type="text"
+                          placeholder="John Doe"
+                          value={ownerName}
+                          onChange={(e) => setOwnerName(e.target.value)}
+                          className="pl-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                          autoFocus
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="phoneNumber" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
+                      </Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                        <PhoneInput
+                          id="phoneNumber"
+                          international
+                          defaultCountry="RW"
+                          value={phoneNumber}
+                          onChange={(value) => setPhoneNumber(value || "")}
+                          className="phone-input-wrapper"
+                          placeholder="+250 788 123 456"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Include country code (e.g., +250 for Rwanda)
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Password */}
+                {currentStep === 4 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="password" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                          autoFocus
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="confirmPassword" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Confirm Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="pl-10 pr-10 h-10 text-sm border-gray-200 dark:border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <h3 className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">Password Requirements</h3>
+                      <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                        <li className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                          At least 8 characters long
+                        </li>
+                        <li className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                          Include uppercase and lowercase letters
+                        </li>
+                        <li className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                          Include at least one number
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {error && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <div className="flex items-center gap-2 justify-center">
+                      <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
+                      <p className="text-xs text-red-600 dark:text-red-400 text-center">{error}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation Buttons */}
+                <div className="flex gap-3">
+                  {currentStep > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                      className="flex-1 h-10 text-sm border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
+                  )}
+                  
+                  {currentStep < 4 ? (
+                    <Button
+                      type="button"
+                      onClick={handleNext}
+                      className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-sm rounded-lg"
+                    >
+                      Next
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-sm rounded-lg"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Creating Account...</span>
+                          <span className="sm:hidden">Creating...</span>
+                        </>
+                      ) : (
+                        "Create Account"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Login Link */}
+          <div className="text-center mt-6">
+            <p className="text-gray-500 dark:text-gray-400 text-xs">
+              Already have an account?{" "}
+              <button
+                onClick={() => navigate("/login")}
+                className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium underline underline-offset-2 transition-colors"
+              >
+                Sign in here
+              </button>
+            </p>
+          </div>
         </div>
       </div>
     </div>
