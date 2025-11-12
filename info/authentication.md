@@ -1,91 +1,139 @@
-# Authentication System Documentation
+Desired User Flow (Step by Step)
+🪪 Step 1: Start Form
 
-## Overview
+User types:
 
-This document outlines the authentication system for the FishLedger Management System using Supabase Auth for all users, providing a unified authentication experience for both admin users and workers.
+Business Name
 
----
+Email Address
 
-## Authentication Structure
+Clicks “Continue”
 
-### 🔐 Admin Users (Business Owners) with Supabase Auth
-- **Authentication Method:** Supabase Auth (Sign in with Google + Email/Password)
-- **Login:** Sign in via Supabase Auth UI or a custom implementation
-- **Session:** Supabase manages sessions and issues JWT tokens
-- **Frontend:** Supabase Client handles session management and token refresh
-- **API Requests:** Frontend includes Supabase session token (Bearer) in Authorization header
-- **Backend:**
-  - Hono middleware verifies Supabase JWTs or uses Supabase service key to fetch user info
-  - Extracts `user.id`, `app_metadata` and custom claims for role verification
-  - Performs role-based authorization (admin/worker roles)
-  - On success: fetches data from DB, returns to frontend
-  - On failure: returns 401/403 status
-- **User Provisioning:** Admin account can be created automatically on first OAuth sign-in or provisioned manually
+✅ Backend sends an OTP code (e.g., 6-digit) to that email.
+✅ Frontend shows “Verify your email” screen.
 
-### 👷 Worker Users (Staff Members)
-- **Authentication Method:** Supabase Auth (Email/Password)
-- **Registration:** Manual by admin/business owner or self-serve if enabled
-- **Login:** Email, password, and business name form
-- **Session:** Supabase JWT tokens
-- **User Data:** Stored in Supabase Auth with secure password hashing
+🔢 Step 2: Verify Email
 
----
+User enters the 6-digit OTP they received.
 
-## Supabase Auth Integration Details
+Backend checks if OTP matches & is not expired.
 
-### Required Environment Variables
+If valid → mark email as verified → return temporary session or allow next form step.
 
-**Frontend (.env.local):**
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_URL=http://localhost:8080
-```
+🧍 Step 3: Complete Profile
 
-**Backend (backend/.env):**
-```env
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key   # server-side service role key
-```
+Now show fields:
 
----
+Full Name
 
-## Frontend Implementation
-- Add Supabase client and (optionally) Supabase Auth UI components where admin or worker authentication is needed
-- Use the Supabase Client to manage sessions, sign-in flows (Google, email/password), and token refresh
-- To access protected backend endpoints: include the Supabase session token as a Bearer token in the Authorization header
-- Use Supabase user object and `app_metadata` or custom user metadata for roles/permissions
+Phone Number
 
-## Backend Implementation
-- Install `@supabase/supabase-js` in the backend and create a server client with the service key
-- Implement Hono middleware that reads the Bearer token, validates or introspects it with Supabase, and attaches the user to the request context
-- Enforce role checks (for example by reading `app_metadata.role` or checking a `users` table column)
-- On validation success: continue request handling. On failure: return 401/403
+Password
 
----
+User submits → /auth/register (with verified email flag)
 
-## Example Admin Flow
-1. Admin signs in with Google or Email/Password via Supabase Auth UI
-2. Supabase handles OAuth, creates a session, and issues a JWT
-3. Admin navigates the app; frontend includes the Supabase session token in requests
-4. Backend validates the Supabase JWT (or calls Supabase auth endpoint) and extracts user info
-5. Backend verifies admin role/permissions, fetches data, and responds
+Backend creates user → issues JWT → redirect to dashboard ✅
 
----
+⚙️ Technical Implementation (Hono + Node)
 
-## Security Considerations
-- All admin routes require a valid Supabase JWT
-- Role verification must be enforced for all privileged actions
-- Use Supabase service role key only on the server and protect it in environment variables
-- Prefer short-lived access tokens and server-side verification
+Let’s make the OTP verification secure and simple.
 
----
+Step 1: Install dependencies
+pnpm add hono nodemailer otp-generator bcrypt jsonwebtoken
 
-## Database Schema for Admins (example)
-- Store Supabase `user.id` and reference to local business/admin info when needed
-- Use `app_metadata` or a `users` table column to store roles (`admin` / `worker`)
+Step 2: auth.ts – with OTP system
+import { Hono } from 'hono'
+import nodemailer from 'nodemailer'
+import otpGenerator from 'otp-generator'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
 
----
+const auth = new Hono()
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'
 
-## Summary
-Supabase Auth provides a single, unified authentication system for admins and workers. It handles OAuth (Google), email/password, session management, and token issuance; backend services should validate Supabase JWTs and enforce role-based access.
+// Mock DBs
+const pendingVerifications: Record<string, any> = {}
+const users: any[] = []
+
+// Configure mailer (you can use SendGrid, Resend, Mailgun, etc.)
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // or use SMTP config
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+})
+
+// --- STEP 1: Send OTP ---
+auth.post('/send-otp', async (c) => {
+  const { email, businessName } = await c.req.json()
+
+  // Basic validation
+  if (!email || !businessName) return c.json({ message: 'Missing fields' }, 400)
+  if (users.find(u => u.email === email)) return c.json({ message: 'Email already registered' }, 400)
+
+  const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, specialChars: false })
+  const expiresAt = Date.now() + 5 * 60 * 1000 // expires in 5 minutes
+
+  pendingVerifications[email] = { otp, expiresAt, businessName }
+
+  // Send email
+  await transporter.sendMail({
+    from: 'FishLedger <no-reply@fishledger.com>',
+    to: email,
+    subject: 'Your FishLedger verification code',
+    text: `Your verification code is ${otp}. It will expire in 5 minutes.`,
+  })
+
+  return c.json({ message: 'OTP sent to email' })
+})
+
+// --- STEP 2: Verify OTP ---
+auth.post('/verify-otp', async (c) => {
+  const { email, otp } = await c.req.json()
+  const record = pendingVerifications[email]
+  if (!record) return c.json({ message: 'No OTP found for this email' }, 400)
+
+  if (Date.now() > record.expiresAt) return c.json({ message: 'OTP expired' }, 400)
+  if (record.otp !== otp) return c.json({ message: 'Invalid OTP' }, 400)
+
+  // Mark as verified
+  record.verified = true
+  return c.json({ message: 'Email verified successfully' })
+})
+
+// --- STEP 3: Register User ---
+auth.post('/register', async (c) => {
+  const { email, name, phone, password } = await c.req.json()
+  const record = pendingVerifications[email]
+
+  if (!record || !record.verified) return c.json({ message: 'Email not verified' }, 400)
+
+  const hashed = await bcrypt.hash(password, 10)
+  const newUser = {
+    id: users.length + 1,
+    businessName: record.businessName,
+    email,
+    name,
+    phone,
+    password: hashed,
+  }
+
+  users.push(newUser)
+  delete pendingVerifications[email] // cleanup
+
+  const token = jwt.sign({ id: newUser.id, email }, JWT_SECRET, { expiresIn: '7d' })
+  return c.json({ message: 'Account created', token })
+})
+
+export default auth
+
+🪄 Step 3: Frontend (React)
+
+The flow:
+
+/signup — collects businessName + email, calls /send-otp.
+
+/verify — asks for OTP, calls /verify-otp.
+
+/complete — asks for name, phone, password → calls /register

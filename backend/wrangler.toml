@@ -9,7 +9,6 @@ compatibility_flags = ["nodejs_compat"]
 command = ""
 
 
-
 # Production environment variables (will be set via wrangler secrets)
 # These are placeholders - actual values should be set using:
 # wrangler secret put SUPABASE_URL
@@ -39,7 +38,7 @@ JWT_REFRESH_EXPIRES_IN = "30d"
 # Cloudinary Configuration
 CLOUDINARY_CLOUD_NAME = "dji23iymw"
 CLOUDINARY_API_KEY = "162843632338622"
-CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0"
+CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0" 
 
 # Email Configuration
 EMAIL_HOST = "smtp.gmail.com"

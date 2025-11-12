@@ -24,11 +24,11 @@
   "author": "Local Fishing Team",
   "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.80.0",
+    "@supabase/supabase-js": "^2.81.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "date-fns": "^4.1.0",
-    "hono": "^4.10.4",
+    "hono": "^4.10.5",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
     "nodemailer": "^7.0.10",
@@ -38,17 +38,17 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251107.0",
+    "@cloudflare/workers-types": "^4.20251111.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/nodemailer": "^7.0.3",
     "@types/otp-generator": "^4.0.2",
     "@types/pdfmake": "^0.2.12",
-    "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.3",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.8",
-    "wrangler": "^4.46.0"
+    "wrangler": "^4.47.0"
   },
   "engines": {
     "node": ">=18.0.0"
