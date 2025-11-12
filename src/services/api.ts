@@ -45,6 +45,17 @@ export interface RegisterRequest {
   confirm_password: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -246,6 +257,26 @@ export const authAPI = {
       return response;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to verify OTP');
+    }
+  },
+
+  // Forgot password
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/api/auth/forgot-password', data);
+      return response;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to process password reset request');
+    }
+  },
+
+  // Reset password
+  resetPassword: async (data: ResetPasswordRequest): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/api/auth/reset-password', data);
+      return response;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to reset password');
     }
   },
 

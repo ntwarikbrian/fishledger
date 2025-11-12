@@ -23,6 +23,51 @@ import {
 // Import routes
 import { createApiRoutes, createHealthRoutes, createDebugRoutes } from './routes';
 
+// Import Supabase configuration
+import { getSupabaseClientSingleton } from './config/supabase';
+
+// Global variable to track if database initialization has been attempted
+let databaseInitializationAttempted = false;
+
+/**
+ * Initialize database connection on startup
+ */
+async function initializeDatabaseConnection(env: Env): Promise<void> {
+  if (databaseInitializationAttempted) {
+    return;
+  }
+
+  databaseInitializationAttempted = true;
+  console.log('🔧 Initializing database connection on startup...');
+
+  try {
+    // Validate environment variables
+    const validatedEnv = validateEnvironment(env);
+
+    // Get or create singleton database connection
+    const {
+      client: supabase,
+      usingServiceRole,
+      connectionHealthy,
+      isNewConnection,
+      error: dbError,
+    } = await getSupabaseClientSingleton(validatedEnv);
+
+    // Log connection status
+    if (isNewConnection && connectionHealthy) {
+      console.log(`✅ Database connection established on startup (${usingServiceRole ? 'service role' : 'anonymous'})`);
+    } else if (isNewConnection && !connectionHealthy) {
+      console.warn(`⚠️ Database client created but connection test failed: ${dbError}`);
+      console.warn('⚠️ Continuing with database client (tables may not exist yet)');
+    } else {
+      console.log('♻️ Reusing existing database connection');
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize database connection on startup:', error);
+    console.warn('⚠️ Database connection will be initialized on first request');
+  }
+}
+
 /**
  * Create and configure the main Hono application
  */
@@ -69,6 +114,9 @@ export default {
    */
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
+      // Initialize database connection on first request
+      await initializeDatabaseConnection(env);
+
       // Validate environment variables
       const validatedEnv = validateEnvironment(env);
 

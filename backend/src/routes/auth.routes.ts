@@ -13,6 +13,8 @@ import {
   profileHandler,
   sendOtpHandler,
   verifyOtpHandler,
+  forgotPasswordHandler,
+  resetPasswordHandler,
 } from '../handlers/auth';
 import {
   authenticateWorker,
@@ -39,6 +41,12 @@ auth.post('/send-otp', authRateLimit, sendOtpHandler);
 
 // POST /auth/verify-otp - Verify OTP
 auth.post('/verify-otp', authRateLimit, verifyOtpHandler);
+
+// POST /auth/forgot-password - Request password reset
+auth.post('/forgot-password', authRateLimit, forgotPasswordHandler);
+
+// POST /auth/reset-password - Reset password with OTP
+auth.post('/reset-password', authRateLimit, resetPasswordHandler);
 
 // POST /auth/login - User login
 auth.post('/login', authRateLimit, loginHandler);

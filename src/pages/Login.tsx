@@ -46,11 +46,13 @@ const Login = () => {
   const [businessName, setBusinessName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       if (loginType === "admin") {
@@ -113,7 +115,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-3 sm:p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
         {/* Language Switcher */}
         <div className="flex justify-end mb-4 sm:mb-6">
@@ -123,7 +125,7 @@ const Login = () => {
         {/* Logo and Title */}
         <div className="text-center mb-4 sm:mb-8">
           <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="p-2 sm:p-3 bg-blue-600 rounded-lg sm:rounded-xl shadow-lg">
+            <div className="p-2 sm:p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg sm:rounded-xl shadow-lg">
               <Fish className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
@@ -136,7 +138,7 @@ const Login = () => {
         </div>
 
         {/* Login Form */}
-        <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
+        <Card className="shadow-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-3 sm:pb-4 pt-4 sm:pt-6">
             <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
               {t('common.welcome', 'Welcome Back')}
@@ -170,7 +172,7 @@ const Login = () => {
                       placeholder="admin@business.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+                      className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                       required
                     />
                   </div>
@@ -188,7 +190,7 @@ const Login = () => {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+                      className="pl-10 pr-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                       required
                     />
                     <button
@@ -218,7 +220,7 @@ const Login = () => {
                         placeholder="Your Business Name"
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
-                        className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+                        className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                         required
                       />
                     </div>
@@ -236,7 +238,7 @@ const Login = () => {
                         placeholder="worker@company.com"
                         value={workerId}
                         onChange={(e) => setWorkerId(e.target.value)}
-                        className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+                        className="pl-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                         required
                       />
                     </div>
@@ -254,7 +256,7 @@ const Login = () => {
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg"
+                        className="pl-10 pr-10 h-9 text-sm border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg bg-gray-50/50 dark:bg-gray-800/50"
                         required
                       />
                       <button
@@ -268,7 +270,7 @@ const Login = () => {
                   </div>
                 </TabsContent>
 
-                {/* Error Message */}
+                {/* Messages */}
                 {error && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <div className="flex items-center gap-2">
@@ -278,10 +280,19 @@ const Login = () => {
                   </div>
                 )}
 
+                {success && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+                      <p className="text-xs text-green-600 dark:text-green-400">{success}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Login Button */}
                 <Button
                   type="submit"
-                  className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full h-9 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
                   disabled={isLoading}
                 >
                   {isLoading ? (

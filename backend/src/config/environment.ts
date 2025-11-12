@@ -46,9 +46,9 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().min(1, 'Cloudinary API secret is required').optional(),
 
   // Google OAuth Configuration (required for admin authentication)
-  GOOGLE_CLIENT_ID: z.string().min(1, 'Google Client ID is required'),
-  GOOGLE_CLIENT_SECRET: z.string().min(1, 'Google Client Secret is required'),
-  GOOGLE_REDIRECT_URI: z.string().url('Invalid Google Redirect URI'),
+  GOOGLE_CLIENT_ID: z.string().min(1, 'Google Client ID is required').optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, 'Google Client Secret is required').optional(),
+  GOOGLE_REDIRECT_URI: z.string().url('Invalid Google Redirect URI').optional(),
 });
 
 // Type for validated environment variables
