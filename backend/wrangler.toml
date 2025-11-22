@@ -24,33 +24,31 @@ MAX_FILE_SIZE = "10485760"
 RATE_LIMIT_WINDOW_MS = "900000"
 RATE_LIMIT_MAX_REQUESTS = "100"
 
-# Supabase Configuration
-SUPABASE_URL = "https://irxbpmlcqvmivlafoivt.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNjIwNjUsImV4cCI6MjA3MzkzODA2NX0.a0i_Edhu8SANJzAdTV2nx6FLoaJJ1n-sNUBsugFJwgY"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODM2MjA2NSwiZXhwIjoyMDczOTM4MDY1fQ.dps-iEltfrpKWAUl0fiEUWcNSZxFd0Oaec-J-OyDB70"
+# Supabase Configuration (set via wrangler secrets)
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_ANON_KEY = "your-supabase-anon-key-placeholder"
+SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key-placeholder"
 
-# JWT Configuration
-JWT_SECRET = "IUzI1NiIsInR5cCI6IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJw"
-JWT_REFRESH_SECRET = "IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZv"
+# JWT Configuration (set via wrangler secrets)
+JWT_SECRET = "your-jwt-secret-placeholder-must-be-at-least-32-characters"
+JWT_REFRESH_SECRET = "your-jwt-refresh-secret-placeholder-must-be-at-least-32-characters"
 JWT_EXPIRES_IN = "7d"
 JWT_REFRESH_EXPIRES_IN = "30d"
 
-# Cloudinary Configuration
-CLOUDINARY_CLOUD_NAME = "dji23iymw"
-CLOUDINARY_API_KEY = "162843632338622"
-CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0" 
+# Cloudinary Configuration (set via wrangler secrets)
+CLOUDINARY_CLOUD_NAME = "your-cloudinary-cloud-name-placeholder"
+CLOUDINARY_API_KEY = "your-cloudinary-api-key-placeholder"
+CLOUDINARY_API_SECRET = "your-cloudinary-api-secret-placeholder"
 
-# Email Configuration
+# Email Configuration (set via wrangler secrets)
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = "587"
-EMAIL_USER = "automatedinventorymessage@gmail.com"
-EMAIL_PASSWORD = "wzge fkwj unyk xkiw"
-EMAIL_FROM = "automatedinventorymessage@gmail.com"
+EMAIL_USER = "your-email-user-placeholder"
+EMAIL_PASSWORD = "your-email-password-placeholder"
+EMAIL_FROM = "your-email-from-placeholder"
 
-# Google OAuth Configuration
-GOOGLE_CLIENT_ID = "your-google-client-id-here"
-GOOGLE_CLIENT_SECRET = "your-google-client-secret-here"
-GOOGLE_REDIRECT_URI = "http://localhost:8787/api/auth/google/callback"
+# Google OAuth Configuration (set via wrangler secrets)
+
 
 # Development environment (for local testing)
 [env.development]
@@ -63,24 +61,31 @@ CORS_ORIGIN = "http://localhost:5000,http://localhost:8080,http://localhost:5173
 MAX_FILE_SIZE = "10485760"
 RATE_LIMIT_WINDOW_MS = "900000"
 RATE_LIMIT_MAX_REQUESTS = "100"
-SUPABASE_URL = "https://irxbpmlcqvmivlafoivt.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNjIwNjUsImV4cCI6MjA3MzkzODA2NX0.a0i_Edhu8SANJzAdTV2nx6FLoaJJ1n-sNUBsugFJwgY"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODM2MjA2NSwiZXhwIjoyMDczOTM4MDY1fQ.dps-iEltfrpKWAUl0fiEUWcNSZxFd0Oaec-J-OyDB70"
-JWT_SECRET = "IUzI1NiIsInR5cCI6IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJw"
-JWT_REFRESH_SECRET = "IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZv"
+# Supabase Configuration (set via wrangler secrets)
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_ANON_KEY = "your-supabase-anon-key-placeholder"
+SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key-placeholder"
+
+# JWT Configuration (set via wrangler secrets)
+JWT_SECRET = "your-jwt-secret-placeholder-must-be-at-least-32-characters"
+JWT_REFRESH_SECRET = "your-jwt-refresh-secret-placeholder-must-be-at-least-32-characters"
 JWT_EXPIRES_IN = "7d"
 JWT_REFRESH_EXPIRES_IN = "30d"
-CLOUDINARY_CLOUD_NAME = "dji23iymw"
-CLOUDINARY_API_KEY = "162843632338622"
-CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0"
+
+# Cloudinary Configuration (set via wrangler secrets)
+CLOUDINARY_CLOUD_NAME = "your-cloudinary-cloud-name-placeholder"
+CLOUDINARY_API_KEY = "your-cloudinary-api-key-placeholder"
+CLOUDINARY_API_SECRET = "your-cloudinary-api-secret-placeholder"
+
+# Email Configuration (set via wrangler secrets)
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = "587"
-EMAIL_USER = "automatedinventorymessage@gmail.com"
-EMAIL_PASSWORD = "wzge fkwj unyk xkiw"
-EMAIL_FROM = "automatedinventorymessage@gmail.com"
-GOOGLE_CLIENT_ID = "your-google-client-id-here"
-GOOGLE_CLIENT_SECRET = "your-google-client-secret-here"
-GOOGLE_REDIRECT_URI = "http://localhost:8787/api/auth/google/callback"
+EMAIL_USER = "your-email-user-placeholder"
+EMAIL_PASSWORD = "your-email-password-placeholder"
+EMAIL_FROM = "your-email-from-placeholder"
+
+# Google OAuth Configuration (set via wrangler secrets)
+
 
 # Production environment
 [env.production]
@@ -93,22 +98,29 @@ CORS_ORIGIN = "http://localhost:5000,http://localhost:8080,http://localhost:5173
 MAX_FILE_SIZE = "10485760"
 RATE_LIMIT_WINDOW_MS = "900000"
 RATE_LIMIT_MAX_REQUESTS = "100"
-SUPABASE_URL = "https://irxbpmlcqvmivlafoivt.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNjIwNjUsImV4cCI6MjA3MzkzODA2NX0.a0i_Edhu8SANJzAdTV2nx6FLoaJJ1n-sNUBsugFJwgY"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZvaXZ0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODM2MjA2NSwiZXhwIjoyMDczOTM4MDY1fQ.dps-iEltfrpKWAUl0fiEUWcNSZxFd0Oaec-J-OyDB70"
-JWT_SECRET = "IUzI1NiIsInR5cCI6IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJw"
-JWT_REFRESH_SECRET = "IkpXVCJ9eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyeGJwbWxjcXZtaXZsYWZv"
+# Supabase Configuration (set via wrangler secrets)
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_ANON_KEY = "your-supabase-anon-key-placeholder"
+SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key-placeholder"
+
+# JWT Configuration (set via wrangler secrets)
+JWT_SECRET = "your-jwt-secret-placeholder-must-be-at-least-32-characters"
+JWT_REFRESH_SECRET = "your-jwt-refresh-secret-placeholder-must-be-at-least-32-characters"
 JWT_EXPIRES_IN = "7d"
 JWT_REFRESH_EXPIRES_IN = "30d"
-CLOUDINARY_CLOUD_NAME = "dji23iymw"
-CLOUDINARY_API_KEY = "162843632338622"
-CLOUDINARY_API_SECRET = "pB_7QOUVorneWKAer1aErW-yNe0"
+
+# Cloudinary Configuration (set via wrangler secrets)
+CLOUDINARY_CLOUD_NAME = "your-cloudinary-cloud-name-placeholder"
+CLOUDINARY_API_KEY = "your-cloudinary-api-key-placeholder"
+CLOUDINARY_API_SECRET = "your-cloudinary-api-secret-placeholder"
+
+# Email Configuration (set via wrangler secrets)
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = "587"
-EMAIL_USER = "automatedinventorymessage@gmail.com"
-EMAIL_PASSWORD = "wzge fkwj unyk xkiw"
-EMAIL_FROM = "automatedinventorymessage@gmail.com"
-GOOGLE_CLIENT_ID = "your-google-client-id-here"
-GOOGLE_CLIENT_SECRET = "your-google-client-secret-here"
-GOOGLE_REDIRECT_URI = "http://localhost:8787/api/auth/google/callback"
+EMAIL_USER = "your-email-user-placeholder"
+EMAIL_PASSWORD = "your-email-password-placeholder"
+EMAIL_FROM = "your-email-from-placeholder"
+
+# Google OAuth Configuration (set via wrangler secrets)
+
 # Production secrets should be set via wrangler secret put commands

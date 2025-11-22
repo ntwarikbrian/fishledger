@@ -46,6 +46,12 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
 - **Error Handling**: Comprehensive error handling and user feedback
 - **Performance Optimized**: Efficient data fetching with caching and selective updates
 
+### 🔐 **Security**
+- **Secure Secrets Management**: All sensitive credentials are managed through Wrangler secrets
+- **Environment Validation**: Zod schema validation for all environment variables
+- **Data Isolation**: Multi-tenant architecture with complete data isolation
+- **JWT Authentication**: Secure token-based authentication with refresh capabilities
+
 ---
 
 ## 🏗️ Stack Overview
@@ -121,6 +127,7 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
 │   │   └── tests/        # Backend tests
 │   ├── package.json      # Backend dependencies
 │   ├── wrangler.toml     # Cloudflare config
+│   └── README.md         # Backend-specific documentation
 ├── database/             # SQL schema for Supabase (PostgreSQL)
 │   ├── main.sql          # Canonical schema
 │   ├── schemas/          # Per-table SQL
@@ -157,6 +164,30 @@ Designed for fast iteration, global scaling, and easy maintainability—using pn
   pnpm run lint
   pnpm run build
   ```
+
+### 🔐 Security Setup
+
+All sensitive credentials must be set using Wrangler secrets:
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Set all required secrets
+wrangler secret put SUPABASE_URL
+wrangler secret put SUPABASE_ANON_KEY
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put JWT_SECRET
+wrangler secret put JWT_REFRESH_SECRET
+wrangler secret put CLOUDINARY_CLOUD_NAME
+wrangler secret put CLOUDINARY_API_KEY
+wrangler secret put CLOUDINARY_API_SECRET
+wrangler secret put EMAIL_USER
+wrangler secret put EMAIL_PASSWORD
+
+```
+
+For detailed instructions, see [backend/README.md](backend/README.md).
 
 ---
 
